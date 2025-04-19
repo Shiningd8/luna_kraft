@@ -1,0 +1,486 @@
+import 'dart:async';
+import 'dart:ui';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:otp/otp.dart';
+
+import '/backend/backend.dart';
+import 'package:stream_transform/stream_transform.dart';
+import 'firebase_auth_manager.dart';
+import 'google_auth.dart';
+
+export 'firebase_auth_manager.dart';
+
+final _authManager = FirebaseAuthManager();
+FirebaseAuthManager get authManager => _authManager;
+
+String get currentUserEmail =>
+    currentUserDocument?.email ?? currentUser?.email ?? '';
+
+String get currentUserUid => currentUser?.uid ?? '';
+
+String get currentUserDisplayName =>
+    currentUserDocument?.displayName ?? currentUser?.displayName ?? '';
+
+String get currentUserPhoto {
+  String photoUrl =
+      currentUserDocument?.photoUrl ?? currentUser?.photoUrl ?? '';
+
+  if (photoUrl.isEmpty) {
+    // Return a default avatar URL if no photo is available
+    String initial = currentUserDisplayName.isNotEmpty
+        ? currentUserDisplayName[0].toUpperCase()
+        : 'U';
+    return 'https://ui-avatars.com/api/?name=$initial&background=random&size=256';
+  }
+
+  // For Firebase Storage URLs with potential CORS issues, use UI Avatars instead
+  if (photoUrl.contains('firebasestorage.googleapis.com')) {
+    print('PHOTO URL DEBUG (Firebase Storage detected): $photoUrl');
+    print('CORS issues might occur - defaulting to avatar URL');
+
+    String initial = currentUserDisplayName.isNotEmpty
+        ? currentUserDisplayName[0].toUpperCase()
+        : 'U';
+    return 'https://ui-avatars.com/api/?name=$initial&background=random&size=256';
+  }
+
+  // For ui-avatars URLs, they're already safe to use
+  if (photoUrl.contains('ui-avatars.com')) {
+    print('PHOTO URL DEBUG (avatar URL): $photoUrl');
+    return photoUrl;
+  }
+
+  // For any other URL type
+  return photoUrl;
+}
+
+String get currentPhoneNumber =>
+    currentUserDocument?.phoneNumber ?? currentUser?.phoneNumber ?? '';
+
+String get currentJwtToken => _currentJwtToken ?? '';
+
+bool get currentUserEmailVerified => currentUser?.emailVerified ?? false;
+
+/// Create a Stream that listens to the current user's JWT Token, since Firebase
+/// generates a new token every hour.
+String? _currentJwtToken;
+final jwtTokenStream = FirebaseAuth.instance
+    .idTokenChanges()
+    .map((user) async => _currentJwtToken = await user?.getIdToken())
+    .asBroadcastStream();
+
+DocumentReference? get currentUserReference =>
+    loggedIn ? UserRecord.collection.doc(currentUser!.uid) : null;
+
+UserRecord? currentUserDocument;
+final authenticatedUserStream = FirebaseAuth.instance
+    .authStateChanges()
+    .map<String>((user) => user?.uid ?? '')
+    .switchMap(
+      (uid) => uid.isEmpty
+          ? Stream.value(null)
+          : UserRecord.getDocument(UserRecord.collection.doc(uid))
+              .handleError((_) {}),
+    )
+    .map((user) {
+  currentUserDocument = user;
+
+  return currentUserDocument;
+}).asBroadcastStream();
+
+class AuthUserStreamWidget extends StatelessWidget {
+  const AuthUserStreamWidget({Key? key, required this.builder})
+      : super(key: key);
+
+  final WidgetBuilder builder;
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder(
+        stream: authenticatedUserStream,
+        builder: (context, _) => builder(context),
+      );
+}
+
+class AuthUtil {
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static const int _maxRetries = 3;
+  static const Duration _retryDelay = Duration(seconds: 2);
+
+  static Future<UserCredential> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+    int retryCount = 0,
+  }) async {
+    try {
+      return await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (_isNetworkError(e) && retryCount < _maxRetries) {
+        await Future.delayed(_retryDelay);
+        return signInWithEmailAndPassword(
+          email: email,
+          password: password,
+          retryCount: retryCount + 1,
+        );
+      }
+      _handleAuthException(e);
+      rethrow;
+    }
+  }
+
+  static Future<UserCredential> createUserWithEmailAndPassword({
+    required String email,
+    required String password,
+    int retryCount = 0,
+  }) async {
+    try {
+      return await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (_isNetworkError(e) && retryCount < _maxRetries) {
+        await Future.delayed(_retryDelay);
+        return createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+          retryCount: retryCount + 1,
+        );
+      }
+      _handleAuthException(e);
+      rethrow;
+    }
+  }
+
+  static Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+    } on FirebaseAuthException catch (e) {
+      if (_isNetworkError(e)) {
+        // For sign out, we can ignore network errors as the user is already signed out locally
+        debugPrint('Network error during sign out: ${e.message}');
+      } else {
+        _handleAuthException(e);
+      }
+    }
+  }
+
+  static Future<void> resetPassword({
+    required String email,
+    int retryCount = 0,
+  }) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      if (_isNetworkError(e) && retryCount < _maxRetries) {
+        await Future.delayed(_retryDelay);
+        return resetPassword(
+          email: email,
+          retryCount: retryCount + 1,
+        );
+      }
+      _handleAuthException(e);
+      rethrow;
+    }
+  }
+
+  static bool _isNetworkError(FirebaseAuthException e) {
+    return e.code == 'network-request-failed' ||
+        e.code == 'timeout' ||
+        e.code == 'too-many-requests';
+  }
+
+  static void _handleAuthException(FirebaseAuthException e) {
+    String message;
+    switch (e.code) {
+      case 'user-not-found':
+        message = 'No user found with this email.';
+        break;
+      case 'wrong-password':
+        message = 'Wrong password provided.';
+        break;
+      case 'invalid-email':
+        message = 'The email address is invalid.';
+        break;
+      case 'user-disabled':
+        message = 'This user account has been disabled.';
+        break;
+      case 'too-many-requests':
+        message = 'Too many attempts. Please try again later.';
+        break;
+      case 'network-request-failed':
+        message = 'Network error. Please check your connection.';
+        break;
+      case 'timeout':
+        message = 'Request timed out. Please try again.';
+        break;
+      default:
+        message = e.message ?? 'An error occurred. Please try again.';
+    }
+    debugPrint('Firebase Auth Error: ${e.code} - $message');
+    throw FirebaseAuthException(
+      code: e.code,
+      message: message,
+    );
+  }
+
+  static User? get currentUser => _auth.currentUser;
+  static Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  // Function to check if 2FA is enabled for the current user
+  static Future<bool> isTwoFactorEnabled() async {
+    try {
+      // Check if a user is logged in
+      final user = _auth.currentUser;
+      if (user == null) {
+        return false;
+      }
+
+      // Get the user's document from Firestore
+      final userDoc =
+          await UserRecord.getDocumentOnce(UserRecord.collection.doc(user.uid));
+      return userDoc.is2FAEnabled;
+    } catch (e) {
+      print('Error checking 2FA status: $e');
+      return false;
+    }
+  }
+
+  // Function to verify a TOTP 2FA code
+  static Future<bool> verifyTwoFactorCode(String code) async {
+    try {
+      if (code.length != 6) {
+        return false;
+      }
+
+      // Get current user
+      final user = _auth.currentUser;
+      if (user == null) {
+        return false;
+      }
+
+      // Get the user's document from Firestore
+      final userDoc =
+          await UserRecord.getDocumentOnce(UserRecord.collection.doc(user.uid));
+      final secretKey = userDoc.twoFactorSecretKey;
+
+      if (secretKey.isEmpty) {
+        return false;
+      }
+
+      // Generate TOTP code with the current time
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final currentCode = OTP.generateTOTPCodeString(
+        secretKey,
+        now,
+        length: 6,
+        interval: 30,
+        algorithm: Algorithm.SHA1,
+        isGoogle: true,
+      );
+
+      // Check if the entered code matches the current code
+      if (code == currentCode) {
+        return true;
+      }
+
+      // Try with adjacent time windows to account for timing differences
+      for (int i = -1; i <= 1; i++) {
+        if (i == 0) continue; // Skip the current time as we already checked it
+
+        final adjustedTime = now + (i * 30 * 1000);
+        final alternateCode = OTP.generateTOTPCodeString(
+          secretKey,
+          adjustedTime,
+          length: 6,
+          interval: 30,
+          algorithm: Algorithm.SHA1,
+          isGoogle: true,
+        );
+
+        if (code == alternateCode) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      print('Error verifying 2FA code: $e');
+      return false;
+    }
+  }
+}
+
+// Function to handle Google Sign-In with error handling
+Future<UserCredential?> handleGoogleSignIn(BuildContext context) async {
+  try {
+    return await googleSignInFunc();
+  } on FirebaseAuthException catch (e) {
+    String errorMessage = 'An error occurred during sign in.';
+    String errorTitle = 'Sign In Error';
+    IconData errorIcon = Icons.error_outline;
+
+    // Handle known error codes with user-friendly messages
+    if (e.code == 'google-signin-config-error') {
+      errorTitle = 'Configuration Error';
+      errorMessage =
+          'Google Sign-In is not properly configured. Please try another sign-in method or try again later.';
+      errorIcon = Icons.settings;
+    } else if (e.code == 'account-exists-with-different-credential') {
+      errorTitle = 'Account Exists';
+      errorMessage =
+          'An account already exists with the same email address but different sign-in method. Please try signing in a different way.';
+      errorIcon = Icons.person;
+    } else if (e.code == 'network-request-failed') {
+      errorTitle = 'Network Error';
+      errorMessage = 'Please check your internet connection and try again.';
+      errorIcon = Icons.wifi_off;
+    } else if (e.code.contains('user-disabled')) {
+      errorTitle = 'Account Disabled';
+      errorMessage =
+          'This account has been disabled. Please contact support for help.';
+      errorIcon = Icons.block;
+    }
+
+    // Show error dialog
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (BuildContext context) {
+          return TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0.0, end: 1.0),
+            duration: Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: 0.5 + (0.5 * value),
+                child: Opacity(
+                  opacity: value,
+                  child: child,
+                ),
+              );
+            },
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                insetPadding: EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color:
+                        Theme.of(context).colorScheme.surface.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.2),
+                        blurRadius: 20,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              errorIcon,
+                              size: 50,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .error
+                                  .withOpacity(0.8),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              errorTitle,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              errorMessage,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 24),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.onPrimary,
+                                padding: EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 24),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: Text('OK'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    return null;
+  } catch (e) {
+    // Handle other exceptions
+    debugPrint('Unexpected error during Google Sign-In: $e');
+
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Sign In Error'),
+            content:
+                Text('An unexpected error occurred. Please try again later.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    return null;
+  }
+}

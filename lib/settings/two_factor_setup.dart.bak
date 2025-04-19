@@ -1,0 +1,1198 @@
+import 'dart:async';
+// Remove html import to prevent any issues
+// import 'dart:html' as html;
+
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
+import '/auth/firebase_auth/auth_util.dart';
+import 'package:pin_code_fields/pin_code_fields.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+class TwoFactorSetupPage extends StatefulWidget {
+  const TwoFactorSetupPage({Key? key}) : super(key: key);
+
+  static String routeName = 'TwoFactorSetup';
+  static String routePath = '/twoFactorSetup';
+
+  @override
+  State<TwoFactorSetupPage> createState() => _TwoFactorSetupPageState();
+}
+
+class _TwoFactorSetupPageState extends State<TwoFactorSetupPage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _verificationCodeController =
+      TextEditingController();
+
+  bool _isLoading = false;
+  bool _isVerifyingPhone = false;
+  bool _is2FAEnabled = false;
+  String _verificationId = '';
+  int? _resendToken;
+  String _phoneNumber = '';
+  Timer? _countdownTimer;
+  int _timerSeconds = 60;
+  ConfirmationResult? _webConfirmationResult;
+  bool _showVerificationCodeInput = false;
+  bool _isResendingCode = false;
+  String _recaptchaContainerId =
+      'recaptcha-container-${DateTime.now().millisecondsSinceEpoch}';
+  bool _recaptchaLoaded = false;
+  Timer? _verificationTimeout;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _checkFirebaseWebConfig();
+    }
+    _checkCurrentState();
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _verificationCodeController.dispose();
+    _countdownTimer?.cancel();
+    _verificationTimeout?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkCurrentState() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final is2FAEnabled = prefs.getBool('is_2fa_enabled') ?? false;
+      final savedPhone = prefs.getString('2fa_phone_number') ?? '';
+
+      // Check if user has multifactor auth enabled in Firebase
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        // Firebase doesn't have a straightforward API for checking 2FA status
+        // So we use the shared preferences as our source of truth
+        setState(() {
+          _is2FAEnabled = is2FAEnabled;
+          if (savedPhone.isNotEmpty) {
+            _phoneNumber = savedPhone;
+            // Format phone number for display
+            _phoneController.text = _formatPhoneForDisplay(savedPhone);
+          }
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error checking 2FA status: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _formatPhoneForDisplay(String phone) {
+    // Add formatting for display if needed
+    return phone;
+  }
+
+  // Check if Firebase is properly configured for web
+  void _checkFirebaseWebConfig() {
+    try {
+      print('Checking Firebase web configuration...');
+      // Check if the current user is available - this can help verify the Firebase initialization
+      final user = _auth.currentUser;
+      if (user != null) {
+        print('Firebase web config: User is authenticated as ${user.uid}');
+      } else {
+        print('Firebase web config: No authenticated user');
+      }
+
+      // Print the app name to verify Firebase initialization
+      final app = _auth.app;
+      print('Firebase web config: Using Firebase app named "${app.name}"');
+
+      // This helps determine if web config is properly set up
+      print('Firebase web config: Auth instance created successfully');
+    } catch (e) {
+      print('Error checking Firebase web configuration: $e');
+    }
+  }
+
+  void _startVerification() {
+    setState(() {
+      _isVerifyingPhone = true;
+      _isLoading = true;
+    });
+
+    String phoneNumber = _phoneController.text.trim();
+    if (!phoneNumber.startsWith('+')) {
+      phoneNumber = '+$phoneNumber';
+    }
+
+    _phoneNumber = phoneNumber;
+
+    // Add a timeout in case the verification process gets stuck
+    _startVerificationTimeout();
+
+    // On web platforms, we need special handling for reCAPTCHA
+    if (kIsWeb) {
+      // Use web-specific verification method
+      _startWebVerification(phoneNumber);
+    } else {
+      // Use standard mobile verification
+      _verifyPhoneNumber(phoneNumber);
+    }
+  }
+
+  // Timer to handle timeout if verification process gets stuck
+  void _startVerificationTimeout() {
+    // Cancel any existing timeout
+    _verificationTimeout?.cancel();
+
+    // Set a new timeout (30 seconds)
+    _verificationTimeout = Timer(Duration(seconds: 30), () {
+      // Only execute if still loading
+      if (_isLoading && mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Show timeout message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Verification request timed out. Please try again.'),
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'RETRY',
+              onPressed: () {
+                _startVerification();
+              },
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  // This sets up the recaptcha container
+  void _setupRecaptcha() {
+    if (kIsWeb && !_recaptchaLoaded) {
+      setState(() {
+        _recaptchaContainerId =
+            'recaptcha-container-${DateTime.now().millisecondsSinceEpoch}';
+      });
+    }
+  }
+
+  // This is a simplified approach for web that avoids SDK issues
+  Future<void> _startWebVerification(String phoneNumber) async {
+    try {
+      print('Starting phone verification for web: $phoneNumber');
+
+      // For web, we'll use the standard verifyPhoneNumber but with some extra precautions
+      setState(() {
+        _isLoading = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Starting verification process...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Use the normal phone verification method but handle web-specific errors
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          _verificationTimeout?.cancel();
+          await _linkPhoneAuthCredential(credential);
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          _verificationTimeout?.cancel();
+
+          setState(() {
+            _isLoading = false;
+            _isVerifyingPhone = false;
+          });
+
+          // Handle web-specific errors more gracefully
+          String errorMessage;
+          if (e.code == 'invalid-app-credential' ||
+              e.code == 'captcha-check-failed') {
+            errorMessage =
+                'Unable to verify on web. Try using the mobile app instead.';
+            _showWebErrorDialog();
+          } else {
+            errorMessage = 'Verification failed: ${e.message}';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(errorMessage), duration: Duration(seconds: 5)),
+          );
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          _verificationTimeout?.cancel();
+
+          print('Verification code sent to $phoneNumber on web');
+
+          setState(() {
+            _verificationId = verificationId;
+            _resendToken = resendToken;
+            _isLoading = false;
+            _isVerifyingPhone = true;
+            _showVerificationCodeInput = true;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('Please enter the verification code sent to your phone'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          print('Code auto retrieval timeout: $verificationId');
+        },
+        timeout: Duration(seconds: 60),
+      );
+    } catch (e) {
+      _verificationTimeout?.cancel();
+
+      print('Error in web verification: $e');
+      setState(() {
+        _isLoading = false;
+        _isVerifyingPhone = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('Error starting verification. Try using the mobile app.'),
+          duration: Duration(seconds: 5),
+        ),
+      );
+
+      // Show web error dialog
+      _showWebErrorDialog();
+    }
+  }
+
+  void _showWebErrorDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Web Verification Issue'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange,
+              size: 48,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'For the best experience with phone verification:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text('• Use our mobile app instead'),
+            Text('• Ensure cookies are enabled'),
+            Text('• Try a different browser'),
+            Text('• Disable any ad blockers'),
+            SizedBox(height: 16),
+            Text(
+              'Web-based phone verification may not work in all browsers due to reCAPTCHA restrictions.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleConfirmationResult(ConfirmationResult confirmationResult) {
+    print('Verification confirmation result obtained');
+
+    // Store the confirmation result for later verification
+    setState(() {
+      _webConfirmationResult = confirmationResult;
+      _isLoading = false;
+      _isVerifyingPhone = true;
+      _showVerificationCodeInput = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Please enter the verification code sent to your phone'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _startCountdownTimer() {
+    _timerSeconds = 60;
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_timerSeconds > 0) {
+          _timerSeconds--;
+        } else {
+          _countdownTimer?.cancel();
+        }
+      });
+    });
+  }
+
+  Future<void> _verifyPhoneNumber(String phoneNumber) async {
+    try {
+      print('Starting phone verification for: $phoneNumber (Mobile path)');
+      // Log Firebase app information to help debug configuration issues
+      print('Using Firebase app: ${_auth.app.name}');
+
+      // Show feedback that we're sending the code
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sending verification code...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Cancel the timeout since we got a response
+          _verificationTimeout?.cancel();
+
+          // This callback is only triggered on Android devices that support instant verification
+          print(
+              'Auto-verification completed with credential provider: ${credential.providerId}');
+          await _linkPhoneAuthCredential(credential);
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          // Cancel the timeout since we got a response
+          _verificationTimeout?.cancel();
+
+          print('Verification failed with code ${e.code}: ${e.message}');
+          if (e.stackTrace != null) {
+            print('Error stack trace: ${e.stackTrace}');
+          }
+
+          setState(() {
+            _isLoading = false;
+            _isVerifyingPhone = false;
+          });
+
+          String errorMessage;
+          switch (e.code) {
+            case 'invalid-phone-number':
+              errorMessage =
+                  'The phone number format is incorrect. Please enter a valid number with country code (e.g., +1234567890).';
+              break;
+            case 'quota-exceeded':
+              errorMessage = 'SMS quota exceeded. Please try again later.';
+              break;
+            case 'user-disabled':
+              errorMessage =
+                  'This user has been disabled. Please contact support.';
+              break;
+            case 'captcha-check-failed':
+              errorMessage = 'reCAPTCHA verification failed. Please try again.';
+              break;
+            case 'missing-client-identifier':
+              errorMessage =
+                  'The app is not properly configured for phone authentication.';
+              break;
+            case 'app-not-authorized':
+              errorMessage =
+                  'The app is not authorized to use Firebase Phone Authentication.';
+              break;
+            default:
+              errorMessage = 'Verification failed: ${e.message}';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              duration: Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'OK',
+                onPressed: () {},
+              ),
+            ),
+          );
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          // Cancel the timeout since we got a response
+          _verificationTimeout?.cancel();
+
+          print('Verification code sent successfully to $phoneNumber');
+          print('Verification ID: $verificationId');
+          print('Resend Token available: ${resendToken != null}');
+
+          setState(() {
+            _verificationId = verificationId;
+            _resendToken = resendToken;
+            _isLoading = false;
+            _isVerifyingPhone = true;
+            _showVerificationCodeInput = true;
+            _startCountdownTimer();
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Verification code sent to your phone'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          // Auto retrieval timeout - no action needed
+          print('Auto retrieval timeout for verification ID: $verificationId');
+        },
+        timeout: Duration(seconds: 60),
+        forceResendingToken: _resendToken,
+      );
+    } catch (e) {
+      // Cancel the timeout since we got an error
+      _verificationTimeout?.cancel();
+
+      print('Error in verifyPhoneNumber: $e');
+      if (e is FirebaseAuthException) {
+        print('Firebase Auth Error: ${e.code} - ${e.message}');
+        print('Firebase credentials present: ${_auth.currentUser != null}');
+      }
+
+      setState(() {
+        _isLoading = false;
+        _isVerifyingPhone = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error sending verification code: $e'),
+          duration: Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'RETRY',
+            onPressed: () {
+              _startVerification();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _verifyCode() async {
+    if (_verificationCodeController.text.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Please enter a valid 6-digit verification code')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    String smsCode = _verificationCodeController.text.trim();
+    print('Verifying code: $smsCode');
+    await _confirmVerificationCode(smsCode);
+  }
+
+  Future<void> _confirmVerificationCode(String smsCode) async {
+    try {
+      print('Attempting to confirm verification code...');
+
+      // For web, check if we have a web confirmation result
+      if (kIsWeb && _webConfirmationResult != null) {
+        print('Using web confirmation flow');
+        try {
+          UserCredential userCredential =
+              await _webConfirmationResult!.confirm(smsCode);
+          print(
+              'Web verification successful for user: ${userCredential.user?.uid}');
+
+          // Save the verification
+          await _savePhoneVerification();
+        } catch (webError) {
+          print('Web confirmation error: $webError');
+          if (webError is FirebaseAuthException) {
+            if (webError.code == 'invalid-verification-code') {
+              throw FirebaseAuthException(
+                  code: 'invalid-verification-code',
+                  message:
+                      'The verification code you entered is invalid. Please try again.');
+            }
+          }
+          throw webError;
+        }
+      }
+      // For mobile or if web confirmation result is not available
+      else if (_verificationId.isNotEmpty) {
+        print('Using mobile verification flow with ID: $_verificationId');
+        // Create the credential
+        PhoneAuthCredential credential = PhoneAuthProvider.credential(
+          verificationId: _verificationId,
+          smsCode: smsCode,
+        );
+
+        // Link the credential
+        await _linkPhoneAuthCredential(credential);
+      }
+      // If neither method is available
+      else {
+        throw FirebaseAuthException(
+            code: 'missing-verification-session',
+            message:
+                'Verification session not found. Please restart the verification process.');
+      }
+    } catch (e) {
+      print('Error verifying code: $e');
+      String errorMessage = 'Error verifying code';
+
+      if (e is FirebaseAuthException) {
+        switch (e.code) {
+          case 'invalid-verification-code':
+            errorMessage =
+                'The verification code is invalid. Please check and try again.';
+            break;
+          case 'credential-already-in-use':
+            errorMessage =
+                'This phone number is already linked to another account.';
+            break;
+          case 'missing-verification-session':
+            errorMessage =
+                'Verification session expired. Please restart the verification process.';
+            break;
+          default:
+            errorMessage = 'Verification error: ${e.message}';
+        }
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  Future<void> _savePhoneVerification() async {
+    try {
+      // Save to shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_2fa_enabled', true);
+      await prefs.setString('2fa_phone_number', _phoneNumber);
+
+      setState(() {
+        _is2FAEnabled = true;
+        _isVerifyingPhone = false;
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Two-factor authentication enabled successfully')),
+      );
+    } catch (e) {
+      print('Error saving 2FA status: $e');
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving 2FA settings: $e')),
+      );
+    }
+  }
+
+  Future<void> _linkPhoneAuthCredential(PhoneAuthCredential credential) async {
+    try {
+      print('Linking phone auth credential to user...');
+      final user = _auth.currentUser;
+
+      if (user != null) {
+        // Link the phone authentication to the user
+        await user.linkWithCredential(credential);
+        print('Successfully linked phone auth credential');
+
+        // Use our helper method to save the verification status
+        await _savePhoneVerification();
+      }
+    } catch (e) {
+      print('Error linking credential: $e');
+      setState(() {
+        _isLoading = false;
+      });
+
+      String errorMessage = 'Error enabling 2FA: $e';
+      // Check for specific errors
+      if (e is FirebaseAuthException) {
+        if (e.code == 'provider-already-linked') {
+          errorMessage = 'This phone number is already linked to your account.';
+        } else if (e.code == 'credential-already-in-use') {
+          errorMessage =
+              'This phone number is already linked to another account.';
+        } else if (e.code == 'invalid-verification-code') {
+          errorMessage = 'The verification code is invalid. Please try again.';
+        }
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    }
+  }
+
+  Future<void> _disable2FA() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Remove from shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_2fa_enabled', false);
+      await prefs.remove('2fa_phone_number');
+
+      // Note: Firebase doesn't provide easy way to remove second factor
+      // We're simulating removal by updating our preferences
+
+      setState(() {
+        _is2FAEnabled = false;
+        _phoneNumber = '';
+        _phoneController.text = '';
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Two-factor authentication disabled')),
+      );
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error disabling 2FA: $e')),
+      );
+    }
+  }
+
+  // Simple Firebase connectivity test
+  Future<void> _testFirebaseConnection() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      print('Testing Firebase connection...');
+
+      // Try to get the current user
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user != null) {
+        print('Firebase connection successful: User ID ${user.uid}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Firebase connection successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        print('Firebase connection successful but no user is signed in');
+        // Try a simple Firebase operation to confirm connectivity
+        await FirebaseAuth.instance.signInAnonymously();
+        await FirebaseAuth.instance.signOut();
+        print('Anonymous auth test successful');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Firebase connection successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Firebase connection test failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Firebase connection failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final paddingTop = mediaQuery.padding.top;
+    final paddingBottom = mediaQuery.padding.bottom;
+    
+    return Scaffold(
+      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios,
+              color: FlutterFlowTheme.of(context).primaryText),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Two-Factor Authentication',
+          style: FlutterFlowTheme.of(context).headlineSmall.override(
+                fontFamily: 'Figtree',
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        actions: [
+          if (_isLoading)
+            IconButton(
+              icon: Icon(Icons.cancel),
+              onPressed: () {
+                _verificationTimeout?.cancel();
+                setState(() {
+                  _isLoading = false;
+                  _isVerifyingPhone = false;
+                });
+              },
+            ),
+        ],
+      ),
+      body: Material(
+        color: FlutterFlowTheme.of(context).primaryBackground,
+        child: SafeArea(
+          minimum: EdgeInsets.only(
+            left: 8.0,
+            right: 8.0,
+            top: 8.0,
+            bottom: 8.0 + paddingBottom
+          ),
+          child: _isLoading
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Processing your request...'),
+                      SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: () {
+                          _verificationTimeout?.cancel();
+                          setState(() {
+                            _isLoading = false;
+                          });
+                        },
+                        child: Text('Cancel'),
+                      ),
+                    ],
+                  ),
+                )
+              : GestureDetector(
+                  // Add this GestureDetector to dismiss keyboard when tapping outside
+                  onTap: () => FocusScope.of(context).unfocus(),
+                  behavior: HitTestBehavior.translucent,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Info card
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: FlutterFlowTheme.of(context).secondaryBackground,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.security,
+                                    color: FlutterFlowTheme.of(context).primary,
+                                    size: 24,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Enhanced Security',
+                                      style: FlutterFlowTheme.of(context)
+                                          .titleMedium
+                                          .override(
+                                            fontFamily: 'Figtree',
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 12),
+                              Text(
+                                'Two-factor authentication adds an extra layer of security to your account. '
+                                'When enabled, you\'ll need to verify your identity using your phone in addition to your password.',
+                                style: FlutterFlowTheme.of(context).bodyMedium,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Icon(
+                              _is2FAEnabled ? Icons.check_circle : Icons.cancel,
+                              color: _is2FAEnabled
+                                  ? Colors.green
+                                  : FlutterFlowTheme.of(context).secondaryText,
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _is2FAEnabled
+                                    ? 'Two-factor authentication is enabled'
+                                    : 'Two-factor authentication is not enabled',
+                                style: FlutterFlowTheme.of(context).bodyMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 24),
+                        if (_is2FAEnabled) ...[
+                          Text(
+                            'Verification Phone Number',
+                            style: FlutterFlowTheme.of(context).titleMedium,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            _phoneNumber,
+                            style: FlutterFlowTheme.of(context).bodyLarge,
+                          ),
+                          SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _disable2FA,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text('Disable Two-Factor Authentication'),
+                            ),
+                          ),
+                        ] else if (_isVerifyingPhone ||
+                            _showVerificationCodeInput) ...[
+                          Text(
+                            'Enter Verification Code',
+                            style: FlutterFlowTheme.of(context).titleMedium,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Enter the 6-digit code sent to ${_phoneController.text}',
+                            style: FlutterFlowTheme.of(context).bodyMedium,
+                          ),
+                          SizedBox(height: 16),
+                          PinCodeTextField(
+                            appContext: context,
+                            length: 6,
+                            controller: _verificationCodeController,
+                            autoFocus: true,
+                            cursorColor: FlutterFlowTheme.of(context).primary,
+                            keyboardType: TextInputType.number,
+                            pinTheme: PinTheme(
+                              shape: PinCodeFieldShape.box,
+                              borderRadius: BorderRadius.circular(8),
+                              fieldHeight: 50,
+                              fieldWidth: 45,
+                              activeFillColor:
+                                  FlutterFlowTheme.of(context).primaryBackground,
+                              inactiveFillColor: FlutterFlowTheme.of(context)
+                                  .secondaryBackground,
+                              selectedFillColor:
+                                  FlutterFlowTheme.of(context).primaryBackground,
+                              activeColor: FlutterFlowTheme.of(context).primary,
+                              inactiveColor:
+                                  FlutterFlowTheme.of(context).alternate,
+                              selectedColor: FlutterFlowTheme.of(context).primary,
+                            ),
+                            animationType: AnimationType.fade,
+                            animationDuration: Duration(milliseconds: 300),
+                            enableActiveFill: true,
+                            onCompleted: (code) {
+                              _verifyCode();
+                            },
+                          ),
+                          SizedBox(height: 12),
+                          Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.timer_outlined,
+                                  size: 16,
+                                  color:
+                                      FlutterFlowTheme.of(context).secondaryText,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Code valid for 60 seconds',
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodySmall
+                                      .override(
+                                        fontFamily: 'Figtree',
+                                        color: FlutterFlowTheme.of(context)
+                                            .secondaryText,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _verifyCode,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    FlutterFlowTheme.of(context).primary,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text('Verify Code'),
+                            ),
+                          ),
+                          SizedBox(height: 16),
+                          Center(
+                            child: TextButton.icon(
+                              onPressed: _isResendingCode
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _isResendingCode = true;
+                                      });
+                                      _startVerification();
+                                      Future.delayed(Duration(seconds: 30), () {
+                                        if (mounted) {
+                                          setState(() {
+                                            _isResendingCode = false;
+                                          });
+                                        }
+                                      });
+                                    },
+                              icon: Icon(
+                                Icons.refresh,
+                                size: 18,
+                              ),
+                              label: Text(_isResendingCode
+                                  ? 'Sending new code...'
+                                  : 'Didn\'t receive code? Resend'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: _isResendingCode
+                                    ? FlutterFlowTheme.of(context).secondaryText
+                                    : FlutterFlowTheme.of(context).primary,
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          if (kIsWeb)
+                            RecaptchaWidget(
+                              containerId: _recaptchaContainerId,
+                              onLoaded: () {
+                                setState(() {
+                                  _recaptchaLoaded = true;
+                                });
+                              },
+                            ),
+                          Text(
+                            'Enter Your Phone Number',
+                            style: FlutterFlowTheme.of(context).titleMedium,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'We\'ll send a verification code to this number',
+                            style: FlutterFlowTheme.of(context).bodyMedium,
+                          ),
+                          if (kIsWeb)
+                            Padding(
+                              padding: EdgeInsets.only(top: 8),
+                              child: Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: FlutterFlowTheme.of(context)
+                                      .info
+                                      .withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: FlutterFlowTheme.of(context)
+                                        .info
+                                        .withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.info_outline,
+                                          color:
+                                              FlutterFlowTheme.of(context).info,
+                                          size: 20,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Verification on Web',
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                fontFamily: 'Figtree',
+                                                fontWeight: FontWeight.bold,
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .info,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'You\'ll need to complete a reCAPTCHA verification when you tap "Send Verification Code".',
+                                      style:
+                                          FlutterFlowTheme.of(context).bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          SizedBox(height: 16),
+                          TextFormField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              labelText: 'Phone Number',
+                              hintText: '+1 123 456 7890',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              prefixIcon: Icon(Icons.phone),
+                              helperText:
+                                  'Include country code (e.g., +1 for US)',
+                            ),
+                          ),
+                          SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _startVerification,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    FlutterFlowTheme.of(context).primary,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text('Send Verification Code'),
+                            ),
+                          ),
+                          SizedBox(height: 16),
+                          Center(
+                            child: Text(
+                              'You will receive an SMS with a verification code',
+                              style: FlutterFlowTheme.of(context).bodySmall.override(
+                                    fontFamily: 'Figtree',
+                                    color: FlutterFlowTheme.of(context)
+                                        .secondaryText,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+      ),
+    );
+  }
+}
+
+// Widget to manage recaptcha state without manipulating DOM directly
+class RecaptchaWidget extends StatefulWidget {
+  final String containerId;
+  final Function onLoaded;
+
+  RecaptchaWidget({
+    required this.containerId,
+    required this.onLoaded,
+  });
+
+  @override
+  _RecaptchaWidgetState createState() => _RecaptchaWidgetState();
+}
+
+class _RecaptchaWidgetState extends State<RecaptchaWidget> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Simply notify that we're ready for verification
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onLoaded();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // This is an invisible widget that doesn't interfere with layout
+    return SizedBox.shrink();
+  }
+}

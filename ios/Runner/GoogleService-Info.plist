@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>295093114967-mkki5lqkulj6fkd41l31dhflgl38sucj.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.295093114967-mkki5lqkulj6fkd41l31dhflgl38sucj</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>295093114967-6ra6nd5eqpme4p5rhi62b1a69mchutrd.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyDe0n-9uUR9VpKX4gOOsrAm1J0xltkqAs4</string>
+	<key>GCM_SENDER_ID</key>
+	<string>295093114967</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.flutterflow.lunakraft</string>
+	<key>PROJECT_ID</key>
+	<string>luna-kraft-7dsjjb</string>
+	<key>STORAGE_BUCKET</key>
+	<string>luna-kraft-7dsjjb.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:295093114967:ios:d124dd25f4782e04a12b12</string>
+</dict>
+</plist>

@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "295093114967",
+    "project_id": "luna-kraft-7dsjjb",
+    "storage_bucket": "luna-kraft-7dsjjb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:295093114967:android:bae7f95d07c34a76a12b12",
+        "android_client_info": {
+          "package_name": "com.flutterflow.lunakraft"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "295093114967-6ra6nd5eqpme4p5rhi62b1a69mchutrd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flutterflow.lunakraft",
+            "certificate_hash": "9bbb3186b2189ef16d8f272bdab59362c395cbb4"
+          }
+        },
+        {
+          "client_id": "295093114967-7r5dn9p0858h60tjkuda0fcu4vftn00h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8MT4Ktpq7OdGC9oXY-mKxqaUWG4TUP5k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "295093114967-7r5dn9p0858h60tjkuda0fcu4vftn00h.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "295093114967-mkki5lqkulj6fkd41l31dhflgl38sucj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.flutterflow.lunakraft"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
