@@ -13,6 +13,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 // Add import for DreamPostedMessage component
 import '/components/dream_posted_message.dart';
+import '/components/premium_upload_dialog.dart';
+import '/components/remaining_uploads_card.dart';
+import '/services/dream_upload_service.dart';
 
 class CreatePostWidget extends StatefulWidget {
   const CreatePostWidget({
@@ -37,6 +40,15 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
   bool _isLoading = false;
   String _selectedBackground = '';
   bool _isPrivate = false;
+
+  // Upload limits
+  bool _uploadsChecked = false;
+  int _remainingFreeUploads = 0;
+  int _lunaCoins = 0;
+
+  // Word count tracking
+  int _wordCount = 0;
+  static const int _minWordCount = 25;
 
   final List<Map<String, dynamic>> backgrounds = [
     {
@@ -77,6 +89,11 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
   void initState() {
     super.initState();
     _contentController.text = widget.generatedText;
+    _checkUploadAvailability();
+
+    // Initialize word count and listen for changes
+    _updateWordCount();
+    _contentController.addListener(_updateWordCount);
   }
 
   @override
@@ -87,9 +104,74 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
     super.dispose();
   }
 
+  // Calculate word count from text content
+  void _updateWordCount() {
+    final text = _contentController.text.trim();
+    // Split by whitespace and filter out empty strings
+    final words =
+        text.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
+
+    setState(() {
+      _wordCount = words.length;
+    });
+  }
+
+  // Check how many free uploads are available
+  Future<void> _checkUploadAvailability() async {
+    try {
+      final result = await DreamUploadService.checkUploadAvailability();
+      setState(() {
+        _uploadsChecked = true;
+        _remainingFreeUploads = result['remainingFreeUploads'];
+        _lunaCoins = result['lunaCoins'];
+      });
+    } catch (e) {
+      print('Error checking upload availability: $e');
+    }
+  }
+
   Future<void> _createPost() async {
     if (!_formKey.currentState!.validate()) {
       return;
+    }
+
+    // Check minimum word count
+    if (_wordCount < _minWordCount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Please write at least $_minWordCount words to share your dream.'),
+          backgroundColor: Colors.red.shade400,
+        ),
+      );
+      return;
+    }
+
+    // Check if user can upload for free
+    final availabilityCheck =
+        await DreamUploadService.checkUploadAvailability();
+    final canUploadForFree = availabilityCheck['canUploadForFree'];
+    final lunaCoins = availabilityCheck['lunaCoins'];
+
+    // If cannot upload for free, show premium dialog
+    if (!canUploadForFree) {
+      final purchaseSuccess = await PremiumUploadDialog.show(
+        context,
+        lunaCoins: lunaCoins,
+        onPurchase: (success) {
+          // Update luna coins in state if purchase was successful
+          if (success) {
+            setState(() {
+              _lunaCoins -= DreamUploadService.LUNA_COINS_COST;
+            });
+          }
+        },
+      );
+
+      // If they cancelled or purchase failed, don't continue
+      if (purchaseSuccess != true) {
+        return;
+      }
     }
 
     setState(() => _isLoading = true);
@@ -112,9 +194,26 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
 
       await FirebaseFirestore.instance.collection('posts').add(postData);
 
+      // Increment the user's daily dream count
+      await DreamUploadService.incrementDreamUploadCount();
+
+      // Get updated remaining uploads for the message
+      final updatedAvailability =
+          await DreamUploadService.checkUploadAvailability();
+      final remainingFreeUploads = updatedAvailability['remainingFreeUploads'];
+
+      // Update state to show correct count
+      setState(() {
+        _remainingFreeUploads = remainingFreeUploads;
+      });
+
       if (mounted) {
-        // Show success message with the new component
-        DreamPostedMessage.show(context);
+        // Show success message with remaining uploads info
+        DreamPostedMessage.show(
+          context,
+          message: 'Dream shared successfully!',
+          remainingUploads: remainingFreeUploads,
+        );
 
         // Navigate to home page after a short delay
         Future.delayed(Duration(milliseconds: 500), () {
@@ -144,6 +243,59 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  // Word count indicator widget
+  Widget _buildWordCountIndicator() {
+    final bool isAtLeastMinimum = _wordCount >= _minWordCount;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isAtLeastMinimum
+            ? Colors.green.withOpacity(0.1)
+            : Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Icon(
+            isAtLeastMinimum ? Icons.check_circle : Icons.info_outline,
+            color: isAtLeastMinimum ? Colors.green : Colors.red.shade300,
+            size: 18,
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              isAtLeastMinimum
+                  ? 'Great! Your dream description is detailed enough.'
+                  : 'Please write at least $_minWordCount words to share your dream.',
+              style: TextStyle(
+                color: isAtLeastMinimum ? Colors.green : Colors.red.shade300,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: isAtLeastMinimum
+                  ? Colors.green.withOpacity(0.2)
+                  : Colors.red.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              '$_wordCount/${_minWordCount}',
+              style: TextStyle(
+                color: isAtLeastMinimum ? Colors.green : Colors.red.shade300,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -234,7 +386,17 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                             duration: Duration(milliseconds: 400),
                             curve: Curves.easeOut),
 
-                        SizedBox(height: 32),
+                        SizedBox(height: 24),
+
+                        // Remaining uploads card
+                        if (_uploadsChecked)
+                          RemainingUploadsCard(
+                            remainingUploads: _remainingFreeUploads,
+                          ).animate().fadeIn(
+                              duration: Duration(milliseconds: 400),
+                              curve: Curves.easeOut),
+
+                        SizedBox(height: 24),
 
                         // Title field with glassmorphism
                         Container(
@@ -291,7 +453,76 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
 
                         SizedBox(height: 24),
 
-                        // Content field with glassmorphism
+                        // Word count indicator in separate container
+                        Container(
+                          margin: EdgeInsets.only(bottom: 12),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _wordCount >= _minWordCount
+                                ? Colors.green.withOpacity(0.1)
+                                : Colors.red.shade400.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _wordCount >= _minWordCount
+                                  ? Colors.green.withOpacity(0.3)
+                                  : Colors.red.shade400.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _wordCount >= _minWordCount
+                                    ? Icons.check_circle_outline
+                                    : Icons.info_outline,
+                                color: _wordCount >= _minWordCount
+                                    ? Colors.green
+                                    : Colors.red.shade400,
+                                size: 16,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _wordCount >= _minWordCount
+                                      ? 'Great! Your dream description is detailed enough.'
+                                      : 'Please write at least $_minWordCount words to share your dream.',
+                                  style: TextStyle(
+                                    color: _wordCount >= _minWordCount
+                                        ? Colors.green
+                                        : Colors.red.shade400,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _wordCount >= _minWordCount
+                                      ? Colors.green.withOpacity(0.2)
+                                      : Colors.red.shade400.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '$_wordCount/$_minWordCount',
+                                  style: TextStyle(
+                                    color: _wordCount >= _minWordCount
+                                        ? Colors.green
+                                        : Colors.red.shade400,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn(
+                            delay: Duration(milliseconds: 300),
+                            duration: Duration(milliseconds: 600),
+                            curve: Curves.easeOut),
+
+                        // Dream content field
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.05),
@@ -303,14 +534,15 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                           ),
                           child: TextFormField(
                             controller: _contentController,
-                            maxLines: 6,
-                            minLines: 2,
-                            style:
-                                FlutterFlowTheme.of(context).bodyLarge.override(
-                                      fontFamily: 'Figtree',
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                    ),
+                            maxLines: 8,
+                            minLines: 5,
+                            style: FlutterFlowTheme.of(context)
+                                .bodyMedium
+                                .override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
                             decoration: InputDecoration(
                               labelText: 'Your Dream',
                               labelStyle: FlutterFlowTheme.of(context)
@@ -320,7 +552,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                                     color: Colors.white.withOpacity(0.5),
                                     fontSize: 16,
                                   ),
-                              hintText: 'Describe your dream...',
+                              hintText: 'Describe your dream in detail...',
                               hintStyle: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
@@ -338,6 +570,18 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                               if (value == null || value.isEmpty) {
                                 return 'Please describe your dream';
                               }
+
+                              // Check word count in validator
+                              final wordCount = value
+                                  .trim()
+                                  .split(RegExp(r'\s+'))
+                                  .where((word) => word.isNotEmpty)
+                                  .length;
+
+                              if (wordCount < _minWordCount) {
+                                return 'Please write at least $_minWordCount words';
+                              }
+
                               return null;
                             },
                           ),

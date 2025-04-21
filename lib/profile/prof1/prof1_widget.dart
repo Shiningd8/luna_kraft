@@ -58,7 +58,6 @@ class _Prof1WidgetState extends State<Prof1Widget> {
   Map<String, int> _cachedCounts = {};
   AppState? _appState;
   GoRouter? _goRouter;
-  bool _isDisposed = false;
 
   @override
   void didChangeDependencies() {
@@ -90,13 +89,6 @@ class _Prof1WidgetState extends State<Prof1Widget> {
 
   @override
   void dispose() {
-    _isDisposed = true;
-    _model.dispose();
-
-    // Clear references that might cause issues if accessed after disposal
-    _appState = null;
-    _goRouter = null;
-
     super.dispose();
   }
 
@@ -2631,29 +2623,41 @@ class _Prof1WidgetState extends State<Prof1Widget> {
 
   // Separate method to perform sign out without using context
   Future<void> _performSignOut() async {
-    // Don't proceed if already disposed
-    if (_isDisposed) return;
-
-    // Store references locally
-    final routerRef = _goRouter;
-    final appStateRef = _appState;
-
     try {
-      // Cleanup app state first if available
-      if (appStateRef != null) {
-        await appStateRef.cleanup();
-      }
+      if (!mounted) return;
 
-      // Sign out
-      await FirebaseAuth.instance.signOut();
+      // Add a flag to track if sign out is in progress
+      bool isSigningOut = true;
 
-      // Navigate to home only if not disposed and we have a router
-      if (!_isDisposed && routerRef != null) {
-        routerRef.go('/');
+      try {
+        await AuthUtil.safeSignOut(
+          context: context,
+          shouldNavigate: true,
+          navigateTo: '/',
+        );
+        // If we reach here, sign-out was successful
+        isSigningOut = false;
+      } catch (e) {
+        // If there's an error, mark sign-out as complete and show error
+        isSigningOut = false;
+        debugPrint('Error during sign out: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error signing out: ${e.toString()}'),
+            ),
+          );
+        }
       }
     } catch (e) {
-      print('Error signing out: $e');
-      // Can't show UI feedback since we might not have a valid context
+      debugPrint('Error during sign out: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error signing out: ${e.toString()}'),
+          ),
+        );
+      }
     }
   }
 }

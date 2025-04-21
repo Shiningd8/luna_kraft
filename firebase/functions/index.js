@@ -46,8 +46,16 @@ async function verifyAuthHeader(request) {
   }
 }
 
+
 exports.geminiAIV2 = onRequest(
-  { cors: true, minInstances: 0, timeoutSeconds: 120 },
+  {
+    cors: true,
+    minInstances: 0,
+    timeoutSeconds: 120,
+    memory: '1GB',
+    region: 'us-central1',
+    invoker: 'public'
+  },
   async (req, res) => {
     try {
       const context = {

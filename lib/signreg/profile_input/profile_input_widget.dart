@@ -24,6 +24,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:luna_kraft/onboarding/onboarding_manager.dart';
+import 'package:luna_kraft/onboarding/onboarding_screen.dart';
 export 'profile_input_model.dart';
 
 class ProfileInputWidget extends StatefulWidget {
@@ -1193,33 +1195,58 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
         String? photoUrl;
 
         // Upload profile picture if one was selected
-        if (_model.uploadedLocalFile1.bytes != null) {
+        if (_model.uploadedLocalFile1.bytes != null &&
+            _model.uploadedFileUrl1 == 'local_image') {
           final userId = currentUser.uid;
           if (userId.isEmpty) {
             throw Exception('User ID is empty');
           }
 
           try {
+            print('Starting profile picture upload...');
+
+            // Create a timestamp for unique filename
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final fileName = '${timestamp}_${userId}_profile.jpg';
+
             // Create the storage reference with the user's ID
-            final storageRef = FirebaseStorage.instance
-                .ref()
-                .child('profile_images')
-                .child('$userId.jpg');
+            final storageRef =
+                FirebaseStorage.instance.ref().child('public').child(fileName);
 
             // Upload file with metadata
             final metadata = SettableMetadata(
               contentType: 'image/jpeg',
-              customMetadata: {'userId': userId},
+              customMetadata: {
+                'userId': userId,
+                'uploadedAt': DateTime.now().toIso8601String(),
+                'fileName': fileName,
+                'type': 'profile_image'
+              },
             );
 
+            print('Uploading file to Firebase Storage...');
+
             // Upload the image bytes
-            await storageRef.putData(
+            final uploadTask = await storageRef.putData(
                 _model.uploadedLocalFile1.bytes!, metadata);
 
-            // Get the download URL
-            photoUrl = await storageRef.getDownloadURL();
+            if (uploadTask.state == TaskState.success) {
+              // Get the download URL
+              photoUrl = await storageRef.getDownloadURL();
+              print('Successfully uploaded profile picture. URL: $photoUrl');
+            } else {
+              print('Upload task failed: ${uploadTask.state}');
+              throw Exception('Failed to upload profile picture');
+            }
           } catch (e) {
-            print('Error uploading image: $e');
+            print('Error uploading profile picture: $e');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content:
+                    Text('Error uploading profile picture. Please try again.'),
+                backgroundColor: FlutterFlowTheme.of(context).error,
+              ),
+            );
             // Continue with profile creation even if image upload fails
           }
         }
@@ -1229,36 +1256,87 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
           // First update the currentUser profile in Firebase Auth
           await currentUser.updateProfile(
             displayName: _model.displayNameTextController.text,
+            photoURL: photoUrl,
           );
 
           // Then update the Firestore document
           if (currentUserReference != null) {
-            await currentUserReference!.update({
+            final updateData = {
               'display_name': _model.displayNameTextController.text,
               'user_name': _model.userIDTextController.text.toLowerCase(),
-              if (photoUrl != null) 'photo_url': photoUrl,
               'last_updated': getCurrentTimestamp,
               'date_of_birth': _model.datePicked,
               'gender': _model.selectedGender,
-            });
+            };
+
+            // Only add photo_url if we have one
+            if (photoUrl != null) {
+              updateData['photo_url'] = photoUrl;
+            }
+
+            await currentUserReference!.update(updateData);
           } else {
             // If the currentUserReference is null, create a new document
             final userDocRef = FirebaseFirestore.instance
                 .collection('User')
                 .doc(currentUser.uid);
 
-            await userDocRef.set({
+            final userData = {
               'display_name': _model.displayNameTextController.text,
               'user_name': _model.userIDTextController.text.toLowerCase(),
               'email': currentUser.email,
               'created_time': getCurrentTimestamp,
               'last_updated': getCurrentTimestamp,
-              if (photoUrl != null) 'photo_url': photoUrl,
               'date_of_birth': _model.datePicked,
               'gender': _model.selectedGender,
               'uid': currentUser.uid,
               'phone_number': currentUser.phoneNumber,
+            };
+
+            // Only add photo_url if we have one
+            if (photoUrl != null) {
+              userData['photo_url'] = photoUrl;
+            }
+
+            await userDocRef.set(userData);
+          }
+
+          print('Successfully updated user profile with photo: $photoUrl');
+
+          // Create username record
+          try {
+            await FirebaseFirestore.instance
+                .collection('usernames')
+                .doc(_model.userIDTextController.text.toLowerCase())
+                .set({
+              'userId': currentUserReference ??
+                  FirebaseFirestore.instance
+                      .collection('User')
+                      .doc(currentUser.uid),
+              'username': _model.userIDTextController.text.toLowerCase(),
+              'created_time': getCurrentTimestamp,
             });
+          } catch (e) {
+            print('Error creating username record: $e');
+            // Continue even if username record creation fails
+          }
+
+          // Only navigate if the widget is still mounted
+          if (mounted) {
+            // Show onboarding before going to home page
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => OnboardingScreen(
+                  onComplete: () async {
+                    await OnboardingManager.markOnboardingComplete();
+                    if (mounted) {
+                      context.goNamed('HomePage');
+                    }
+                  },
+                ),
+              ),
+            );
           }
         } catch (e) {
           print('Error updating user profile: $e');
@@ -1270,29 +1348,6 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
             ),
           );
           return;
-        }
-
-        // Create username record
-        try {
-          await FirebaseFirestore.instance
-              .collection('usernames')
-              .doc(_model.userIDTextController.text.toLowerCase())
-              .set({
-            'userId': currentUserReference ??
-                FirebaseFirestore.instance
-                    .collection('User')
-                    .doc(currentUser.uid),
-            'username': _model.userIDTextController.text.toLowerCase(),
-            'created_time': getCurrentTimestamp,
-          });
-        } catch (e) {
-          print('Error creating username record: $e');
-          // Continue even if username record creation fails
-        }
-
-        // Only navigate if the widget is still mounted
-        if (mounted) {
-          context.goNamed('HomePage');
         }
       } catch (e) {
         print('Error in profile creation process: $e');

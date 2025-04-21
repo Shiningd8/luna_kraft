@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:async';
 import 'package:go_router/go_router.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -13,7 +15,7 @@ import 'backend/firebase/firebase_config.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'index.dart';
-import 'services/app_state.dart';
+import 'services/app_state.dart' as custom_app_state;
 import '/components/base_layout.dart';
 import '/flutter_flow/flutter_flow_widget_state.dart' as ff;
 import '/utils/logging_config.dart';
@@ -27,7 +29,11 @@ void main() async {
   // Initialize log filtering
   LoggingConfig.initialize();
 
-  await initFirebase();
+  // Initialize Firebase
+  await Firebase.initializeApp();
+
+  // Initialize AdMob
+  await MobileAds.instance.initialize();
 
   await FlutterFlowTheme.initialize();
 
@@ -35,7 +41,7 @@ void main() async {
   await appState.initializePersistedState();
 
   // Initialize our custom AppState for music
-  final musicAppState = AppState();
+  final musicAppState = custom_app_state.AppState();
 
   runApp(MultiProvider(
     providers: [

@@ -58,12 +58,6 @@ class NotificationsRecord extends FirestoreRecord {
   bool hasStatus() => _status != null;
 
   void _initializeFields() {
-    // Debug the raw data for is_a_like field
-    print(
-        'NotificationsRecord init - Raw is_a_like: ${snapshotData['is_a_like']}');
-    print(
-        'NotificationsRecord init - Type: ${snapshotData['is_a_like']?.runtimeType}');
-
     // For boolean fields, explicitly cast to bool to avoid type issues
     final rawIsALike = snapshotData['is_a_like'];
     if (rawIsALike != null) {
@@ -73,7 +67,6 @@ class NotificationsRecord extends FirestoreRecord {
         // Try to convert other types to bool
         _isALike =
             rawIsALike == true || rawIsALike == 'true' || rawIsALike == 1;
-        print('NotificationsRecord - converted is_a_like to: $_isALike');
       }
     } else {
       _isALike = false;

@@ -12,6 +12,7 @@ import 'package:page_transition/page_transition.dart';
 import '/flutter_flow/nav/nav.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -711,21 +712,11 @@ class _SettingsPageState extends State<SettingsPage>
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              try {
-                // Sign out from all devices
-                await FirebaseAuth.instance.signOut();
-                if (mounted) {
-                  // Clear any stored state
-                  final appState = context.read<FFAppState>();
-                  await appState.initializePersistedState();
-                  // Navigate to sign in page
-                  context.go('/');
-                }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error logging out: $e')),
-                );
-              }
+              await AuthUtil.safeSignOut(
+                context: context,
+                shouldNavigate: true,
+                navigateTo: '/',
+              );
             },
             child: Text('Logout'),
           ),

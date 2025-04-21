@@ -12,6 +12,7 @@ import 'dart:ui';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lottie/lottie.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EditProfileWidget extends StatefulWidget {
   const EditProfileWidget({super.key});
@@ -30,6 +31,9 @@ class _EditProfileWidgetState extends State<EditProfileWidget> {
   File? _imageFile;
   bool _isLoading = false;
   bool _isImagePickerActive = false;
+  bool _canChangeUsername = true;
+  String? _originalUsername;
+  DateTime? _lastUsernameChangeDate;
 
   @override
   void initState() {
@@ -52,6 +56,20 @@ class _EditProfileWidgetState extends State<EditProfileWidget> {
       setState(() {
         _displayNameController.text = userDoc.displayName ?? '';
         _usernameController.text = userDoc.userName ?? '';
+        _originalUsername = userDoc.userName;
+        _lastUsernameChangeDate = userDoc.lastUsernameChangeDate;
+
+        // Check if user can change username (once per 30 days)
+        if (_lastUsernameChangeDate != null) {
+          final daysSinceLastChange =
+              DateTime.now().difference(_lastUsernameChangeDate!).inDays;
+          _canChangeUsername = daysSinceLastChange >= 30;
+          print(
+              'Last username change: $_lastUsernameChangeDate, Days since: $daysSinceLastChange, Can change: $_canChangeUsername');
+        } else {
+          _canChangeUsername = true;
+          print('No previous username change found. User can change username.');
+        }
       });
     }
   }
@@ -86,6 +104,22 @@ class _EditProfileWidgetState extends State<EditProfileWidget> {
 
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Check if username is being changed and if the user can change it
+    final trimmedOriginalUsername = _originalUsername?.trim() ?? '';
+    final trimmedNewUsername = _usernameController.text.trim();
+    bool usernameChanged = trimmedOriginalUsername != trimmedNewUsername;
+
+    if (usernameChanged && !_canChangeUsername) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Username can only be changed once every 30 days.'),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -188,12 +222,44 @@ class _EditProfileWidgetState extends State<EditProfileWidget> {
       // Update user profile
       print('Updating user profile in Firestore...');
       try {
-        await currentUserReference!.update({
+        // Prepare update data
+        Map<String, dynamic> updateData = {
           'display_name': _displayNameController.text,
           'user_name': _usernameController.text,
           if (photoUrl != null) 'photo_url': photoUrl,
           'last_updated': getCurrentTimestamp,
-        });
+        };
+
+        // If username changed, update the last_username_change_date
+        if (usernameChanged) {
+          updateData['last_username_change_date'] = getCurrentTimestamp;
+
+          // Update username record in usernames collection
+          try {
+            // If there's an old username, delete it
+            if (_originalUsername != null && _originalUsername!.isNotEmpty) {
+              await FirebaseFirestore.instance
+                  .collection('usernames')
+                  .doc(_originalUsername!.toLowerCase())
+                  .delete();
+            }
+
+            // Create new username record
+            await FirebaseFirestore.instance
+                .collection('usernames')
+                .doc(_usernameController.text.toLowerCase())
+                .set({
+              'userId': currentUserReference,
+              'username': _usernameController.text.toLowerCase(),
+              'created_time': getCurrentTimestamp,
+            });
+          } catch (e) {
+            print('Error updating username record: $e');
+            // Continue even if username record update fails
+          }
+        }
+
+        await currentUserReference!.update(updateData);
         print('Profile updated successfully');
       } catch (e) {
         print('Error updating Firestore document: $e');
@@ -557,8 +623,67 @@ class _EditProfileWidgetState extends State<EditProfileWidget> {
                             }
                             return null;
                           },
+                          enabled: _canChangeUsername ||
+                              (_originalUsername?.trim() ?? '') ==
+                                  _usernameController.text.trim(),
                         ),
-                        SizedBox(height: 32),
+                        SizedBox(height: 8),
+                        // Username change info box
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _canChangeUsername
+                                ? FlutterFlowTheme.of(context)
+                                    .info
+                                    .withOpacity(0.1)
+                                : FlutterFlowTheme.of(context)
+                                    .error
+                                    .withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _canChangeUsername
+                                  ? FlutterFlowTheme.of(context)
+                                      .info
+                                      .withOpacity(0.3)
+                                  : FlutterFlowTheme.of(context)
+                                      .error
+                                      .withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _canChangeUsername
+                                    ? Icons.info_outline
+                                    : Icons.warning_amber_rounded,
+                                color: _canChangeUsername
+                                    ? FlutterFlowTheme.of(context).info
+                                    : FlutterFlowTheme.of(context).error,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _canChangeUsername
+                                      ? 'Username can be changed only once in 30 days. Editing this field will count as your change for the next 30 days.'
+                                      : 'You can change your username again in ${_lastUsernameChangeDate != null ? (30 - DateTime.now().difference(_lastUsernameChangeDate!).inDays) : 30} days. You can still update your display name and profile photo.',
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodySmall
+                                      .override(
+                                        fontFamily: 'Figtree',
+                                        color: _canChangeUsername
+                                            ? FlutterFlowTheme.of(context).info
+                                            : FlutterFlowTheme.of(context)
+                                                .error,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 24),
                         // Save Button
                         FFButtonWidget(
                           onPressed: _isLoading ? null : _saveChanges,

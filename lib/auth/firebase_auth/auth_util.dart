@@ -6,8 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:otp/otp.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '/backend/backend.dart';
+import '/services/app_state.dart';
+import '/flutter_flow/app_state.dart';
 import 'package:stream_transform/stream_transform.dart';
 import 'firebase_auth_manager.dart';
 import 'google_auth.dart';
@@ -313,6 +317,49 @@ class AuthUtil {
     } catch (e) {
       print('Error verifying 2FA code: $e');
       return false;
+    }
+  }
+
+  static Future<void> safeSignOut({
+    required BuildContext context,
+    bool shouldNavigate = true,
+    String? navigateTo,
+  }) async {
+    try {
+      // Store references before any async operations
+      final router = GoRouter.of(context);
+
+      // Only try to access AppState if it's available
+      try {
+        final appState = Provider.of<AppState>(context, listen: false);
+        await appState.cleanup();
+      } catch (e) {
+        debugPrint('AppState not available: $e');
+      }
+
+      // Sign out from Firebase
+      await _auth.signOut();
+
+      // Try to clear app state if available
+      try {
+        await FFAppState().initializePersistedState();
+      } catch (e) {
+        debugPrint('FFAppState not available: $e');
+      }
+
+      // Only proceed with navigation if the widget is still mounted
+      if (shouldNavigate && context.mounted) {
+        // First pop any remaining navigation stack
+        while (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+
+        // Then navigate to the specified route or default to sign in
+        router.go(navigateTo ?? '/');
+      }
+    } catch (e) {
+      debugPrint('Error during safe sign out: $e');
+      // Don't show error messages since the widget might be disposed
     }
   }
 }

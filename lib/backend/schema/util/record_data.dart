@@ -49,6 +49,7 @@ Map<String, dynamic> createUserRecordData({
   int? lunaCoins,
   List<DocumentReference>? pendingFollowRequests,
   List<String>? pendingFollowRequestsPaths,
+  DateTime? lastUsernameChangeDate,
 }) {
   final firestoreData = {
     if (email != null) 'email': email,
@@ -68,6 +69,8 @@ Map<String, dynamic> createUserRecordData({
       'pending_follow_requests': pendingFollowRequests,
     if (pendingFollowRequestsPaths != null)
       'pending_follow_requests_paths': pendingFollowRequestsPaths,
+    if (lastUsernameChangeDate != null)
+      'last_username_change_date': lastUsernameChangeDate,
   };
 
   return firestoreData;

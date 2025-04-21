@@ -105,6 +105,21 @@ class UserRecord extends FirestoreRecord {
   String get twoFactorSecretKey => _twoFactorSecretKey ?? '';
   bool hasTwoFactorSecretKey() => _twoFactorSecretKey != null;
 
+  // "daily_dream_uploads" field.
+  int? _dailyDreamUploads;
+  int get dailyDreamUploads => _dailyDreamUploads ?? 0;
+  bool hasDailyDreamUploads() => _dailyDreamUploads != null;
+
+  // "last_upload_reset_date" field.
+  DateTime? _lastUploadResetDate;
+  DateTime? get lastUploadResetDate => _lastUploadResetDate;
+  bool hasLastUploadResetDate() => _lastUploadResetDate != null;
+
+  // "last_username_change_date" field.
+  DateTime? _lastUsernameChangeDate;
+  DateTime? get lastUsernameChangeDate => _lastUsernameChangeDate;
+  bool hasLastUsernameChangeDate() => _lastUsernameChangeDate != null;
+
   void _initializeFields() {
     _email = snapshotData['email'] as String?;
     _displayName = snapshotData['display_name'] as String?;
@@ -126,6 +141,10 @@ class UserRecord extends FirestoreRecord {
         getDataList(snapshotData['pending_follow_requests_paths']);
     _is2FAEnabled = snapshotData['is_2fa_enabled'] as bool?;
     _twoFactorSecretKey = snapshotData['2fa_secret_key'] as String?;
+    _dailyDreamUploads = snapshotData['daily_dream_uploads'] as int?;
+    _lastUploadResetDate = snapshotData['last_upload_reset_date'] as DateTime?;
+    _lastUsernameChangeDate =
+        snapshotData['last_username_change_date'] as DateTime?;
   }
 
   static CollectionReference get collection =>

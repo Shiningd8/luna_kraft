@@ -69,93 +69,109 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
       _userCache.clear();
       _latestPost = null;
 
-      // Get current user's latest post first
-      if (currentUserReference != null) {
-        final latestPostQuery = FirebaseFirestore.instance
-            .collection('posts')
-            .where('poster', isEqualTo: currentUserReference)
-            .orderBy('date', descending: true)
-            .limit(1);
+      // First get ALL posts from the database
+      final allPostsQuery = await FirebaseFirestore.instance
+          .collection('posts')
+          .orderBy('date', descending: true)
+          .get();
 
-        final latestPostSnapshot = await latestPostQuery.get();
-        if (latestPostSnapshot.docs.isNotEmpty) {
-          _latestPost = PostsRecord.fromSnapshot(latestPostSnapshot.docs.first);
+      List<PostsRecord> allPosts = [];
 
-          // Add user to cache
-          if (!_userCache.containsKey(currentUserReference?.id)) {
-            final userDoc =
-                await UserRecord.getDocumentOnce(currentUserReference!);
-            if (userDoc != null) {
-              _userCache[currentUserReference!.id] = userDoc;
-            }
+      // Process all posts and validate user references
+      for (var doc in allPostsQuery.docs) {
+        try {
+          final post = PostsRecord.fromSnapshot(doc);
+
+          // Skip posts without a valid poster reference
+          if (post.poster == null) {
+            continue;
           }
+
+          // Verify the user exists
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(post.poster!.id)
+              .get();
+
+          if (!userDoc.exists) {
+            continue;
+          }
+
+          // Check if this is a public post or from current user or followed user
+          final isCurrentUserPost = post.poster == currentUserReference;
+          final isFollowedUser =
+              currentUserDocument?.followingUsers?.contains(post.poster) ??
+                  false;
+
+          if (!post.isPrivate || isCurrentUserPost || isFollowedUser) {
+            allPosts.add(post);
+          }
+        } catch (e) {
+          continue;
         }
       }
 
-      // Get posts from followed users or public posts
-      final followingList = currentUserDocument?.followingUsers.toList() ?? [];
+      // Sort posts by date
+      allPosts.sort((a, b) => b.date!.compareTo(a.date!));
 
-      Query postsQuery;
-      if (followingList.isNotEmpty) {
-        postsQuery = FirebaseFirestore.instance
-            .collection('posts')
-            .where('poster', whereIn: followingList)
-            .orderBy('date', descending: true)
-            .limit(20);
-      } else {
-        // If not following anyone, show public posts
-        postsQuery = FirebaseFirestore.instance
-            .collection('posts')
-            .orderBy('date', descending: true)
-            .limit(20);
-      }
+      // Take only the most recent posts
+      _allPosts = allPosts.take(50).toList();
 
-      final QuerySnapshot postsSnapshot = await postsQuery.get();
-      final List<PostsRecord> feedPosts = postsSnapshot.docs
-          .map((doc) => PostsRecord.fromSnapshot(doc))
-          .where((post) => post.reference.id != _latestPost?.reference.id)
-          .toList();
-
-      // Load user data for all posts
+      // Load user data for all posts efficiently
       final Set<DocumentReference> userRefs =
-          feedPosts.map((post) => post.poster!).toSet();
+          _allPosts.map((post) => post.poster!).toSet();
 
-      if (_latestPost != null && _latestPost!.poster != null) {
-        userRefs.add(_latestPost!.poster!);
-      }
-
+      // Load user data in parallel with error handling
       await Future.wait(
         userRefs.map((userRef) async {
-          if (!_userCache.containsKey(userRef.id)) {
-            final userDoc = await UserRecord.getDocumentOnce(userRef);
-            if (userDoc != null) {
-              _userCache[userRef.id] = userDoc;
+          try {
+            if (!_userCache.containsKey(userRef.id)) {
+              final userDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(userRef.id)
+                  .get();
+
+              if (userDoc.exists && userDoc.data() != null) {
+                final userData = UserRecord.fromSnapshot(userDoc);
+                _userCache[userRef.id] = userData;
+              }
             }
+          } catch (e) {
+            // Silently handle errors
           }
         }),
       );
-
-      // Add posts to the list
-      if (_latestPost != null) {
-        _allPosts.add(_latestPost!);
-      }
-
-      _allPosts.addAll(feedPosts);
 
       if (!mounted) return;
 
       setState(() {
         _isLoading = false;
       });
-    } catch (error) {
+    } catch (e, stackTrace) {
       if (!mounted) return;
 
       setState(() {
         _isLoading = false;
         _hasError = true;
-        _errorMessage = 'Failed to load posts. Please try again.';
+        _errorMessage = _getErrorMessage(e);
       });
     }
+  }
+
+  String _getErrorMessage(dynamic error) {
+    if (error is FirebaseException) {
+      switch (error.code) {
+        case 'permission-denied':
+          return 'Access denied. Please check your permissions.';
+        case 'unavailable':
+          return 'Service temporarily unavailable. Please try again later.';
+        case 'resource-exhausted':
+          return 'Too many requests. Please wait a moment and try again.';
+        default:
+          return 'Failed to load posts. ${error.message}';
+      }
+    }
+    return 'Failed to load posts. Please try again.';
   }
 
   // Update a specific post's like status locally
@@ -208,110 +224,246 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(
-            FlutterFlowTheme.of(context).primary,
-          ),
-        ),
-      );
-    }
-
-    if (_hasError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              color: FlutterFlowTheme.of(context).error,
-              size: 60,
-            ),
-            SizedBox(height: 16),
-            Text(
-              _errorMessage,
-              style: FlutterFlowTheme.of(context).bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadPosts,
-              child: Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: FlutterFlowTheme.of(context).primary,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_allPosts.isEmpty) {
-      return Center(
-        child: EmptylistWidget(),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadPosts,
-      child: ListView.builder(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 8,
-          bottom: 80,
-        ),
-        itemCount: _allPosts.length,
-        itemBuilder: (context, index) {
-          final post = _allPosts[index];
-          final isLatestPost = _latestPost != null &&
-              post.reference.id == _latestPost!.reference.id;
-
-          if (post.poster == null) {
-            return SizedBox.shrink();
-          }
-
-          final userRecord = _userCache[post.poster!.id];
-          if (userRecord == null) {
-            return SizedBox.shrink();
-          }
-
-          // Skip private posts from other users
-          if (post.isPrivate && post.poster != currentUserReference) {
-            return SizedBox.shrink();
-          }
-
-          return Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: isLatestPost
-                ? _buildLatestPostItem(context, post, userRecord)
-                : StandardizedPostItem(
-                    post: post,
-                    user: userRecord,
-                    animateEntry: true,
-                    animationIndex: index,
-                    onLike: () {
-                      final isCurrentlyLiked =
-                          post.likes.contains(currentUserReference);
-                      _updatePostLikeState(post, isCurrentlyLiked);
-                    },
-                    onSave: () {
-                      final isCurrentlySaved =
-                          post.postSavedBy.contains(currentUserReference);
-                      _updatePostSaveState(post, isCurrentlySaved);
-                    },
-                  ),
-          );
-        },
+    return StreamBuilder<List<PostsRecord>>(
+      stream: queryPostsRecord(
+        queryBuilder: (postsRecord) =>
+            postsRecord.orderBy('date', descending: true),
       ),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: Colors.white,
+                  size: 48,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Error loading posts',
+                  style: FlutterFlowTheme.of(context).titleMedium.override(
+                        fontFamily: 'Outfit',
+                        color: Colors.white,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {});
+                  },
+                  icon: Icon(Icons.refresh),
+                  label: Text('Try Again'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: FlutterFlowTheme.of(context).primary,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (!snapshot.hasData) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text(
+                  'Loading your feed...',
+                  style: FlutterFlowTheme.of(context).bodyMedium.override(
+                        fontFamily: 'Figtree',
+                        color: Colors.white,
+                      ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        List<PostsRecord> posts = snapshot.data!;
+
+        // Get the current user's following list
+        final followingUsers = currentUserDocument?.followingUsers ?? [];
+        final isFollowingAnyone = followingUsers.isNotEmpty;
+
+        // Find the latest post from the current user (safely handle no posts case)
+        PostsRecord? latestPost;
+        for (var post in posts) {
+          if (post.poster == currentUserReference) {
+            latestPost = post;
+            break;
+          }
+        }
+
+        // Filter out posts that don't have a valid poster reference
+        final validPosts = posts.where((post) {
+          // Skip posts without a valid poster reference
+          if (post.poster == null) {
+            return false;
+          }
+
+          // Skip the latest post as it will be displayed separately
+          if (latestPost != null &&
+              post.reference.id == latestPost.reference.id) {
+            return false;
+          }
+
+          // Skip posts from current user (they'll only see their latest post in purple box)
+          if (post.poster == currentUserReference) {
+            return false;
+          }
+
+          final isFromFollowedUser = followingUsers.contains(post.poster);
+
+          // Show post if:
+          // 1. If not following anyone: It's a public post
+          // 2. If following someone: It's from a followed user
+          final shouldShow = (!isFollowingAnyone && !post.isPrivate) ||
+              (isFollowingAnyone && isFromFollowedUser);
+
+          return shouldShow;
+        }).toList();
+
+        if (validPosts.isEmpty && latestPost == null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.article_outlined,
+                  color: Colors.white,
+                  size: 48,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Welcome to LunaKraft!',
+                  style: FlutterFlowTheme.of(context).titleMedium.override(
+                        fontFamily: 'Outfit',
+                        color: Colors.white,
+                      ),
+                ),
+                SizedBox(height: 8),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    'Share your first dream or follow others to see their dream stories here',
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          fontFamily: 'Figtree',
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            setState(() {});
+          },
+          child: ListView.builder(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 8,
+              bottom: 80,
+            ),
+            itemCount: (latestPost != null ? 1 : 0) + validPosts.length,
+            itemBuilder: (context, index) {
+              // First item is the latest post
+              if (latestPost != null && index == 0) {
+                return StreamBuilder<UserRecord>(
+                  stream: UserRecord.getDocument(latestPost.poster!),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData) {
+                      return SizedBox();
+                    }
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: _buildLatestPostItem(
+                        context,
+                        latestPost,
+                        userSnapshot.data!,
+                      ),
+                    );
+                  },
+                );
+              }
+
+              // Adjust index for feed posts
+              final postIndex = latestPost != null ? index - 1 : index;
+              final post = validPosts[postIndex];
+
+              return StreamBuilder<UserRecord>(
+                stream: UserRecord.getDocument(post.poster!),
+                builder: (context, userSnapshot) {
+                  // Handle error case - user document doesn't exist or other error
+                  if (userSnapshot.hasError) {
+                    print(
+                        'Error loading user for post ${post.reference.id}: ${userSnapshot.error}');
+                    return SizedBox();
+                  }
+
+                  if (!userSnapshot.hasData) {
+                    return SizedBox();
+                  }
+
+                  final userRecord = userSnapshot.data!;
+
+                  // Double-check that post isn't from a private account that user doesn't follow
+                  if (userRecord.isPrivate &&
+                      post.poster != currentUserReference &&
+                      !(currentUserDocument?.followingUsers
+                              ?.contains(post.poster) ??
+                          false)) {
+                    print('Skipping post from private account: ${post.title}');
+                    return SizedBox();
+                  }
+
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: StandardizedPostItem(
+                      post: post,
+                      user: userRecord,
+                      animateEntry: true,
+                      animationIndex: index,
+                      onLike: () {
+                        final isCurrentlyLiked =
+                            post.likes.contains(currentUserReference);
+                        _updatePostLikeState(post, !isCurrentlyLiked);
+                      },
+                      onSave: () {
+                        final isCurrentlySaved =
+                            post.postSavedBy.contains(currentUserReference);
+                        _updatePostSaveState(post, !isCurrentlySaved);
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
   // Helper method to build the latest post item
   Widget _buildLatestPostItem(
-      BuildContext context, PostsRecord latestPost, UserRecord user) {
+      BuildContext context, PostsRecord? latestPost, UserRecord user) {
+    if (latestPost == null) return SizedBox();
+
     final bool initialIsLiked = latestPost.likes.contains(currentUserReference);
     final bool initialIsSaved =
         latestPost.postSavedBy.contains(currentUserReference);
@@ -1540,27 +1692,14 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 onTap: () async {
                   try {
                     if (_isDisposed) return;
-
-                    // Store appState reference before any async operation
-                    final appState = context.read<AppState>();
-
-                    // Sign out from Firebase
-                    await FirebaseAuth.instance.signOut();
-
-                    // Only proceed with cleanup and navigation if still mounted
-                    if (mounted && !_isDisposed) {
-                      await appState.cleanup();
-
-                      // Use Future.microtask to avoid widget deactivation issues
-                      Future.microtask(() {
-                        if (mounted && !_isDisposed) {
-                          context.go('/');
-                        }
-                      });
-                    }
+                    await AuthUtil.safeSignOut(
+                      context: context,
+                      shouldNavigate: true,
+                      navigateTo: '/',
+                    );
                   } catch (e) {
                     print('Error signing out: $e');
-                    // Don't show a snackbar to avoid widget deactivation issues
+                    // Don't try to display errors via scaffold messenger to avoid deactivation issues
                   }
                 },
               ),
