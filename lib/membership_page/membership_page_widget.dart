@@ -13,6 +13,83 @@ import 'dart:ui';
 import '/services/purchase_service.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 export 'membership_page_model.dart';
+import '/services/ad_service.dart';
+
+class LunaCoinDisplay extends StatelessWidget {
+  const LunaCoinDisplay({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsetsDirectional.fromSTEB(0, 0, 16, 0),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(50),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: AuthUserStreamWidget(
+        builder: (context) => StreamBuilder<UserRecord>(
+          stream: currentUserReference != null
+              ? UserRecord.getDocument(currentUserReference!)
+              : null,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              print('Error in LunaCoinDisplay stream: ${snapshot.error}');
+              return Text('Error loading coins');
+            }
+
+            if (!snapshot.hasData) {
+              print('No data in LunaCoinDisplay stream');
+              return Text('Loading...');
+            }
+
+            final userRecord = snapshot.data;
+            print('LunaCoinDisplay - User record received');
+
+            final coins = userRecord?.lunaCoins ?? 0;
+            print('LunaCoinDisplay - Current coins: $coins');
+
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.transparent,
+                  ),
+                  child: Image.asset(
+                    'assets/images/lunacoin.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                SizedBox(width: 6),
+                Container(
+                  constraints: BoxConstraints(minWidth: 40),
+                  child: Text(
+                    '$coins',
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          fontFamily: 'Outfit',
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 
 class MembershipPageWidget extends StatefulWidget {
   const MembershipPageWidget({super.key});
@@ -58,6 +135,42 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
 
     // Initialize RevenueCat and fetch packages
     _initializePurchases();
+
+    // Initialize and preload a rewarded ad
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (mounted) {
+        try {
+          print('Initializing ad service...');
+          await AdService().loadRewardedAd();
+          print('Ad service initialized successfully');
+        } catch (e) {
+          print('Error initializing ad service: $e');
+        }
+      }
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Ensure ad service is initialized when dependencies change
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (mounted) {
+        try {
+          print('Reloading ad service...');
+          await AdService().loadRewardedAd();
+          print('Ad service reloaded successfully');
+        } catch (e) {
+          print('Error reloading ad service: $e');
+        }
+      }
+    });
+  }
+
+  @override
+  void deactivate() {
+    // Don't dispose the ad service when the page is deactivated
+    super.deactivate();
   }
 
   Future<void> _initializePurchases() async {
@@ -101,7 +214,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
           // Update the user's coin balance in Firebase
           final currentCoins = currentUserDocument?.lunaCoins ?? 0;
           await currentUserReference?.update({
-            'lunaCoins': currentCoins + result.coinAmount!,
+            'luna_coins': currentCoins + result.coinAmount!,
           });
         }
       } else {
@@ -112,6 +225,42 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Purchase failed. Please try again.')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _earnCoinsWithAd() async {
+    setState(() => _isLoading = true);
+    try {
+      final adService = AdService();
+      final adResult = await adService.showRewardedAd();
+      // The snackbar will be shown in the onUserEarnedReward callback in ad_service.dart
+      if (!adResult) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load ad. Please try again later.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An error occurred. Please try again.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: EdgeInsets.all(16),
+        ),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -151,49 +300,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
                 ),
           ),
           actions: [
-            Container(
-              margin: EdgeInsetsDirectional.fromSTEB(0, 0, 16, 0),
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.25),
-                borderRadius: BorderRadius.circular(50),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.1),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 20,
-                    height: 20,
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.transparent,
-                    ),
-                    child: Image.asset(
-                      'assets/images/lunacoin.png',
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  SizedBox(width: 6),
-                  Container(
-                    constraints: BoxConstraints(minWidth: 40),
-                    child: Text(
-                      '${currentUserDocument?.lunaCoins ?? 0}',
-                      style: FlutterFlowTheme.of(context).bodyMedium.override(
-                            fontFamily: 'Outfit',
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            LunaCoinDisplay(),
           ],
         ),
         body: Stack(
@@ -562,6 +669,8 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
                         ),
                       ),
                       SizedBox(height: 100),
+                      // Add Free Coins button to the UI
+                      _buildFreeCoinSection(),
                     ],
                   ),
                 ),
@@ -768,9 +877,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            // TODO: Implement watch ad functionality
-          },
+          onTap: _earnCoinsWithAd,
           borderRadius: BorderRadius.circular(10),
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -799,7 +906,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
                 ),
                 SizedBox(width: 6),
                 Text(
-                  'Watch Ad for 50 Coins',
+                  'Watch Ad for 10 Coins',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 13,
@@ -986,6 +1093,117 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
             ),
           ),
       ],
+    );
+  }
+
+  // Add Free Coins button to the UI
+  Widget _buildFreeCoinSection() {
+    return Container(
+      margin: EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.1),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Free Luna Coins',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.pinkAccent.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'FREE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Watch a short video ad to earn 10 Luna Coins.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _earnCoinsWithAd,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purpleAccent.withOpacity(0.6),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: _isLoading
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.videocam, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'Watch Ad for 10 Coins',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

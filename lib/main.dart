@@ -33,7 +33,19 @@ void main() async {
   await Firebase.initializeApp();
 
   // Initialize AdMob
-  await MobileAds.instance.initialize();
+  try {
+    await MobileAds.instance.initialize();
+    print('AdMob SDK initialized successfully');
+
+    // Set test device IDs for development
+    MobileAds.instance.updateRequestConfiguration(
+      RequestConfiguration(
+        testDeviceIds: ['TEST_DEVICE_ID'], // Replace with your test device ID
+      ),
+    );
+  } catch (e) {
+    print('Error initializing AdMob SDK: $e');
+  }
 
   await FlutterFlowTheme.initialize();
 
