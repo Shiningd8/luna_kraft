@@ -31,6 +31,7 @@ import '/widgets/lottie_background.dart';
 import 'package:luna_kraft/components/standardized_post_item.dart';
 import '/components/dream_fact_widget.dart';
 import '/components/share_options_dialog.dart';
+import 'package:luna_kraft/components/native_ad_post.dart';
 
 // Separate class for home feed content
 class _HomeFeedContent extends StatefulWidget {
@@ -47,6 +48,13 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
   String _errorMessage = '';
   PostsRecord? _latestPost;
   Map<String, UserRecord> _userCache = {};
+
+  // Ad unit ID for native advanced ads
+  static const String _nativeAdUnitId =
+      'ca-app-pub-3940256099942544/2247696110';
+
+  // Frequency of ads (show an ad after this many posts)
+  static const int _adFrequency = 8;
 
   @override
   void initState() {
@@ -249,20 +257,47 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
                       ),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {});
-                  },
-                  icon: Icon(Icons.refresh),
-                  label: Text('Try Again'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: FlutterFlowTheme.of(context).primary,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+              ],
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          if (_isLoading) {
+            return Center(
+              child: CircularProgressIndicator(
+                color: FlutterFlowTheme.of(context).primary,
+              ),
+            );
+          }
+
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.article_outlined,
+                  color: Colors.white,
+                  size: 48,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Welcome to LunaKraft!',
+                  style: FlutterFlowTheme.of(context).titleMedium.override(
+                        fontFamily: 'Outfit',
+                        color: Colors.white,
+                      ),
+                ),
+                SizedBox(height: 8),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    'Share your first dream or follow others to see their dream stories here',
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          fontFamily: 'Figtree',
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
@@ -270,33 +305,12 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
           );
         }
 
-        if (!snapshot.hasData) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text(
-                  'Loading your feed...',
-                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                        fontFamily: 'Figtree',
-                        color: Colors.white,
-                      ),
-                ),
-              ],
-            ),
-          );
-        }
-
         List<PostsRecord> posts = snapshot.data!;
-
-        // Get the current user's following list
         final followingUsers = currentUserDocument?.followingUsers ?? [];
         final isFollowingAnyone = followingUsers.isNotEmpty;
-
-        // Find the latest post from the current user (safely handle no posts case)
         PostsRecord? latestPost;
+
+        // Find the latest post from current user
         for (var post in posts) {
           if (post.poster == currentUserReference) {
             latestPost = post;
@@ -368,6 +382,12 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
           );
         }
 
+        // Calculate the number of items in the list, including ads
+        final int regularItems =
+            (latestPost != null ? 1 : 0) + validPosts.length;
+        final int adItems = (regularItems / _adFrequency).floor();
+        final int totalItems = regularItems + adItems;
+
         return RefreshIndicator(
           onRefresh: () async {
             setState(() {});
@@ -379,10 +399,44 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
               top: 8,
               bottom: 80,
             ),
-            itemCount: (latestPost != null ? 1 : 0) + validPosts.length,
+            itemCount: totalItems,
             itemBuilder: (context, index) {
-              // First item is the latest post
-              if (latestPost != null && index == 0) {
+              // Calculate the actual post index, considering ads
+              int postIndex = index;
+
+              // Adjust for ads that have been inserted before this index
+              final int adsBeforeIndex = (index / (_adFrequency + 1)).floor();
+              postIndex = index - adsBeforeIndex;
+
+              // Check if this position should show an ad
+              // We want to show an ad after every _adFrequency posts (not including the ad itself)
+              if ((postIndex + 1) % (_adFrequency + 1) == 0 && postIndex > 0) {
+                // Check if the previous item was also an ad
+                final int previousIndex = index - 1;
+                if (previousIndex >= 0) {
+                  final int previousPostIndex = previousIndex -
+                      (previousIndex / (_adFrequency + 1)).floor();
+                  if ((previousPostIndex + 1) % (_adFrequency + 1) == 0) {
+                    // Skip this ad position to avoid consecutive ads
+                    return SizedBox();
+                  }
+                }
+
+                return Padding(
+                  padding: EdgeInsets.only(bottom: 3),
+                  child: NativeAdPost(
+                    adUnitId: _nativeAdUnitId,
+                    animateEntry: true,
+                    animationIndex: index,
+                  ),
+                );
+              }
+
+              // Adjust index back to the actual post index
+              postIndex = index - (index / (_adFrequency + 1)).floor();
+
+              // First item is the latest post from the current user
+              if (latestPost != null && postIndex == 0) {
                 return StreamBuilder<UserRecord>(
                   stream: UserRecord.getDocument(latestPost.poster!),
                   builder: (context, userSnapshot) {
@@ -402,8 +456,15 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
               }
 
               // Adjust index for feed posts
-              final postIndex = latestPost != null ? index - 1 : index;
-              final post = validPosts[postIndex];
+              final feedPostIndex =
+                  latestPost != null ? postIndex - 1 : postIndex;
+
+              // Check if the index is valid
+              if (feedPostIndex >= validPosts.length) {
+                return SizedBox();
+              }
+
+              final post = validPosts[feedPostIndex];
 
               return StreamBuilder<UserRecord>(
                 stream: UserRecord.getDocument(post.poster!),

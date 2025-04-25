@@ -20,6 +20,7 @@ import '/components/base_layout.dart';
 import '/flutter_flow/flutter_flow_widget_state.dart' as ff;
 import '/utils/logging_config.dart';
 import '/splash_screen.dart';
+import '/services/native_ad_factory.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +37,9 @@ void main() async {
   try {
     await MobileAds.instance.initialize();
     print('AdMob SDK initialized successfully');
+
+    // Register the custom native ad factory
+    LunaKraftNativeAdFactory.registerNativeAdFactory();
 
     // Set test device IDs for development
     MobileAds.instance.updateRequestConfiguration(

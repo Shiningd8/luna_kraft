@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="21507" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21505"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view contentMode="scaleToFill" id="iN0-l3-epB" customClass="GADNativeAdView">
+            <rect key="frame" x="0.0" y="0.0" width="375" height="250"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+                <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" spacing="8" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc">
+                    <rect key="frame" x="12" y="12" width="351" height="226"/>
+                    <subviews>
+                        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Headline" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc-1">
+                            <rect key="frame" x="0.0" y="0.0" width="351" height="20.5"/>
+                            <fontDescription key="fontDescription" type="boldSystem" pointSize="17"/>
+                            <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                            <nil key="highlightedColor"/>
+                        </label>
+                        <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc-2">
+                            <rect key="frame" x="0.0" y="28.5" width="351" height="200"/>
+                            <subviews>
+                                <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc-3">
+                                    <rect key="frame" x="0.0" y="0.0" width="351" height="200"/>
+                                    <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                </view>
+                            </subviews>
+                            <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                            <constraints>
+                                <constraint firstItem="Ygc-Yd-Ygc-3" firstAttribute="leading" secondItem="Ygc-Yd-Ygc-2" secondAttribute="leading" id="Ygc-Yd-Ygc-4"/>
+                                <constraint firstItem="Ygc-Yd-Ygc-3" firstAttribute="top" secondItem="Ygc-Yd-Ygc-2" secondAttribute="top" id="Ygc-Yd-Ygc-5"/>
+                                <constraint firstItem="Ygc-Yd-Ygc-2" firstAttribute="trailing" secondItem="Ygc-Yd-Ygc-3" secondAttribute="trailing" id="Ygc-Yd-Ygc-6"/>
+                                <constraint firstItem="Ygc-Yd-Ygc-2" firstAttribute="bottom" secondItem="Ygc-Yd-Ygc-3" secondAttribute="bottom" id="Ygc-Yd-Ygc-7"/>
+                            </constraints>
+                        </view>
+                        <stackView opaque="NO" contentMode="scaleToFill" spacing="8" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc-8">
+                            <rect key="frame" x="0.0" y="236.5" width="351" height="40"/>
+                            <subviews>
+                                <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc-9">
+                                    <rect key="frame" x="0.0" y="0.0" width="40" height="40"/>
+                                    <constraints>
+                                        <constraint firstAttribute="width" constant="40" id="Ygc-Yd-Ygc-10"/>
+                                        <constraint firstAttribute="height" constant="40" id="Ygc-Yd-Ygc-11"/>
+                                    </constraints>
+                                </imageView>
+                                <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Body" textAlignment="natural" lineBreakMode="tailTruncation" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc-12">
+                                    <rect key="frame" x="48" y="0.0" width="303" height="40"/>
+                                    <fontDescription key="fontDescription" type="system" pointSize="15"/>
+                                    <color key="textColor" white="1" alpha="0.89999999999999991" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                    <nil key="highlightedColor"/>
+                                </label>
+                            </subviews>
+                        </stackView>
+                        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Advertiser" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc-13">
+                            <rect key="frame" x="0.0" y="284.5" width="351" height="14.5"/>
+                            <fontDescription key="fontDescription" type="system" pointSize="12"/>
+                            <color key="textColor" white="1" alpha="0.69999999999999996" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                            <nil key="highlightedColor"/>
+                        </label>
+                        <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc-14">
+                            <rect key="frame" x="0.0" y="307" width="351" height="44"/>
+                            <color key="backgroundColor" red="0.42352941176470588" green="0.36470588235294116" blue="0.82745098039215681" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            <fontDescription key="fontDescription" type="boldSystem" pointSize="15"/>
+                            <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
+                            <state key="normal" title="Call to Action">
+                                <color key="titleColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                            </state>
+                            <connections>
+                                <action selector="callToActionTapped:" destination="iN0-l3-epB" eventType="touchUpInside" id="Ygc-Yd-Ygc-15"/>
+                            </connections>
+                        </button>
+                        <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Sponsored" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Ygc-Yd-Ygc-16">
+                            <rect key="frame" x="0.0" y="359" width="351" height="10.5"/>
+                            <fontDescription key="fontDescription" type="system" pointSize="10"/>
+                            <color key="textColor" white="1" alpha="0.69999999999999996" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                            <nil key="highlightedColor"/>
+                        </label>
+                    </subviews>
+                    <constraints>
+                        <constraint firstItem="Ygc-Yd-Ygc-16" firstAttribute="leading" secondItem="Ygc-Yd-Ygc" secondAttribute="leading" id="Ygc-Yd-Ygc-17"/>
+                        <constraint firstItem="Ygc-Yd-Ygc-14" firstAttribute="leading" secondItem="Ygc-Yd-Ygc" secondAttribute="leading" id="Ygc-Yd-Ygc-18"/>
+                        <constraint firstItem="Ygc-Yd-Ygc-13" firstAttribute="leading" secondItem="Ygc-Yd-Ygc" secondAttribute="leading" id="Ygc-Yd-Ygc-19"/>
+                        <constraint firstItem="Ygc-Yd-Ygc-8" firstAttribute="leading" secondItem="Ygc-Yd-Ygc" secondAttribute="leading" id="Ygc-Yd-Ygc-20"/>
+                        <constraint firstItem="Ygc-Yd-Ygc-1" firstAttribute="leading" secondItem="Ygc-Yd-Ygc" secondAttribute="leading" id="Ygc-Yd-Ygc-21"/>
+                        <constraint firstItem="Ygc-Yd-Ygc-2" firstAttribute="leading" secondItem="Ygc-Yd-Ygc" secondAttribute="leading" id="Ygc-Yd-Ygc-22"/>
+                        <constraint firstItem="Ygc-Yd-Ygc" firstAttribute="trailing" secondItem="Ygc-Yd-Ygc-16" secondAttribute="trailing" id="Ygc-Yd-Ygc-23"/>
+                        <constraint firstItem="Ygc-Yd-Ygc" firstAttribute="trailing" secondItem="Ygc-Yd-Ygc-14" secondAttribute="trailing" id="Ygc-Yd-Ygc-24"/>
+                        <constraint firstItem="Ygc-Yd-Ygc" firstAttribute="trailing" secondItem="Ygc-Yd-Ygc-13" secondAttribute="trailing" id="Ygc-Yd-Ygc-25"/>
+                        <constraint firstItem="Ygc-Yd-Ygc" firstAttribute="trailing" secondItem="Ygc-Yd-Ygc-8" secondAttribute="trailing" id="Ygc-Yd-Ygc-26"/>
+                        <constraint firstItem="Ygc-Yd-Ygc" firstAttribute="trailing" secondItem="Ygc-Yd-Ygc-1" secondAttribute="trailing" id="Ygc-Yd-Ygc-27"/>
+                        <constraint firstItem="Ygc-Yd-Ygc" firstAttribute="trailing" secondItem="Ygc-Yd-Ygc-2" secondAttribute="trailing" id="Ygc-Yd-Ygc-28"/>
+                    </constraints>
+                </stackView>
+            </subviews>
+            <viewLayoutGuide key="safeArea" id="vUN-kp-3ea"/>
+            <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+            <constraints>
+                <constraint firstItem="Ygc-Yd-Ygc" firstAttribute="leading" secondItem="iN0-l3-epB" secondAttribute="leading" constant="12" id="Ygc-Yd-Ygc-29"/>
+                <constraint firstItem="Ygc-Yd-Ygc" firstAttribute="top" secondItem="iN0-l3-epB" secondAttribute="top" constant="12" id="Ygc-Yd-Ygc-30"/>
+                <constraint firstItem="iN0-l3-epB" firstAttribute="trailing" secondItem="Ygc-Yd-Ygc" secondAttribute="trailing" constant="12" id="Ygc-Yd-Ygc-31"/>
+                <constraint firstItem="iN0-l3-epB" firstAttribute="bottom" secondItem="Ygc-Yd-Ygc" secondAttribute="bottom" constant="12" id="Ygc-Yd-Ygc-32"/>
+            </constraints>
+            <connections>
+                <outlet property="advertiserView" destination="Ygc-Yd-Ygc-13" id="Ygc-Yd-Ygc-33"/>
+                <outlet property="bodyView" destination="Ygc-Yd-Ygc-12" id="Ygc-Yd-Ygc-34"/>
+                <outlet property="callToActionView" destination="Ygc-Yd-Ygc-14" id="Ygc-Yd-Ygc-35"/>
+                <outlet property="headlineView" destination="Ygc-Yd-Ygc-1" id="Ygc-Yd-Ygc-36"/>
+                <outlet property="iconView" destination="Ygc-Yd-Ygc-9" id="Ygc-Yd-Ygc-37"/>
+                <outlet property="mediaView" destination="Ygc-Yd-Ygc-3" id="Ygc-Yd-Ygc-38"/>
+            </connections>
+            <point key="canvasLocation" x="131" y="131"/>
+        </view>
+    </objects>
+    <resources>
+        <systemColor name="systemBackgroundColor">
+            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        </systemColor>
+    </resources>
+</document> 
