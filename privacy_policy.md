@@ -45,8 +45,18 @@ You have the right to:
 * Opt-out of marketing communications.
 
 ## Children's Privacy
+*LunaKraft Safety Policy Against Child Sexual Abuse and Exploitation (CSAE)*
 
-The Service is not intended for individuals under the age of 13. We do not knowingly collect data from children without parental consent.
+At LunaKraft, we maintain a zero-tolerance policy toward child sexual abuse and exploitation (CSAE). We are committed to protecting our users and preventing any form of abusive or illegal activity on our platform.
+
+* We do not allow any content that involves or promotes CSAE.
+* We use a combination of automated tools and human review to detect and remove harmful content.
+* Any CSAE-related content will be reported to the *National Center for Missing & Exploited Children (NCMEC)* and appropriate law enforcement agencies.
+* We comply with Google Play’s Developer Program Policies and strive to ensure a safe environment for all users.
+
+If you come across any content that violates this policy, please report it to us immediately via our contact form or support email i.e, lunakraftco@gmail.com.
+
+
 
 ## Changes to This Privacy Policy
 
