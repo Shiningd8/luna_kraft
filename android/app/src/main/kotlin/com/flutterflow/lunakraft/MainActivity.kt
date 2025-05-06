@@ -2,6 +2,13 @@ package com.flutterflow.lunakraft
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugins.GeneratedPluginRegistrant
+import android.os.Bundle
+import android.util.Log
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+import com.google.firebase.FirebaseApp
 import com.google.android.gms.ads.MobileAds
 import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin
 import android.content.Context
@@ -17,6 +24,11 @@ import com.google.android.gms.ads.nativead.MediaView
 class MainActivity: FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        
+        // Register plugins
+        GeneratedPluginRegistrant.registerWith(flutterEngine)
+        
+        // Initialize AdMob
         MobileAds.initialize(this) {}
         
         // Register the native ad factory
@@ -25,6 +37,37 @@ class MainActivity: FlutterActivity() {
             "adFactoryExample",
             NativeAdFactory(layoutInflater)
         )
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        try {
+            // Initialize Firebase
+            FirebaseApp.initializeApp(this)
+            
+            // Initialize Firebase App Check with proper provider
+            val firebaseAppCheck = FirebaseAppCheck.getInstance()
+            
+            // Use Debug provider in debug builds, Play Integrity in release
+            val isDebug = BuildConfig.DEBUG
+            
+            if (isDebug) {
+                Log.d("LunaKraft", "Initializing Firebase App Check with Debug provider")
+                firebaseAppCheck.installAppCheckProviderFactory(
+                    DebugAppCheckProviderFactory.getInstance()
+                )
+            } else {
+                Log.d("LunaKraft", "Initializing Firebase App Check with Play Integrity provider")
+                firebaseAppCheck.installAppCheckProviderFactory(
+                    PlayIntegrityAppCheckProviderFactory.getInstance()
+                )
+            }
+            
+            Log.d("LunaKraft", "Firebase App Check initialized successfully")
+        } catch (e: Exception) {
+            Log.e("LunaKraft", "Error initializing Firebase App Check: ${e.message}", e)
+        }
     }
     
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {

@@ -28,11 +28,16 @@ class GeminiAPICall {
     return ApiCallResponse.fromCloudCallResponse(response);
   }
 
-  static String? aiGeneratedText(dynamic response) =>
-      castToType<String>(getJsonField(
-        response,
-        r'''$.candidates[:].content.parts[:].text''',
-      ));
+  static String? aiGeneratedText(dynamic response) {
+    // Extract the raw text from the response
+    final rawText = getJsonField(
+      response,
+      r'''$.candidates[:].content.parts[:].text''',
+    );
+
+    // Return the complete text including any markers
+    return castToType<String>(rawText);
+  }
 }
 
 class ApiPagingParams {

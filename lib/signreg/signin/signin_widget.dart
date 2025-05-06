@@ -6,12 +6,16 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/index.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:lottie/lottie.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'signin_model.dart';
 import 'dart:async';
 import 'package:luna_kraft/backend/schema/util/record_data.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import '/debug_login_helper.dart';
 export 'signin_model.dart';
 
 class SigninWidget extends StatefulWidget {
@@ -140,30 +144,127 @@ class _SigninWidgetState extends State<SigninWidget>
   }
 
   Future<void> _signIn() async {
+    int attemptCount = 0;
+    const maxAttempts = 2;
+    bool appCheckBypassEnabled = false; // Start with normal App Check
+
+    // Helper function for the actual sign-in attempt
+    Future<BaseAuthUser?> attemptSignIn({bool bypassAppCheck = false}) async {
+      try {
+        if (bypassAppCheck) {
+          print('Attempting sign-in with App Check bypass');
+          // First try to refresh the token
+          try {
+            await FirebaseAppCheck.instance.getToken(true);
+            await Future.delayed(Duration(milliseconds: 500));
+          } catch (e) {
+            print('Token refresh failed (continuing anyway): $e');
+          }
+        }
+
+        // Standard sign-in logic
+        final router = GoRouter.of(context);
+        router.prepareAuthEvent();
+
+        return await authManager
+            .signInWithEmail(
+          context,
+          _model.emailAddressTextController.text,
+          _model.passwordTextController.text,
+        )
+            .timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            throw Exception(
+                'Sign-in is taking longer than expected. Please check your internet connection and try again.');
+          },
+        );
+      } catch (e) {
+        print('Sign in error in attempt $attemptCount: $e');
+        if (isAppCheckError(e.toString())) {
+          throw Exception('App Check error: ${e.toString()}');
+        }
+        throw e;
+      }
+    }
+
     try {
       setState(() {
         _isLoading = true;
         _errorMessage = null;
       });
 
-      // Get router reference and prepare auth event
-      final router = GoRouter.of(context);
-      router.prepareAuthEvent();
+      // Check network connectivity first
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult == ConnectivityResult.none) {
+        // Show network error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.signal_wifi_off, color: Colors.white),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Network connection issue detected. Please check your internet connection and try again.',
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          fontFamily: 'Figtree',
+                          color: Colors.white,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                _signIn(); // Retry login
+              },
+            ),
+          ),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
 
-      // Then attempt sign in with timeout
-      final BaseAuthUser? user = await authManager
-          .signInWithEmail(
-        context,
-        _model.emailAddressTextController.text,
-        _model.passwordTextController.text,
-      )
-          .timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('Sign-in timed out. Please try again.');
-        },
-      );
+      // Validate credentials before attempting sign in
+      if (_model.emailAddressTextController.text.isEmpty ||
+          _model.passwordTextController.text.isEmpty) {
+        throw Exception('Please enter both email and password.');
+      }
 
+      // Try normal sign-in first
+      BaseAuthUser? user;
+      while (user == null && attemptCount < maxAttempts) {
+        try {
+          attemptCount++;
+          // Try the sign-in with current App Check setting
+          user = await attemptSignIn(bypassAppCheck: appCheckBypassEnabled);
+        } catch (e) {
+          final errorMsg = e.toString();
+          print('Sign in attempt $attemptCount failed: $errorMsg');
+
+          if (attemptCount < maxAttempts && isAppCheckError(errorMsg)) {
+            // If it's an App Check error and we haven't tried bypassing yet
+            appCheckBypassEnabled = true;
+            print('Enabling App Check bypass for next attempt');
+            continue;
+          }
+
+          // If we've exhausted attempts or it's not an App Check error, rethrow
+          if (attemptCount >= maxAttempts || !isAppCheckError(errorMsg)) {
+            throw e;
+          }
+        }
+      }
+
+      // Handle null user case - this means authentication failed
       if (user == null) {
         throw Exception('Failed to sign in. Please check your credentials.');
       }
@@ -185,6 +286,7 @@ class _SigninWidgetState extends State<SigninWidget>
           );
         }
       } else {
+        // If no 2FA, directly go to home page
         if (mounted) {
           context.pushNamedAuth(
             HomePageWidget.routeName,
@@ -201,13 +303,378 @@ class _SigninWidgetState extends State<SigninWidget>
       }
     } catch (e) {
       if (mounted) {
+        String errorMsg = e.toString();
+        print('Final sign in error: $errorMsg');
+
+        // Provide more specific error message for "Too many attempts"
+        if (errorMsg.contains('too many attempts') ||
+            errorMsg.contains('Too many attempts')) {
+          errorMsg =
+              'Too many login attempts detected. Please wait a moment and try again later.';
+        }
+        // For App Check errors, provide more detailed explanation and solutions
+        else if (errorMsg.contains('App attestation failed') ||
+            errorMsg.contains('App Check') ||
+            errorMsg.contains('403') ||
+            errorMsg.contains('AppCheckProvider') ||
+            errorMsg.contains('token') ||
+            errorMsg.contains('verification failed')) {
+          // Try to automatically retry once with relaxed App Check
+          try {
+            print('Attempting authentication retry with relaxed App Check...');
+            setState(() {
+              _errorMessage = 'Retrying authentication...';
+            });
+
+            final user = await retryAuthWithRelaxedAppCheck(
+              context: context,
+              email: _model.emailAddressTextController.text,
+              password: _model.passwordTextController.text,
+            );
+
+            if (user != null) {
+              print('Retry authentication succeeded!');
+
+              // Check if 2FA is enabled for this user
+              final is2FAEnabled = await AuthUtil.isTwoFactorEnabled();
+              if (is2FAEnabled) {
+                if (mounted) {
+                  context.pushNamed(
+                    'TwoFactorVerification',
+                    extra: <String, dynamic>{
+                      'email': user.email,
+                      kTransitionInfoKey: TransitionInfo(
+                        hasTransition: true,
+                        transitionType: PageTransitionType.fade,
+                        duration: Duration(milliseconds: 250),
+                      ),
+                    },
+                  );
+                }
+              } else {
+                // If no 2FA, directly go to home page
+                if (mounted) {
+                  context.pushNamedAuth(
+                    HomePageWidget.routeName,
+                    context.mounted,
+                    extra: <String, dynamic>{
+                      kTransitionInfoKey: TransitionInfo(
+                        hasTransition: true,
+                        transitionType: PageTransitionType.fade,
+                        duration: Duration(milliseconds: 1000),
+                      ),
+                    },
+                  );
+                }
+              }
+              return;
+            } else {
+              print('Retry authentication failed, showing error dialog');
+            }
+          } catch (retryErr) {
+            print('Error during authentication retry: $retryErr');
+          }
+
+          // Show an alert dialog with more detailed instructions
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text('Authentication Error'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('There was an error verifying your app:'),
+                      SizedBox(height: 10),
+                      Text('• Please check your internet connection'),
+                      Text('• Make sure you have the latest app version'),
+                      Text('• Your device time might be incorrect'),
+                      Text('• Try restarting the app'),
+                      SizedBox(height: 10),
+                      Text(
+                        'Technical details: $errorMsg',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    child: Text('Cancel'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                  TextButton(
+                    child: Text('Try Again'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _signIn(); // Retry login
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+        // For network errors, suggest checking connection with a retry button
+        else if (errorMsg.contains('network') ||
+            errorMsg.contains('connection')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.signal_wifi_off, color: Colors.white),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Network connection issue detected. Please check your internet connection and try again.',
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 10),
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  _signIn(); // Retry login
+                },
+              ),
+            ),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+        // For timeout errors, suggest trying again
+        else if (errorMsg.contains('timed out') ||
+            errorMsg.contains('timeout')) {
+          errorMsg = 'Login request timed out. Please try again.';
+        }
+        // For invalid credentials
+        else if (errorMsg.contains('password') ||
+            errorMsg.contains('user-not-found') ||
+            errorMsg.contains('invalid-credential') ||
+            errorMsg.contains('INVALID_LOGIN_CREDENTIALS')) {
+          errorMsg =
+              'Invalid email or password. Please check your credentials and try again.';
+        }
+
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = errorMsg;
         });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_errorMessage!),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Dismiss',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _createAccount() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      // Check network connectivity first
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult == ConnectivityResult.none) {
+        // Show persistent error banner with retry option
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.signal_wifi_off, color: Colors.white),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Network connection issue detected. Please check your internet connection and try again.',
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          fontFamily: 'Figtree',
+                          color: Colors.white,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                _createAccount(); // Retry account creation
+              },
+            ),
+          ),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Pre-validate form fields
+      if (_model.emailAddressCreateTextController.text.isEmpty ||
+          _model.passwordCreateTextController.text.isEmpty) {
+        throw Exception('Please enter both email and password.');
+      }
+
+      if (_model.passwordCreateTextController.text !=
+          _model.passwordCreateConfirmTextController.text) {
+        throw Exception('Passwords do not match.');
+      }
+
+      // Get router reference and prepare auth event
+      final router = GoRouter.of(context);
+      router.prepareAuthEvent();
+
+      // Increase timeout to 30 seconds for account creation
+      final BaseAuthUser? user = await authManager
+          .createAccountWithEmail(
+        context,
+        _model.emailAddressCreateTextController.text,
+        _model.passwordCreateTextController.text,
+      )
+          .timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception(
+              'Account creation is taking longer than expected. Please check your internet connection and try again.');
+        },
+      );
+
+      if (user == null) {
+        throw Exception('Failed to create account.');
+      }
+
+      // Navigate to profile input page
+      if (mounted) {
+        context.pushNamedAuth(
+          'ProfileInput',
+          context.mounted,
+          extra: <String, dynamic>{
+            kTransitionInfoKey: TransitionInfo(
+              hasTransition: true,
+              transitionType: PageTransitionType.fade,
+              duration: Duration(milliseconds: 500),
+            ),
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMsg = e.toString();
+
+        // Provide more specific error message for "Too many attempts"
+        if (errorMsg.contains('too many attempts') ||
+            errorMsg.contains('Too many attempts')) {
+          errorMsg =
+              'Too many account creation attempts detected. Please wait a moment and try again later.';
+        }
+        // For App Check errors, provide a more helpful message
+        else if (errorMsg.contains('App attestation failed') ||
+            errorMsg.contains('App Check') ||
+            errorMsg.contains('403') ||
+            errorMsg.contains('AppCheckProvider')) {
+          errorMsg =
+              'Authentication error. Please try again or restart the app.';
+        }
+        // For network errors, suggest checking connection with a retry button
+        else if (errorMsg.contains('network') ||
+            errorMsg.contains('connection')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.signal_wifi_off, color: Colors.white),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Network connection issue detected. Please check your internet connection and try again.',
+                      style: FlutterFlowTheme.of(context).bodyMedium.override(
+                            fontFamily: 'Figtree',
+                            color: Colors.white,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 10),
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  _createAccount(); // Retry account creation
+                },
+              ),
+            ),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+        // For timeout errors, suggest trying again
+        else if (errorMsg.contains('timed out') ||
+            errorMsg.contains('timeout')) {
+          errorMsg = 'Account creation request timed out. Please try again.';
+        }
+        // For email already in use errors
+        else if (errorMsg.contains('email-already-in-use') ||
+            errorMsg.contains('already in use')) {
+          errorMsg =
+              'This email is already registered. Please use a different email or try signing in.';
+        }
+
+        setState(() {
+          _errorMessage = errorMsg;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_errorMessage!),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Dismiss',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
           ),
         );
       }
@@ -749,48 +1216,12 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                   0.0,
                                                                   16.0),
                                                       child: FFButtonWidget(
-                                                        onPressed: () async {
-                                                          GoRouter.of(context)
-                                                              .prepareAuthEvent();
-                                                          if (_model
-                                                                  .passwordCreateTextController
-                                                                  .text !=
-                                                              _model
-                                                                  .passwordCreateConfirmTextController
-                                                                  .text) {
-                                                            ScaffoldMessenger
-                                                                    .of(context)
-                                                                .showSnackBar(
-                                                              SnackBar(
-                                                                content: Text(
-                                                                  'Passwords don\'t match!',
-                                                                ),
-                                                              ),
-                                                            );
-                                                            return;
-                                                          }
-
-                                                          final user =
-                                                              await authManager
-                                                                  .createAccountWithEmail(
-                                                            context,
-                                                            _model
-                                                                .emailAddressCreateTextController
-                                                                .text,
-                                                            _model
-                                                                .passwordCreateTextController
-                                                                .text,
-                                                          );
-                                                          if (user == null) {
-                                                            return;
-                                                          }
-
-                                                          context.pushNamedAuth(
-                                                              ProfileInputWidget
-                                                                  .routeName,
-                                                              context.mounted);
-                                                        },
-                                                        text: 'Get Started',
+                                                        onPressed: _isLoading
+                                                            ? null
+                                                            : _createAccount,
+                                                        text: _isLoading
+                                                            ? 'Creating account...'
+                                                            : 'Get Started',
                                                         options:
                                                             FFButtonOptions(
                                                           width: 230.0,
@@ -1470,16 +1901,9 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                       0.0,
                                                                       0.0,
                                                                       0.0),
-                                                          color: _isLoading
-                                                              ? FlutterFlowTheme
-                                                                      .of(
-                                                                          context)
-                                                                  .primary
-                                                                  .withOpacity(
-                                                                      0.5)
-                                                              : FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .primary,
+                                                          color: FlutterFlowTheme
+                                                                  .of(context)
+                                                              .primary,
                                                           textStyle:
                                                               FlutterFlowTheme.of(
                                                                       context)
@@ -1489,10 +1913,15 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                         'Figtree',
                                                                     color: Colors
                                                                         .white,
+                                                                    fontSize:
+                                                                        16.0,
                                                                     letterSpacing:
                                                                         0.0,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
                                                                   ),
-                                                          elevation: 3.0,
+                                                          elevation: 0.0,
                                                           borderSide:
                                                               BorderSide(
                                                             color: Colors
@@ -1502,7 +1931,13 @@ class _SigninWidgetState extends State<SigninWidget>
                                                           borderRadius:
                                                               BorderRadius
                                                                   .circular(
-                                                                      12.0),
+                                                                      50.0),
+                                                          disabledColor:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .secondaryText
+                                                                  .withOpacity(
+                                                                      0.5),
                                                         ),
                                                       ),
                                                     ),

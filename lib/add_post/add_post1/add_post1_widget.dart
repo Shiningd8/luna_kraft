@@ -7,6 +7,8 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/index.dart';
 import '/add_post/create_post/create_post_widget.dart';
+import '/widgets/lottie_background.dart';
+import '/services/app_state.dart' as custom_app_state;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -117,6 +119,8 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
   @override
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
+    // Access the custom app state
+    context.watch<custom_app_state.AppState>();
 
     return GestureDetector(
       onTap: () {
@@ -583,662 +587,759 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
             ),
           ),
         ),
-        body: SafeArea(
-          top: true,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Background with proper Lottie animation
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF1A1A2E),
-                      Color(0xFF16213E),
-                    ],
-                  ),
+        body: LottieBackground(
+          child: SafeArea(
+            top: true,
+            child: SingleChildScrollView(
+              physics: AlwaysScrollableScrollPhysics(),
+              child: Container(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top,
                 ),
-                child: Lottie.asset(
-                  'assets/jsons/Animation_-_1739171323302.json',
-                  fit: BoxFit.cover,
-                  animate: true,
-                  frameRate: FrameRate(60),
-                ),
-              ),
-
-              // Main content
-              SingleChildScrollView(
-                physics: AlwaysScrollableScrollPhysics(),
-                child: Container(
-                  constraints: BoxConstraints(
-                    minHeight: MediaQuery.of(context).size.height -
-                        MediaQuery.of(context).padding.top,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      // Header section
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(24, 24, 24, 32),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.2),
-                                  width: 1,
-                                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    // Header section
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(24, 24, 24, 32),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 1,
                               ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(24),
-                                  onTap: () => context.safePop(),
-                                  child: Icon(
-                                    Icons.arrow_back_ios_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: () => context.safePop(),
+                                child: Icon(
+                                  Icons.arrow_back_ios_rounded,
+                                  color: Colors.white,
+                                  size: 20,
                                 ),
                               ),
                             ),
+                          ),
+                          Text(
+                            'AI Dream Assistant',
+                            style: FlutterFlowTheme.of(context)
+                                .titleMedium
+                                .override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          SizedBox(width: 48),
+                        ],
+                      ),
+                    ).animate().fadeIn(duration: 400.ms, curve: Curves.easeOut),
+
+                    // Dream input section
+                    if (GeminiAPICall.aiGeneratedText(
+                                (_model.apiResultssd?.jsonBody ?? '')) ==
+                            null ||
+                        GeminiAPICall.aiGeneratedText(
+                                (_model.apiResultssd?.jsonBody ?? '')) ==
+                            '')
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              'AI Dream Assistant',
+                              'Share Your Dream Fragment',
                               style: FlutterFlowTheme.of(context)
                                   .titleMedium
                                   .override(
                                     fontFamily: 'Figtree',
                                     color: Colors.white,
-                                    fontSize: 20,
+                                    fontSize: 24,
                                     fontWeight: FontWeight.w600,
                                   ),
                             ),
-                            SizedBox(width: 48),
-                          ],
-                        ),
-                      )
-                          .animate()
-                          .fadeIn(duration: 400.ms, curve: Curves.easeOut),
-
-                      // Dream input section
-                      if (GeminiAPICall.aiGeneratedText(
-                                  (_model.apiResultssd?.jsonBody ?? '')) ==
-                              null ||
-                          GeminiAPICall.aiGeneratedText(
-                                  (_model.apiResultssd?.jsonBody ?? '')) ==
-                              '')
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Share Your Dream Fragment',
+                            SizedBox(height: 8),
+                            Text(
+                              'Tell us what you remember, and we\'ll help complete your dream story',
+                              style: FlutterFlowTheme.of(context)
+                                  .bodyMedium
+                                  .override(
+                                    fontFamily: 'Figtree',
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 16,
+                                  ),
+                            ),
+                            SizedBox(height: 24),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: _isGenerating
+                                      ? Colors.transparent
+                                      : Colors.white.withOpacity(0.1),
+                                  width: 1,
+                                ),
+                                boxShadow: _isGenerating
+                                    ? [
+                                        BoxShadow(
+                                          color: _getGlowColor()
+                                              .withOpacity(_getGlowOpacity()),
+                                          blurRadius: 20,
+                                          spreadRadius: 2,
+                                        ),
+                                        BoxShadow(
+                                          color: _getGlowColor().withOpacity(
+                                              _getGlowOpacity() * 0.7),
+                                          blurRadius: 30,
+                                          spreadRadius: 4,
+                                        ),
+                                        BoxShadow(
+                                          color: _getGlowColor().withOpacity(
+                                              _getGlowOpacity() * 0.5),
+                                          blurRadius: 40,
+                                          spreadRadius: 6,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: TextFormField(
+                                controller: _model.textController,
+                                focusNode: _model.textFieldFocusNode,
+                                maxLines: 6,
+                                minLines: 2,
+                                maxLength: 250,
+                                enabled: !_isGenerating,
                                 style: FlutterFlowTheme.of(context)
-                                    .titleMedium
+                                    .bodyLarge
                                     .override(
                                       fontFamily: 'Figtree',
                                       color: Colors.white,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Tell us what you remember, and we\'ll help complete your dream story',
-                                style: FlutterFlowTheme.of(context)
-                                    .bodyMedium
-                                    .override(
-                                      fontFamily: 'Figtree',
-                                      color: Colors.white.withOpacity(0.7),
                                       fontSize: 16,
                                     ),
-                              ),
-                              SizedBox(height: 24),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: _isGenerating
-                                        ? Colors.transparent
-                                        : Colors.white.withOpacity(0.1),
-                                    width: 1,
-                                  ),
-                                  boxShadow: _isGenerating
-                                      ? [
-                                          BoxShadow(
-                                            color: _getGlowColor()
-                                                .withOpacity(_getGlowOpacity()),
-                                            blurRadius: 20,
-                                            spreadRadius: 2,
-                                          ),
-                                          BoxShadow(
-                                            color: _getGlowColor().withOpacity(
-                                                _getGlowOpacity() * 0.7),
-                                            blurRadius: 30,
-                                            spreadRadius: 4,
-                                          ),
-                                          BoxShadow(
-                                            color: _getGlowColor().withOpacity(
-                                                _getGlowOpacity() * 0.5),
-                                            blurRadius: 40,
-                                            spreadRadius: 6,
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: TextFormField(
-                                  controller: _model.textController,
-                                  focusNode: _model.textFieldFocusNode,
-                                  maxLines: 6,
-                                  minLines: 2,
-                                  maxLength: 250,
-                                  enabled: !_isGenerating,
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyLarge
+                                decoration: InputDecoration(
+                                  hintText: 'Start dreaming here...',
+                                  hintStyle: FlutterFlowTheme.of(context)
+                                      .bodyMedium
                                       .override(
                                         fontFamily: 'Figtree',
-                                        color: Colors.white,
+                                        color: Colors.white.withOpacity(0.5),
                                         fontSize: 16,
                                       ),
-                                  decoration: InputDecoration(
-                                    hintText: 'Start dreaming here...',
-                                    hintStyle: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          fontFamily: 'Figtree',
-                                          color: Colors.white.withOpacity(0.5),
-                                          fontSize: 16,
-                                        ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: EdgeInsets.all(20),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
                                   ),
+                                  contentPadding: EdgeInsets.all(20),
                                 ),
                               ),
-                              SizedBox(height: 16),
-                              Container(
-                                padding: EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.1),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        Icons.tips_and_updates,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    SizedBox(width: 16),
-                                    Expanded(
-                                      child: Text(
-                                        'Include colors, feelings, and specific events to help AI better understand your dream',
-                                        style: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .override(
-                                              fontFamily: 'Figtree',
-                                              color:
-                                                  Colors.white.withOpacity(0.7),
-                                              fontSize: 14,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
+                            ),
+                            SizedBox(height: 16),
+                            Container(
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.1),
+                                  width: 1,
                                 ),
                               ),
-                            ],
-                          ),
-                        ).animate().fadeIn(
-                            delay: 200.ms,
-                            duration: 600.ms,
-                            curve: Curves.easeOut),
-
-                      // Next button
-                      if (GeminiAPICall.aiGeneratedText(
-                                  (_model.apiResultssd?.jsonBody ?? '')) ==
-                              null ||
-                          GeminiAPICall.aiGeneratedText(
-                                  (_model.apiResultssd?.jsonBody ?? '')) ==
-                              '')
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
-                          child: Column(
-                            children: [
-                              // Word count indicator
-                              if (!_isGenerating)
-                                Padding(
-                                  padding: EdgeInsets.only(bottom: 12),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
+                              child: Column(
+                                children: [
+                                  Row(
                                     children: [
+                                      Container(
+                                        padding: EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.tips_and_updates,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      SizedBox(width: 16),
+                                      Expanded(
+                                        child: Text(
+                                          'How to Write Effective Dream Prompts',
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                fontFamily: 'Figtree',
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 12),
+                                  Container(
+                                    height: 100,
+                                    child: PageView(
+                                      controller: PageController(
+                                        initialPage: 0,
+                                        viewportFraction: 1.0,
+                                      ),
+                                      scrollDirection: Axis.horizontal,
+                                      children: [
+                                        _buildTipCard(
+                                            context,
+                                            'Keep it simple and specific',
+                                            'Include only what you remember - don\'t add details you aren\'t sure about.',
+                                            Icons.auto_awesome),
+                                        _buildTipCard(
+                                            context,
+                                            'Be precise',
+                                            'Mention colors, sensations, and settings exactly as you recall them.',
+                                            Icons.colorize),
+                                        _buildTipCard(
+                                            context,
+                                            'Example: Good Format',
+                                            'I was in a blue room. The door opened and I saw a garden with tall trees.',
+                                            Icons.thumb_up_outlined),
+                                        _buildTipCard(
+                                            context,
+                                            'Example: Avoid Interpretation',
+                                            'Write "I saw a snake" instead of "I saw a snake which represents my fear"',
+                                            Icons.thumb_down_outlined),
+                                        _buildTipCard(
+                                            context,
+                                            'Include sensory details',
+                                            'Mention sounds, smells, textures, and how things felt physically in your dream.',
+                                            Icons.sensors),
+                                        _buildTipCard(
+                                            context,
+                                            'Describe transitions',
+                                            'If you don\'t remember how you moved between scenes, simply say "somehow I was now at..."',
+                                            Icons.swap_horiz),
+                                        _buildTipCard(
+                                            context,
+                                            'Example: Good Fragment',
+                                            'I was running in a dark forest. The trees were tall with red leaves. Suddenly I was at my childhood home.',
+                                            Icons.format_quote),
+                                        _buildTipCard(
+                                            context,
+                                            'Avoid assumptions',
+                                            'If you\'re unsure if something was a person or creature, describe only what you saw without naming it.',
+                                            Icons.psychology),
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(height: 10),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.swipe,
+                                        color: Colors.white.withOpacity(0.5),
+                                        size: 16,
+                                      ),
+                                      SizedBox(width: 6),
                                       Text(
-                                        '${_model.textController.text.split(' ').where((word) => word.isNotEmpty).length}/10 words minimum',
+                                        'Swipe for more tips',
                                         style: FlutterFlowTheme.of(context)
                                             .bodySmall
                                             .override(
                                               fontFamily: 'Figtree',
-                                              color: _model.textController.text
-                                                          .split(' ')
-                                                          .where((word) =>
-                                                              word.isNotEmpty)
-                                                          .length >=
-                                                      10
-                                                  ? Colors.white
-                                                      .withOpacity(0.7)
-                                                  : Colors.white
-                                                      .withOpacity(0.5),
+                                              color:
+                                                  Colors.white.withOpacity(0.5),
                                               fontSize: 12,
                                             ),
                                       ),
                                     ],
                                   ),
-                                ),
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      _model.textController.text
-                                                  .split(' ')
-                                                  .where(
-                                                      (word) => word.isNotEmpty)
-                                                  .length >=
-                                              10
-                                          ? Color(0xFF6448FE)
-                                          : Color(0xFF6448FE).withOpacity(0.5),
-                                      _model.textController.text
-                                                  .split(' ')
-                                                  .where(
-                                                      (word) => word.isNotEmpty)
-                                                  .length >=
-                                              10
-                                          ? Color(0xFF9747FF)
-                                          : Color(0xFF9747FF).withOpacity(0.5),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Color(0xFF9747FF).withOpacity(0.3),
-                                      blurRadius: 20,
-                                      offset: Offset(0, 10),
-                                    ),
-                                  ],
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(16),
-                                    onTap: _model.textController.text
-                                                    .split(' ')
-                                                    .where((word) =>
-                                                        word.isNotEmpty)
-                                                    .length >=
-                                                10 &&
-                                            !_isGenerating
-                                        ? () async {
-                                            setState(() {
-                                              _isLoading = true;
-                                              _isGenerating = true;
-                                            });
-
-                                            _model.apiResultssd =
-                                                await GeminiAPICall.call(
-                                              userInputText:
-                                                  _model.textController.text,
-                                            );
-
-                                            // Add delay to show loading animation
-                                            await Future.delayed(
-                                                Duration(seconds: 5));
-
-                                            if ((_model
-                                                    .apiResultssd?.succeeded ??
-                                                true)) {
-                                              _model.apiResponse =
-                                                  valueOrDefault<String>(
-                                                GeminiAPICall.aiGeneratedText(
-                                                  (_model.apiResultssd
-                                                          ?.jsonBody ??
-                                                      ''),
-                                                ),
-                                                'unset',
-                                              );
-                                              safeSetState(() {});
-                                            }
-
-                                            setState(() {
-                                              _isLoading = false;
-                                              _isGenerating = false;
-                                            });
-                                            safeSetState(() {});
-                                          }
-                                        : null,
-                                    child: Container(
-                                      width: double.infinity,
-                                      height: 60,
-                                      padding:
-                                          EdgeInsets.symmetric(horizontal: 24),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            _isGenerating
-                                                ? 'Generating...'
-                                                : 'Generate Dream',
-                                            style: FlutterFlowTheme.of(context)
-                                                .titleSmall
-                                                .override(
-                                                  fontFamily: 'Figtree',
-                                                  color: _model.textController
-                                                                  .text
-                                                                  .split(' ')
-                                                                  .where((word) =>
-                                                                      word
-                                                                          .isNotEmpty)
-                                                                  .length >=
-                                                              10 &&
-                                                          !_isGenerating
-                                                      ? Colors.white
-                                                      : Colors.white
-                                                          .withOpacity(0.7),
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                          ),
-                                          SizedBox(width: 12),
-                                          if (!_isGenerating)
-                                            Icon(
-                                              Icons.auto_awesome,
-                                              color: _model.textController.text
-                                                          .split(' ')
-                                                          .where((word) =>
-                                                              word.isNotEmpty)
-                                                          .length >=
-                                                      10
-                                                  ? Colors.white
-                                                  : Colors.white
-                                                      .withOpacity(0.7),
-                                              size: 24,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ).animate().fadeIn(
-                            delay: 400.ms,
-                            duration: 600.ms,
-                            curve: Curves.easeOut),
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(
+                          delay: 200.ms,
+                          duration: 600.ms,
+                          curve: Curves.easeOut),
 
-                      // Loading Animation
-                      if (_isGenerating)
-                        Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 120,
-                                height: 120,
-                                child: Lottie.asset(
-                                  'assets/jsons/loading.json',
-                                  fit: BoxFit.contain,
-                                  animate: true,
-                                  frameRate: FrameRate(60),
-                                ),
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'Hang on...',
-                                style: FlutterFlowTheme.of(context)
-                                    .titleMedium
-                                    .override(
-                                      fontFamily: 'Figtree',
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        )
-                            .animate()
-                            .fadeIn(duration: 300.ms, curve: Curves.easeOut),
-
-                      // AI Generated Content
-                      if (GeminiAPICall.aiGeneratedText(
-                                  (_model.apiResultssd?.jsonBody ?? '')) !=
-                              null &&
-                          GeminiAPICall.aiGeneratedText(
-                                  (_model.apiResultssd?.jsonBody ?? '')) !=
-                              '')
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.1),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                    // Next button
+                    if (GeminiAPICall.aiGeneratedText(
+                                (_model.apiResultssd?.jsonBody ?? '')) ==
+                            null ||
+                        GeminiAPICall.aiGeneratedText(
+                                (_model.apiResultssd?.jsonBody ?? '')) ==
+                            '')
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
+                        child: Column(
+                          children: [
+                            // Word count indicator
+                            if (!_isGenerating)
+                              Padding(
+                                padding: EdgeInsets.only(bottom: 12),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.white.withOpacity(0.1),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(
-                                            Icons.auto_awesome,
-                                            color: Colors.white,
-                                            size: 24,
-                                          ),
-                                        ),
-                                        SizedBox(width: 16),
-                                        Text(
-                                          'AI Generated Dream',
-                                          style: FlutterFlowTheme.of(context)
-                                              .titleMedium
-                                              .override(
-                                                fontFamily: 'Figtree',
-                                                color: Colors.white,
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                    SizedBox(height: 24),
                                     Text(
-                                      _model.apiResponse,
+                                      '${_model.textController.text.split(' ').where((word) => word.isNotEmpty).length}/10 words minimum',
                                       style: FlutterFlowTheme.of(context)
-                                          .bodyMedium
+                                          .bodySmall
                                           .override(
                                             fontFamily: 'Figtree',
-                                            color: Colors.white,
-                                            fontSize: 16,
+                                            color: _model.textController.text
+                                                        .split(' ')
+                                                        .where((word) =>
+                                                            word.isNotEmpty)
+                                                        .length >=
+                                                    10
+                                                ? Colors.white.withOpacity(0.7)
+                                                : Colors.white.withOpacity(0.5),
+                                            fontSize: 12,
                                           ),
                                     ),
                                   ],
                                 ),
                               ),
-                              SizedBox(height: 24),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.05),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.1),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          onTap: () {
-                                            setState(() {
-                                              _isGenerating = false;
-                                              _model.apiResponse = '';
-                                              _model.apiResultssd = null;
-                                            });
-                                            safeSetState(() {});
-                                          },
-                                          child: Container(
-                                            padding: EdgeInsets.all(16),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  Icons.refresh,
-                                                  color: Colors.white,
-                                                  size: 20,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  'Try Again',
-                                                  style: FlutterFlowTheme.of(
-                                                          context)
-                                                      .bodyMedium
-                                                      .override(
-                                                        fontFamily: 'Figtree',
-                                                        color: Colors.white,
-                                                        fontSize: 16,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 16),
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Color(0xFF6448FE),
-                                            Color(0xFF9747FF),
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Color(0xFF9747FF)
-                                                .withOpacity(0.3),
-                                            blurRadius: 20,
-                                            offset: Offset(0, 10),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          onTap: () {
-                                            context.pushNamed(
-                                              CreatePostWidget.routeName,
-                                              queryParameters: {
-                                                'generatedText': serializeParam(
-                                                  _model.apiResponse,
-                                                  ParamType.String,
-                                                ),
-                                              }.withoutNulls,
-                                            );
-                                          },
-                                          child: Container(
-                                            padding: EdgeInsets.all(16),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  Icons.check,
-                                                  color: Colors.white,
-                                                  size: 20,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  'Use This',
-                                                  style: FlutterFlowTheme.of(
-                                                          context)
-                                                      .bodyMedium
-                                                      .override(
-                                                        fontFamily: 'Figtree',
-                                                        color: Colors.white,
-                                                        fontSize: 16,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    _model.textController.text
+                                                .split(' ')
+                                                .where(
+                                                    (word) => word.isNotEmpty)
+                                                .length >=
+                                            10
+                                        ? Color(0xFF6448FE)
+                                        : Color(0xFF6448FE).withOpacity(0.5),
+                                    _model.textController.text
+                                                .split(' ')
+                                                .where(
+                                                    (word) => word.isNotEmpty)
+                                                .length >=
+                                            10
+                                        ? Color(0xFF9747FF)
+                                        : Color(0xFF9747FF).withOpacity(0.5),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Color(0xFF9747FF).withOpacity(0.3),
+                                    blurRadius: 20,
+                                    offset: Offset(0, 10),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ).animate().fadeIn(
-                            delay: 600.ms,
-                            duration: 800.ms,
-                            curve: Curves.easeOut),
-                    ],
-                  ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: _model.textController.text
+                                                  .split(' ')
+                                                  .where(
+                                                      (word) => word.isNotEmpty)
+                                                  .length >=
+                                              10 &&
+                                          !_isGenerating
+                                      ? () async {
+                                          setState(() {
+                                            _isLoading = true;
+                                            _isGenerating = true;
+                                          });
+
+                                          _model.apiResultssd =
+                                              await GeminiAPICall.call(
+                                            userInputText:
+                                                _model.textController.text,
+                                          );
+
+                                          // Add delay to show loading animation
+                                          await Future.delayed(
+                                              Duration(seconds: 5));
+
+                                          if ((_model.apiResultssd?.succeeded ??
+                                              true)) {
+                                            _model.apiResponse =
+                                                valueOrDefault<String>(
+                                              GeminiAPICall.aiGeneratedText(
+                                                (_model.apiResultssd
+                                                        ?.jsonBody ??
+                                                    ''),
+                                              ),
+                                              'unset',
+                                            );
+                                            safeSetState(() {});
+                                          }
+
+                                          setState(() {
+                                            _isLoading = false;
+                                            _isGenerating = false;
+                                          });
+                                          safeSetState(() {});
+                                        }
+                                      : null,
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 60,
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 24),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          _isGenerating
+                                              ? 'Generating...'
+                                              : 'Generate Dream',
+                                          style: FlutterFlowTheme.of(context)
+                                              .titleSmall
+                                              .override(
+                                                fontFamily: 'Figtree',
+                                                color: _model.textController
+                                                                .text
+                                                                .split(' ')
+                                                                .where((word) =>
+                                                                    word
+                                                                        .isNotEmpty)
+                                                                .length >=
+                                                            10 &&
+                                                        !_isGenerating
+                                                    ? Colors.white
+                                                    : Colors.white
+                                                        .withOpacity(0.7),
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        if (!_isGenerating)
+                                          Icon(
+                                            Icons.auto_awesome,
+                                            color: _model.textController.text
+                                                        .split(' ')
+                                                        .where((word) =>
+                                                            word.isNotEmpty)
+                                                        .length >=
+                                                    10
+                                                ? Colors.white
+                                                : Colors.white.withOpacity(0.7),
+                                            size: 24,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(
+                          delay: 400.ms,
+                          duration: 600.ms,
+                          curve: Curves.easeOut),
+
+                    // Loading Animation
+                    if (_isGenerating)
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 120,
+                              height: 120,
+                              child: Lottie.asset(
+                                'assets/jsons/loading.json',
+                                fit: BoxFit.contain,
+                                animate: true,
+                                frameRate: FrameRate(60),
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Hang on...',
+                              style: FlutterFlowTheme.of(context)
+                                  .titleMedium
+                                  .override(
+                                    fontFamily: 'Figtree',
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      )
+                          .animate()
+                          .fadeIn(duration: 300.ms, curve: Curves.easeOut),
+
+                    // AI Generated Content
+                    if (GeminiAPICall.aiGeneratedText(
+                                (_model.apiResultssd?.jsonBody ?? '')) !=
+                            null &&
+                        GeminiAPICall.aiGeneratedText(
+                                (_model.apiResultssd?.jsonBody ?? '')) !=
+                            '')
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.1),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.auto_awesome,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      SizedBox(width: 16),
+                                      Text(
+                                        'AI Generated Dream',
+                                        style: FlutterFlowTheme.of(context)
+                                            .titleMedium
+                                            .override(
+                                              fontFamily: 'Figtree',
+                                              color: Colors.white,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 24),
+                                  Text(
+                                    _model.apiResponse,
+                                    style: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Figtree',
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.1),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(12),
+                                        onTap: () {
+                                          setState(() {
+                                            _isGenerating = false;
+                                            _model.apiResponse = '';
+                                            _model.apiResultssd = null;
+                                          });
+                                          safeSetState(() {});
+                                        },
+                                        child: Container(
+                                          padding: EdgeInsets.all(16),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.refresh,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Try Again',
+                                                style:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .override(
+                                                          fontFamily: 'Figtree',
+                                                          color: Colors.white,
+                                                          fontSize: 16,
+                                                        ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 16),
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Color(0xFF6448FE),
+                                          Color(0xFF9747FF),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Color(0xFF9747FF)
+                                              .withOpacity(0.3),
+                                          blurRadius: 20,
+                                          offset: Offset(0, 10),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(12),
+                                        onTap: () {
+                                          context.pushNamed(
+                                            CreatePostWidget.routeName,
+                                            queryParameters: {
+                                              'generatedText': serializeParam(
+                                                _model.apiResponse,
+                                                ParamType.String,
+                                              ),
+                                            }.withoutNulls,
+                                          );
+                                        },
+                                        child: Container(
+                                          padding: EdgeInsets.all(16),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.check,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Use This',
+                                                style:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .override(
+                                                          fontFamily: 'Figtree',
+                                                          color: Colors.white,
+                                                          fontSize: 16,
+                                                        ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(
+                          delay: 600.ms,
+                          duration: 800.ms,
+                          curve: Curves.easeOut),
+                  ],
                 ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTipCard(
+      BuildContext context, String title, String description, IconData icon) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                color: Color(0xFF9747FF),
+                size: 16,
+              ),
+              SizedBox(width: 8),
+              Text(
+                title,
+                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                      fontFamily: 'Figtree',
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
             ],
           ),
-        ),
+          SizedBox(height: 8),
+          Text(
+            description,
+            style: FlutterFlowTheme.of(context).bodyMedium.override(
+                  fontFamily: 'Figtree',
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 13,
+                ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

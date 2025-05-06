@@ -7,30 +7,50 @@ async function _geminiAPICall(context, ffVariables) {
   var url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyBD12Lf4b9UB_ZhinHFvNx3JT63u41sa_s`;
   var headers = { "Content-Type": `application/json` };
   var params = {};
-  var ffApiRequestBody = `
-{
-  "contents": [
-    {
-      "parts": [
-        {
-          "text": "You are a helpful dream-writing assistant. A user has written a few fragments of a dream they remember. Your task is to complete this dream into a short story using first person narration, written in simple, natural English. The story should be 2 to 3 short paragraphs and should not be too long. Do not add unrelated fantasy elements, new characters, or random locations that weren't mentioned. Use only the information the user gave and complete it in a way it makes sense like there should not be anything random that was not mentioned in the fragments. The parts of the dream are: ${escapeStringForJson(userInputText)}"
-        }
-      ]
-    }
-  ]
-}`;
+
+  // Create the request body as a JavaScript object instead of a string template
+  const requestBody = {
+    contents: [
+      {
+        parts: [
+          {
+            text: "You are a helpful dream-writing assistant. A user has shared fragments of a dream they remember. Your task is to weave these fragments into a complete dream narrative (200-220 words) using first person narration. The fragments should be integrated naturally throughout the story, not just used as a starting point. Create a coherent dream that incorporates all elements the user mentioned without adding any new characters, places, or names beyond what they provided. Keep your writing simple and straightforward while making the dream feel authentic. Also use simple english thats easy to understand. The dream fragments are: ${escapeStringForJson(userInputText)}"
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.05, // Much lower temperature for more precise, literal responses
+      maxOutputTokens: 300,
+      topP: 0.7,
+      topK: 20
+    },
+    safetySettings: [
+      {
+        category: "HARM_CATEGORY_HARASSMENT",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE"
+      },
+      {
+        category: "HARM_CATEGORY_HATE_SPEECH",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE"
+      },
+      {
+        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE"
+      },
+      {
+        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE"
+      }
+    ]
+  };
 
   return makeApiRequest({
     method: "post",
     url,
     headers,
     params,
-    body: createBody({
-      headers,
-      params,
-      body: ffApiRequestBody,
-      bodyType: "JSON",
-    }),
+    body: requestBody,
     returnBody: true,
     isStreamingApi: false,
   });

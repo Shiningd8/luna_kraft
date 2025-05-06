@@ -1,47 +1,36 @@
+import 'package:flutter/foundation.dart';
+import 'dart:io' show Platform;
+
+// This is a placeholder for the PurchaseConfig
+// The implementation has been temporarily removed and will be re-implemented from scratch
 class PurchaseConfig {
-  // RevenueCat API Keys
-  static const String revenueCatApiKeyIOS = 'YOUR_IOS_API_KEY';
-  static const String revenueCatApiKeyAndroid = 'YOUR_ANDROID_API_KEY';
+  // Coin product IDs from Google Play Console
+  static const String coins100 = 'lunacoin_100';
+  static const String coins500 = 'lunacoin_500';
+  static const String coins1000 = 'lunacoin_1000';
 
-  // Product IDs for coins
-  static const String coins100 = 'luna_100_coins';
-  static const String coins500 = 'luna_500_coins';
-  static const String coins1000 = 'luna_1000_coins';
+  // Subscription product IDs - these match the IDs from the screenshots
+  static const String membershipWeekly = 'premium_weekly';
+  static const String membershipMonthly = 'premium_monthly';
+  static const String membershipYearly = 'premium_yearly';
 
-  // Product IDs for memberships
-  static const String membershipWeekly = 'luna_membership_weekly';
-  static const String membershipMonthly = 'luna_membership_monthly';
-  static const String membershipYearly = 'luna_membership_yearly';
+  // Offering types
+  static const String coinsOffering = 'coins';
+  static const String membershipOffering = 'premium';
 
-  // Offering identifiers (HOW users can purchase)
-  static const String coinsOffering = 'coins_offering';
-  static const String membershipOffering = 'membership_offering';
+  // Get the platform-specific product ID
+  static String getProductId(String baseId) {
+    // For Google Play, we keep the same ID
+    if (Platform.isAndroid) {
+      return baseId;
+    }
 
-  // Entitlement identifiers (WHAT users have access to)
-  static const String premiumEntitlement = 'premium_access';
-  static const String dreamAnalysisEntitlement = 'dream_analysis';
-  static const String exclusiveThemesEntitlement = 'exclusive_themes';
-  static const String adFreeEntitlement = 'ad_free';
+    // For iOS, prefix with 'ios.'
+    if (Platform.isIOS) {
+      return 'ios.$baseId';
+    }
 
-  // Maps membership durations to their entitlements
-  static const Map<String, List<String>> membershipEntitlements = {
-    membershipWeekly: [
-      premiumEntitlement,
-      dreamAnalysisEntitlement,
-      exclusiveThemesEntitlement,
-      adFreeEntitlement,
-    ],
-    membershipMonthly: [
-      premiumEntitlement,
-      dreamAnalysisEntitlement,
-      exclusiveThemesEntitlement,
-      adFreeEntitlement,
-    ],
-    membershipYearly: [
-      premiumEntitlement,
-      dreamAnalysisEntitlement,
-      exclusiveThemesEntitlement,
-      adFreeEntitlement,
-    ],
-  };
+    // Default case
+    return baseId;
+  }
 }

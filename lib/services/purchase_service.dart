@@ -1,230 +1,197 @@
-import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io' show Platform;
 import 'package:connectivity_plus/connectivity_plus.dart';
-import '../config/purchase_config.dart';
+import 'dart:async';
+import 'subscription_service.dart';
+import 'models/subscription_product.dart';
+import 'coin_service.dart';
+import 'models/coin_product.dart';
 
+// This is a placeholder for the PurchaseService
+// The implementation has been temporarily removed and will be re-implemented from scratch
 class PurchaseService {
-  static bool _isInitialized = false;
-  static final Connectivity _connectivity = Connectivity();
-
-  static Future<bool> _checkNetworkConnectivity() async {
-    try {
-      final connectivityResult = await _connectivity.checkConnectivity();
-      return connectivityResult != ConnectivityResult.none;
-    } catch (e) {
-      debugPrint('Error checking network connectivity: $e');
-      return false;
-    }
-  }
-
+  // Initialize the purchase service
   static Future<void> init() async {
-    if (_isInitialized) return;
-
     try {
-      // Check network connectivity first
-      final hasConnection = await _checkNetworkConnectivity();
-      if (!hasConnection) {
-        throw Exception('No internet connection available');
-      }
-
-      // Configure debug logs
-      await Purchases.setLogLevel(LogLevel.debug);
-
-      // Initialize RevenueCat with platform-specific API key
-      final apiKey = Platform.isIOS
-          ? PurchaseConfig.revenueCatApiKeyIOS
-          : PurchaseConfig.revenueCatApiKeyAndroid;
-
-      if (apiKey.isEmpty ||
-          apiKey == 'YOUR_IOS_API_KEY' ||
-          apiKey == 'YOUR_ANDROID_API_KEY') {
-        throw Exception(
-            'Invalid RevenueCat API key. Please configure your API keys in purchase_config.dart');
-      }
-
-      await Purchases.configure(
-        PurchasesConfiguration(apiKey),
-      );
-
-      _isInitialized = true;
+      debugPrint('PurchaseService.init(): Initializing');
+      await SubscriptionService.instance.init();
+      await CoinService.instance.init();
+      debugPrint('PurchaseService.init(): Service initialized successfully');
     } catch (e) {
-      debugPrint('Error initializing RevenueCat: $e');
-      rethrow;
+      debugPrint('PurchaseService.init(): Error initializing service - $e');
     }
   }
 
-  // Fetch coin packages
-  static Future<List<Package>> getCoinPackages() async {
-    int retryCount = 0;
-    const maxRetries = 3;
-    const retryDelay = Duration(seconds: 2);
-
-    while (retryCount < maxRetries) {
-      try {
-        // Check network connectivity before each attempt
-        final hasConnection = await _checkNetworkConnectivity();
-        if (!hasConnection) {
-          throw Exception('No internet connection available');
-        }
-
-        if (!_isInitialized) {
-          await init();
-        }
-
-        final offerings = await Purchases.getOfferings();
-        final offering = offerings.getOffering(PurchaseConfig.coinsOffering);
-        if (offering != null) {
-          return offering.availablePackages;
-        }
-        return [];
-      } catch (e) {
-        retryCount++;
-        if (retryCount == maxRetries) {
-          debugPrint(
-              'Failed to fetch coin packages after $maxRetries attempts: $e');
-          return [];
-        }
-        debugPrint('Retrying to fetch coin packages (attempt $retryCount): $e');
-        await Future.delayed(retryDelay);
-      }
-    }
-    return [];
-  }
-
-  // Fetch membership packages
-  static Future<List<Package>> getMembershipPackages() async {
-    int retryCount = 0;
-    const maxRetries = 3;
-    const retryDelay = Duration(seconds: 2);
-
-    while (retryCount < maxRetries) {
-      try {
-        // Check network connectivity before each attempt
-        final hasConnection = await _checkNetworkConnectivity();
-        if (!hasConnection) {
-          throw Exception('No internet connection available');
-        }
-
-        if (!_isInitialized) {
-          await init();
-        }
-
-        final offerings = await Purchases.getOfferings();
-        final offering =
-            offerings.getOffering(PurchaseConfig.membershipOffering);
-        if (offering != null) {
-          return offering.availablePackages;
-        }
-        return [];
-      } catch (e) {
-        retryCount++;
-        if (retryCount == maxRetries) {
-          debugPrint(
-              'Failed to fetch membership packages after $maxRetries attempts: $e');
-          return [];
-        }
-        debugPrint(
-            'Retrying to fetch membership packages (attempt $retryCount): $e');
-        await Future.delayed(retryDelay);
-      }
-    }
-    return [];
-  }
-
-  // Purchase a package
-  static Future<PurchaseResult> purchasePackage(Package package) async {
+  // Get available coin products
+  static Future<List<CoinProduct>> getCoinProducts() async {
     try {
-      final purchaseResult = await Purchases.purchasePackage(package);
-      final activeEntitlements = purchaseResult.entitlements.active;
+      debugPrint('PurchaseService.getCoinProducts(): Fetching coin products');
 
-      // For membership purchases, verify entitlements
-      if (package.storeProduct.identifier.contains('membership')) {
-        final hasPremium =
-            activeEntitlements[PurchaseConfig.premiumEntitlement]?.isActive ??
-                false;
-        return PurchaseResult(
-          success: hasPremium,
-          isMembership: true,
-          entitlements: activeEntitlements.keys.toList(),
-        );
+      // Make sure the service is initialized
+      if (!CoinService.instance.isLoading &&
+          CoinService.instance.availableProducts.isEmpty) {
+        await CoinService.instance.init();
       }
 
-      // For coin purchases
-      return PurchaseResult(
-        success: true,
-        isMembership: false,
-        coinAmount:
-            _getCoinAmountFromProductId(package.storeProduct.identifier),
-      );
+      final products = CoinService.instance.availableProducts;
+      debugPrint(
+          'PurchaseService.getCoinProducts(): Retrieved ${products.length} products');
+      return products;
     } catch (e) {
-      debugPrint('Error making purchase: $e');
-      return PurchaseResult(success: false);
-    }
-  }
-
-  // Helper method to get coin amount from product ID
-  static int _getCoinAmountFromProductId(String productId) {
-    if (productId == PurchaseConfig.coins100) return 100;
-    if (productId == PurchaseConfig.coins500) return 500;
-    if (productId == PurchaseConfig.coins1000) return 1000;
-    return 0;
-  }
-
-  // Check if user has specific entitlement
-  static Future<bool> hasEntitlement(String entitlementId) async {
-    try {
-      final customerInfo = await Purchases.getCustomerInfo();
-      return customerInfo.entitlements.active[entitlementId]?.isActive ?? false;
-    } catch (e) {
-      debugPrint('Error checking entitlement: $e');
-      return false;
-    }
-  }
-
-  // Get all active entitlements
-  static Future<List<String>> getActiveEntitlements() async {
-    try {
-      final customerInfo = await Purchases.getCustomerInfo();
-      return customerInfo.entitlements.active.keys.toList();
-    } catch (e) {
-      debugPrint('Error getting active entitlements: $e');
+      debugPrint('PurchaseService.getCoinProducts(): Error - $e');
       return [];
     }
   }
 
-  // Restore purchases
-  static Future<bool> restorePurchases() async {
+  // Get available membership products
+  static Future<List<SubscriptionProduct>> getMembershipProducts() async {
     try {
-      final customerInfo = await Purchases.restorePurchases();
-      return customerInfo.entitlements.active.isNotEmpty;
+      debugPrint('PurchaseService.getMembershipProducts(): Fetching products');
+
+      // Make sure the service is initialized
+      if (!SubscriptionService.instance.isLoading &&
+          SubscriptionService.instance.availableProducts.isEmpty) {
+        await SubscriptionService.instance.init();
+      }
+
+      final products = SubscriptionService.instance.availableProducts;
+      debugPrint(
+          'PurchaseService.getMembershipProducts(): Retrieved ${products.length} products');
+      return products;
     } catch (e) {
-      debugPrint('Error restoring purchases: $e');
+      debugPrint('PurchaseService.getMembershipProducts(): Error - $e');
+      return [];
+    }
+  }
+
+  // Purchase a product
+  static Future<PurchaseResult> purchaseProduct(dynamic product) async {
+    try {
+      debugPrint('PurchaseService.purchaseProduct(): Starting purchase flow');
+
+      if (product is SubscriptionProduct) {
+        final result =
+            await SubscriptionService.instance.purchaseSubscription(product);
+
+        return PurchaseResult(
+          success: result.success,
+          isMembership: true,
+          entitlements: result.success ? [product.id] : null,
+          message: result.message,
+        );
+      } else if (product is CoinProduct) {
+        final result = await CoinService.instance.purchaseCoins(product);
+
+        return PurchaseResult(
+          success: result.success,
+          isMembership: false,
+          coinAmount: product.amount,
+          message: result.message,
+        );
+      } else {
+        debugPrint('PurchaseService.purchaseProduct(): Unknown product type');
+        return PurchaseResult(
+          success: false,
+          message: 'Unknown product type',
+        );
+      }
+    } catch (e) {
+      debugPrint('PurchaseService.purchaseProduct(): Error - $e');
+      return PurchaseResult(
+        success: false,
+        message: 'Error: $e',
+      );
+    }
+  }
+
+  // Restore previous purchases
+  static Future<List<PurchaseResult>> restorePurchases() async {
+    try {
+      debugPrint('PurchaseService.restorePurchases(): Restoring purchases');
+
+      final results = await SubscriptionService.instance.restorePurchases();
+
+      return results
+          .map((result) => PurchaseResult(
+                success: result.success,
+                isMembership: true,
+                entitlements: result.success ? [result.productId!] : null,
+                message: result.message,
+              ))
+          .toList();
+    } catch (e) {
+      debugPrint('PurchaseService.restorePurchases(): Error - $e');
+      return [
+        PurchaseResult(
+          success: false,
+          message: 'Error: $e',
+        )
+      ];
+    }
+  }
+
+  // Check if user has active subscription
+  static Future<bool> hasActiveSubscription() async {
+    try {
+      return await SubscriptionService.instance.hasActiveSubscription();
+    } catch (e) {
+      debugPrint('PurchaseService.hasActiveSubscription(): Error - $e');
       return false;
     }
   }
 
-  // Update user identifier
-  static Future<void> updateUserIdentifier(String userId) async {
+  // Dispose resources
+  static void dispose() {
+    SubscriptionService.instance.dispose();
+    CoinService.instance.dispose();
+    debugPrint('PurchaseService.dispose(): Resources disposed');
+  }
+
+  // Run connectivity diagnostics
+  static Future<Map<String, dynamic>> runConnectivityDiagnostics() async {
     try {
-      await Purchases.logIn(userId);
+      final connectivityResult = await Connectivity().checkConnectivity();
+      final isSubInitialized =
+          SubscriptionService.instance.availableProducts.isNotEmpty;
+      final isCoinInitialized =
+          CoinService.instance.availableProducts.isNotEmpty;
+
+      return {
+        'connectivityStatus': connectivityResult.toString(),
+        'hasActiveConnection': connectivityResult != ConnectivityResult.none,
+        'isSubscriptionInitialized': isSubInitialized,
+        'isCoinInitialized': isCoinInitialized,
+        'isInDebugMode': kDebugMode,
+        'platform': Platform.operatingSystem,
+        'osVersion': Platform.operatingSystemVersion,
+        'subscriptionProductsLoaded':
+            SubscriptionService.instance.availableProducts.length,
+        'coinProductsLoaded': CoinService.instance.availableProducts.length,
+        'domainTests': {},
+      };
     } catch (e) {
-      debugPrint('Error updating user identifier: $e');
+      debugPrint('PurchaseService.runConnectivityDiagnostics(): Error - $e');
+      return {
+        'error': e.toString(),
+        'isInDebugMode': kDebugMode,
+      };
     }
   }
 }
 
-// Class to handle purchase results
+// Purchase result
 class PurchaseResult {
   final bool success;
   final bool isMembership;
-  final List<String>? entitlements;
   final int? coinAmount;
+  final List<String>? entitlements;
+  final String? message;
 
   PurchaseResult({
     required this.success,
     this.isMembership = false,
-    this.entitlements,
     this.coinAmount,
+    this.entitlements,
+    this.message,
   });
 }

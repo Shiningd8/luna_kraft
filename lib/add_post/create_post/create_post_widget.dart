@@ -6,10 +6,13 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/index.dart';
+import '/widgets/lottie_background.dart';
+import '/services/app_state.dart' as custom_app_state;
 import 'package:lottie/lottie.dart';
 import 'package:simple_gradient_text/simple_gradient_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 
 // Add import for DreamPostedMessage component
 import '/components/dream_posted_message.dart';
@@ -300,580 +303,555 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // Access the custom app state
+    context.watch<custom_app_state.AppState>();
+
     return Scaffold(
       backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-      body: SafeArea(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background with gradient and Lottie animation
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFF1A1A2E),
-                    Color(0xFF16213E),
-                  ],
-                ),
+      body: LottieBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            physics: AlwaysScrollableScrollPhysics(),
+            child: Container(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height -
+                    MediaQuery.of(context).padding.top,
               ),
-              child: Lottie.asset(
-                'assets/jsons/Animation_-_1739171323302.json',
-                fit: BoxFit.cover,
-                animate: true,
-                frameRate: FrameRate(60),
-              ),
-            ),
-
-            // Main content
-            SingleChildScrollView(
-              physics: AlwaysScrollableScrollPhysics(),
-              child: Container(
-                constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height -
-                      MediaQuery.of(context).padding.top,
-                ),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(24, 24, 24, 32),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header section with back button
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.2),
-                                  width: 1,
-                                ),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header section with back button
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 1,
                               ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(24),
-                                  onTap: () => context.safePop(),
-                                  child: Icon(
-                                    Icons.arrow_back_ios_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: () => context.safePop(),
+                                child: Icon(
+                                  Icons.arrow_back_ios_rounded,
+                                  color: Colors.white,
+                                  size: 20,
                                 ),
                               ),
                             ),
+                          ),
+                          Text(
+                            'Create New Post',
+                            style: FlutterFlowTheme.of(context)
+                                .titleMedium
+                                .override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          SizedBox(width: 48),
+                        ],
+                      ).animate().fadeIn(
+                          duration: Duration(milliseconds: 400),
+                          curve: Curves.easeOut),
+
+                      SizedBox(height: 24),
+
+                      // Remaining uploads card
+                      if (_uploadsChecked)
+                        RemainingUploadsCard(
+                          remainingUploads: _remainingFreeUploads,
+                        ).animate().fadeIn(
+                            duration: Duration(milliseconds: 400),
+                            curve: Curves.easeOut),
+
+                      SizedBox(height: 24),
+
+                      // Title field with glassmorphism
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: TextFormField(
+                          controller: _titleController,
+                          style:
+                              FlutterFlowTheme.of(context).bodyLarge.override(
+                                    fontFamily: 'Figtree',
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                  ),
+                          decoration: InputDecoration(
+                            labelText: 'Title',
+                            labelStyle: FlutterFlowTheme.of(context)
+                                .bodyMedium
+                                .override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                ),
+                            hintText: 'Give your post a title',
+                            hintStyle: FlutterFlowTheme.of(context)
+                                .bodyMedium
+                                .override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.all(20),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a title';
+                            }
+                            return null;
+                          },
+                        ),
+                      ).animate().fadeIn(
+                          delay: Duration(milliseconds: 200),
+                          duration: Duration(milliseconds: 600),
+                          curve: Curves.easeOut),
+
+                      SizedBox(height: 24),
+
+                      // Word count indicator in separate container
+                      Container(
+                        margin: EdgeInsets.only(bottom: 12),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _wordCount >= _minWordCount
+                              ? Colors.green.withOpacity(0.1)
+                              : Colors.red.shade400.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _wordCount >= _minWordCount
+                                ? Colors.green.withOpacity(0.3)
+                                : Colors.red.shade400.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _wordCount >= _minWordCount
+                                  ? Icons.check_circle_outline
+                                  : Icons.info_outline,
+                              color: _wordCount >= _minWordCount
+                                  ? Colors.green
+                                  : Colors.red.shade400,
+                              size: 16,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _wordCount >= _minWordCount
+                                    ? 'Great! Your dream description is detailed enough.'
+                                    : 'Please write at least $_minWordCount words to share your dream.',
+                                style: TextStyle(
+                                  color: _wordCount >= _minWordCount
+                                      ? Colors.green
+                                      : Colors.red.shade400,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _wordCount >= _minWordCount
+                                    ? Colors.green.withOpacity(0.2)
+                                    : Colors.red.shade400.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '$_wordCount/$_minWordCount',
+                                style: TextStyle(
+                                  color: _wordCount >= _minWordCount
+                                      ? Colors.green
+                                      : Colors.red.shade400,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(
+                          delay: Duration(milliseconds: 300),
+                          duration: Duration(milliseconds: 600),
+                          curve: Curves.easeOut),
+
+                      // Dream content field
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: TextFormField(
+                          controller: _contentController,
+                          maxLines: 8,
+                          minLines: 5,
+                          style:
+                              FlutterFlowTheme.of(context).bodyMedium.override(
+                                    fontFamily: 'Figtree',
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                  ),
+                          decoration: InputDecoration(
+                            labelText: 'Your Dream',
+                            labelStyle: FlutterFlowTheme.of(context)
+                                .bodyMedium
+                                .override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                ),
+                            hintText: 'Describe your dream in detail...',
+                            hintStyle: FlutterFlowTheme.of(context)
+                                .bodyMedium
+                                .override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.all(20),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please describe your dream';
+                            }
+
+                            // Check word count in validator
+                            final wordCount = value
+                                .trim()
+                                .split(RegExp(r'\s+'))
+                                .where((word) => word.isNotEmpty)
+                                .length;
+
+                            if (wordCount < _minWordCount) {
+                              return 'Please write at least $_minWordCount words';
+                            }
+
+                            return null;
+                          },
+                        ),
+                      ).animate().fadeIn(
+                          delay: Duration(milliseconds: 400),
+                          duration: Duration(milliseconds: 600),
+                          curve: Curves.easeOut),
+
+                      SizedBox(height: 24),
+
+                      // Background selection
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              'Create New Post',
+                              'Select Background',
                               style: FlutterFlowTheme.of(context)
                                   .titleMedium
                                   .override(
                                     fontFamily: 'Figtree',
                                     color: Colors.white,
-                                    fontSize: 20,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.w600,
                                   ),
                             ),
-                            SizedBox(width: 48),
-                          ],
-                        ).animate().fadeIn(
-                            duration: Duration(milliseconds: 400),
-                            curve: Curves.easeOut),
-
-                        SizedBox(height: 24),
-
-                        // Remaining uploads card
-                        if (_uploadsChecked)
-                          RemainingUploadsCard(
-                            remainingUploads: _remainingFreeUploads,
-                          ).animate().fadeIn(
-                              duration: Duration(milliseconds: 400),
-                              curve: Curves.easeOut),
-
-                        SizedBox(height: 24),
-
-                        // Title field with glassmorphism
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
-                              width: 1,
-                            ),
-                          ),
-                          child: TextFormField(
-                            controller: _titleController,
-                            style:
-                                FlutterFlowTheme.of(context).bodyLarge.override(
-                                      fontFamily: 'Figtree',
-                                      color: Colors.white,
-                                      fontSize: 16,
+                            SizedBox(height: 16),
+                            Container(
+                              height: 120,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: backgrounds.length,
+                                itemBuilder: (context, index) {
+                                  final background = backgrounds[index];
+                                  final isSelected =
+                                      _selectedBackground == background['path'];
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedBackground =
+                                            background['path'];
+                                      });
+                                    },
+                                    child: Container(
+                                      width: 160,
+                                      margin: EdgeInsets.only(right: 12),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? FlutterFlowTheme.of(context)
+                                                  .primary
+                                              : Colors.transparent,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            Image.asset(
+                                              background['path'],
+                                              fit: BoxFit.cover,
+                                            ),
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topCenter,
+                                                  end: Alignment.bottomCenter,
+                                                  colors: [
+                                                    Colors.transparent,
+                                                    Colors.black
+                                                        .withOpacity(0.7),
+                                                  ],
+                                                ),
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  background['name'],
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
-                            decoration: InputDecoration(
-                              labelText: 'Title',
-                              labelStyle: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .override(
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(
+                          delay: Duration(milliseconds: 600),
+                          duration: Duration(milliseconds: 600),
+                          curve: Curves.easeOut),
+
+                      SizedBox(height: 24),
+
+                      // Tags field with glassmorphism
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: TextFormField(
+                          controller: _tagsController,
+                          style:
+                              FlutterFlowTheme.of(context).bodyLarge.override(
                                     fontFamily: 'Figtree',
-                                    color: Colors.white.withOpacity(0.5),
+                                    color: Colors.white,
                                     fontSize: 16,
                                   ),
-                              hintText: 'Give your post a title',
-                              hintStyle: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .override(
-                                    fontFamily: 'Figtree',
-                                    color: Colors.white.withOpacity(0.5),
-                                    fontSize: 16,
-                                  ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: EdgeInsets.all(20),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter a title';
-                              }
-                              return null;
-                            },
-                          ),
-                        ).animate().fadeIn(
-                            delay: Duration(milliseconds: 200),
-                            duration: Duration(milliseconds: 600),
-                            curve: Curves.easeOut),
-
-                        SizedBox(height: 24),
-
-                        // Word count indicator in separate container
-                        Container(
-                          margin: EdgeInsets.only(bottom: 12),
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _wordCount >= _minWordCount
-                                ? Colors.green.withOpacity(0.1)
-                                : Colors.red.shade400.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _wordCount >= _minWordCount
-                                  ? Colors.green.withOpacity(0.3)
-                                  : Colors.red.shade400.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _wordCount >= _minWordCount
-                                    ? Icons.check_circle_outline
-                                    : Icons.info_outline,
-                                color: _wordCount >= _minWordCount
-                                    ? Colors.green
-                                    : Colors.red.shade400,
-                                size: 16,
-                              ),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _wordCount >= _minWordCount
-                                      ? 'Great! Your dream description is detailed enough.'
-                                      : 'Please write at least $_minWordCount words to share your dream.',
-                                  style: TextStyle(
-                                    color: _wordCount >= _minWordCount
-                                        ? Colors.green
-                                        : Colors.red.shade400,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: _wordCount >= _minWordCount
-                                      ? Colors.green.withOpacity(0.2)
-                                      : Colors.red.shade400.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '$_wordCount/$_minWordCount',
-                                  style: TextStyle(
-                                    color: _wordCount >= _minWordCount
-                                        ? Colors.green
-                                        : Colors.red.shade400,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ).animate().fadeIn(
-                            delay: Duration(milliseconds: 300),
-                            duration: Duration(milliseconds: 600),
-                            curve: Curves.easeOut),
-
-                        // Dream content field
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
-                              width: 1,
-                            ),
-                          ),
-                          child: TextFormField(
-                            controller: _contentController,
-                            maxLines: 8,
-                            minLines: 5,
-                            style: FlutterFlowTheme.of(context)
+                          decoration: InputDecoration(
+                            labelText: 'Tags (Optional)',
+                            labelStyle: FlutterFlowTheme.of(context)
                                 .bodyMedium
                                 .override(
                                   fontFamily: 'Figtree',
-                                  color: Colors.white,
+                                  color: Colors.white.withOpacity(0.5),
                                   fontSize: 16,
                                 ),
-                            decoration: InputDecoration(
-                              labelText: 'Your Dream',
-                              labelStyle: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .override(
-                                    fontFamily: 'Figtree',
-                                    color: Colors.white.withOpacity(0.5),
-                                    fontSize: 16,
-                                  ),
-                              hintText: 'Describe your dream in detail...',
-                              hintStyle: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .override(
-                                    fontFamily: 'Figtree',
-                                    color: Colors.white.withOpacity(0.5),
-                                    fontSize: 16,
-                                  ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: EdgeInsets.all(20),
+                            hintText: 'Add tags separated by commas',
+                            hintStyle: FlutterFlowTheme.of(context)
+                                .bodyMedium
+                                .override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please describe your dream';
-                              }
-
-                              // Check word count in validator
-                              final wordCount = value
-                                  .trim()
-                                  .split(RegExp(r'\s+'))
-                                  .where((word) => word.isNotEmpty)
-                                  .length;
-
-                              if (wordCount < _minWordCount) {
-                                return 'Please write at least $_minWordCount words';
-                              }
-
-                              return null;
-                            },
+                            contentPadding: EdgeInsets.all(20),
                           ),
-                        ).animate().fadeIn(
-                            delay: Duration(milliseconds: 400),
-                            duration: Duration(milliseconds: 600),
-                            curve: Curves.easeOut),
+                        ),
+                      ).animate().fadeIn(
+                          delay: Duration(milliseconds: 400),
+                          duration: Duration(milliseconds: 600),
+                          curve: Curves.easeOut),
 
-                        SizedBox(height: 24),
+                      SizedBox(height: 24),
 
-                        // Background selection
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
-                              width: 1,
-                            ),
+                      // Privacy toggle
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                            width: 1,
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Select Background',
+                                'Private Post',
                                 style: FlutterFlowTheme.of(context)
-                                    .titleMedium
+                                    .bodyMedium
                                     .override(
-                                      fontFamily: 'Figtree',
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                              SizedBox(height: 16),
-                              Container(
-                                height: 120,
-                                child: ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: backgrounds.length,
-                                  itemBuilder: (context, index) {
-                                    final background = backgrounds[index];
-                                    final isSelected = _selectedBackground ==
-                                        background['path'];
-                                    return GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedBackground =
-                                              background['path'];
-                                        });
-                                      },
-                                      child: Container(
-                                        width: 160,
-                                        margin: EdgeInsets.only(right: 12),
-                                        decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: isSelected
-                                                ? FlutterFlowTheme.of(context)
-                                                    .primary
-                                                : Colors.transparent,
-                                            width: 2,
-                                          ),
-                                        ),
-                                        child: ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          child: Stack(
-                                            fit: StackFit.expand,
-                                            children: [
-                                              Image.asset(
-                                                background['path'],
-                                                fit: BoxFit.cover,
-                                              ),
-                                              Container(
-                                                decoration: BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    begin: Alignment.topCenter,
-                                                    end: Alignment.bottomCenter,
-                                                    colors: [
-                                                      Colors.transparent,
-                                                      Colors.black
-                                                          .withOpacity(0.7),
-                                                    ],
-                                                  ),
-                                                ),
-                                                child: Center(
-                                                  child: Text(
-                                                    background['name'],
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ).animate().fadeIn(
-                            delay: Duration(milliseconds: 600),
-                            duration: Duration(milliseconds: 600),
-                            curve: Curves.easeOut),
-
-                        SizedBox(height: 24),
-
-                        // Tags field with glassmorphism
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
-                              width: 1,
-                            ),
-                          ),
-                          child: TextFormField(
-                            controller: _tagsController,
-                            style:
-                                FlutterFlowTheme.of(context).bodyLarge.override(
                                       fontFamily: 'Figtree',
                                       color: Colors.white,
                                       fontSize: 16,
                                     ),
-                            decoration: InputDecoration(
-                              labelText: 'Tags (Optional)',
-                              labelStyle: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .override(
-                                    fontFamily: 'Figtree',
-                                    color: Colors.white.withOpacity(0.5),
-                                    fontSize: 16,
-                                  ),
-                              hintText: 'Add tags separated by commas',
-                              hintStyle: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .override(
-                                    fontFamily: 'Figtree',
-                                    color: Colors.white.withOpacity(0.5),
-                                    fontSize: 16,
-                                  ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
                               ),
-                              contentPadding: EdgeInsets.all(20),
-                            ),
-                          ),
-                        ).animate().fadeIn(
-                            delay: Duration(milliseconds: 400),
-                            duration: Duration(milliseconds: 600),
-                            curve: Curves.easeOut),
-
-                        SizedBox(height: 24),
-
-                        // Privacy toggle
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
-                              width: 1,
-                            ),
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Private Post',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        fontFamily: 'Figtree',
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                      ),
-                                ),
-                                Switch(
-                                  value: _isPrivate,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _isPrivate = value;
-                                    });
-                                  },
-                                  activeColor:
-                                      FlutterFlowTheme.of(context).primary,
-                                  activeTrackColor: FlutterFlowTheme.of(context)
-                                      .primary
-                                      .withOpacity(0.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ).animate().fadeIn(
-                            delay: Duration(milliseconds: 400),
-                            duration: Duration(milliseconds: 600),
-                            curve: Curves.easeOut),
-
-                        SizedBox(height: 24),
-
-                        // Submit button
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Color(0xFF6448FE),
-                                Color(0xFF9747FF),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0xFF9747FF).withOpacity(0.3),
-                                blurRadius: 20,
-                                offset: Offset(0, 10),
+                              Switch(
+                                value: _isPrivate,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _isPrivate = value;
+                                  });
+                                },
+                                activeColor:
+                                    FlutterFlowTheme.of(context).primary,
+                                activeTrackColor: FlutterFlowTheme.of(context)
+                                    .primary
+                                    .withOpacity(0.5),
                               ),
                             ],
                           ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: _isLoading ? null : _createPost,
-                              child: Container(
-                                width: double.infinity,
-                                height: 60,
-                                padding: EdgeInsets.symmetric(horizontal: 24),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    if (_isLoading)
-                                      SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    else
-                                      Text(
-                                        'Share Post',
-                                        style: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .override(
-                                              fontFamily: 'Figtree',
-                                              color: Colors.white,
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                      ),
-                                    if (!_isLoading) ...[
-                                      SizedBox(width: 12),
-                                      Icon(
-                                        Icons.send_rounded,
+                        ),
+                      ).animate().fadeIn(
+                          delay: Duration(milliseconds: 400),
+                          duration: Duration(milliseconds: 600),
+                          curve: Curves.easeOut),
+
+                      SizedBox(height: 24),
+
+                      // Submit button
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFF6448FE),
+                              Color(0xFF9747FF),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0xFF9747FF).withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: _isLoading ? null : _createPost,
+                            child: Container(
+                              width: double.infinity,
+                              height: 60,
+                              padding: EdgeInsets.symmetric(horizontal: 24),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_isLoading)
+                                    SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
                                         color: Colors.white,
-                                        size: 24,
+                                        strokeWidth: 2,
                                       ),
-                                    ],
+                                    )
+                                  else
+                                    Text(
+                                      'Share Post',
+                                      style: FlutterFlowTheme.of(context)
+                                          .titleSmall
+                                          .override(
+                                            fontFamily: 'Figtree',
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  if (!_isLoading) ...[
+                                    SizedBox(width: 12),
+                                    Icon(
+                                      Icons.send_rounded,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
                                   ],
-                                ),
+                                ],
                               ),
                             ),
                           ),
-                        ).animate().fadeIn(
-                            delay: Duration(milliseconds: 1000),
-                            duration: Duration(milliseconds: 600),
-                            curve: Curves.easeOut),
-                      ],
-                    ),
+                        ),
+                      ).animate().fadeIn(
+                          delay: Duration(milliseconds: 1000),
+                          duration: Duration(milliseconds: 600),
+                          curve: Curves.easeOut),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -26,7 +26,11 @@ service cloud.firestore {
     match /posts/{document} {
       allow create: if isAuthenticated();
       allow read: if true;
-      allow update: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isPostOwner() || 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Post_saved_by'])
+      );
       allow delete: if isOwner(resource.data.userId);
     }
 

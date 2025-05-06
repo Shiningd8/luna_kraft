@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import '../auth_manager.dart';
 
 import '/backend/backend.dart';
@@ -305,27 +306,118 @@ class FirebaseAuthManager extends AuthManager
     Future<UserCredential?> Function() signInFunc,
     String authProvider,
   ) async {
-    try {
-      final userCredential = await signInFunc();
-      if (userCredential?.user != null) {
-        await maybeCreateUser(userCredential!.user!);
+    // Track retry attempts
+    int attempts = 0;
+    const int maxRetries = 2;
+
+    while (attempts <= maxRetries) {
+      try {
+        final userCredential = await signInFunc();
+        if (userCredential?.user != null) {
+          await maybeCreateUser(userCredential!.user!);
+        }
+        return userCredential == null
+            ? null
+            : LunaKraftFirebaseUser.fromUserCredential(userCredential);
+      } on FirebaseAuthException catch (e) {
+        // Check if this is an App Check error
+        if (isAppCheckError(e) && attempts < maxRetries) {
+          debugPrint(
+              'App Check error during authentication (attempt ${attempts + 1}): ${e.message}');
+          attempts++;
+
+          // Add a short delay between retries
+          await Future.delayed(Duration(milliseconds: 800 * attempts));
+
+          // Try to refresh App Check token if possible
+          try {
+            await FirebaseAppCheck.instance.getToken(true);
+            debugPrint('Forced App Check token refresh for retry attempt');
+          } catch (tokenError) {
+            debugPrint('Failed to refresh App Check token: $tokenError');
+          }
+
+          // Continue to next retry attempt
+          continue;
+        }
+
+        // Not an App Check error or we've exhausted retries
+        final errorMsg = switch (e.code) {
+          'email-already-in-use' =>
+            'Error: The email is already in use by a different account',
+          'INVALID_LOGIN_CREDENTIALS' =>
+            'Error: The supplied auth credential is incorrect, malformed or has expired',
+          _ => 'Error: ${e.message!}',
+        };
+
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMsg)),
+        );
+        return null;
+      } catch (e) {
+        // General error handling
+        debugPrint('Unexpected error during authentication: $e');
+
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Error: An unexpected error occurred. Please try again.')),
+        );
+        return null;
       }
-      return userCredential == null
-          ? null
-          : LunaKraftFirebaseUser.fromUserCredential(userCredential);
-    } on FirebaseAuthException catch (e) {
-      final errorMsg = switch (e.code) {
-        'email-already-in-use' =>
-          'Error: The email is already in use by a different account',
-        'INVALID_LOGIN_CREDENTIALS' =>
-          'Error: The supplied auth credential is incorrect, malformed or has expired',
-        _ => 'Error: ${e.message!}',
-      };
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMsg)),
-      );
-      return null;
     }
+
+    // If we exhausted all retries
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(
+              'Authentication failed after multiple attempts. Please try again later.')),
+    );
+    return null;
+  }
+
+  bool isAppCheckError(dynamic error) {
+    if (error == null) return false;
+
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('app check') ||
+        errorString.contains('app-check') ||
+        errorString.contains('appcheck') ||
+        errorString.contains('attestation') ||
+        errorString.contains('token') ||
+        errorString.contains('permission-denied') ||
+        errorString.contains('permission denied') ||
+        (errorString.contains('403') && errorString.contains('forbidden'));
+  }
+
+  Future<T?> retryOnAppCheckError<T>({
+    required Future<T> Function() operation,
+    int maxRetries = 2,
+  }) async {
+    int attempts = 0;
+
+    while (attempts < maxRetries) {
+      try {
+        attempts++;
+        return await operation();
+      } catch (e) {
+        print('Operation attempt $attempts failed: $e');
+
+        if (isAppCheckError(e) && attempts < maxRetries) {
+          // Wait before retry
+          await Future.delayed(Duration(milliseconds: 500 * attempts));
+          print('Retrying operation after App Check error...');
+          continue;
+        }
+
+        // If not an App Check error or final attempt, rethrow
+        rethrow;
+      }
+    }
+
+    return null;
   }
 }

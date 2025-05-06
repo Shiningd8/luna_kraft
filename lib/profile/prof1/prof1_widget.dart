@@ -89,6 +89,8 @@ class _Prof1WidgetState extends State<Prof1Widget> {
 
   @override
   void dispose() {
+    // Dispose any controllers in the model
+    _model.dispose();
     super.dispose();
   }
 
@@ -127,1088 +129,909 @@ class _Prof1WidgetState extends State<Prof1Widget> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: scaffoldKey,
-      extendBody: true,
-      extendBodyBehindAppBar: true,
-      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-      appBar: AppBar(
+    return LottieBackground(
+      child: Scaffold(
+        key: scaffoldKey,
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        flexibleSpace: ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Container(
-              decoration: BoxDecoration(
-                color: FlutterFlowTheme.of(context)
-                    .primaryBackground
-                    .withOpacity(0.4),
-                border: Border(
-                  bottom: BorderSide(
-                    color:
-                        FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-                    width: 0.5,
-                  ),
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          automaticallyImplyLeading: false,
+          elevation: 0,
+          title: Text(
+            'Profile',
+            style: FlutterFlowTheme.of(context).headlineMedium.override(
+                  fontFamily: 'Outfit',
+                  color: FlutterFlowTheme.of(context).primaryText,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
-              ),
-            ),
           ),
-        ),
-        title: GradientText(
-          'Profile',
-          style: FlutterFlowTheme.of(context).headlineMedium.override(
-            fontFamily: 'Outfit',
-            color: FlutterFlowTheme.of(context).primaryText,
-            fontSize: 22,
-            shadows: [
-              Shadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 4,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-          colors: [
-            FlutterFlowTheme.of(context).primary,
-            FlutterFlowTheme.of(context).secondary
-          ],
-        ),
-        centerTitle: true,
-        actions: [
-          Padding(
-            padding: EdgeInsetsDirectional.fromSTEB(0, 0, 12, 0),
-            child: FlutterFlowIconButton(
-              borderRadius: 8.0,
-              buttonSize: 40.0,
-              icon: Icon(
-                Icons.more_vert,
-                color: FlutterFlowTheme.of(context).primaryText,
-                size: 24.0,
-              ),
-              onPressed: () async {
-                await showDialog(
-                  context: context,
-                  builder: (dialogContext) {
-                    return Dialog(
-                      backgroundColor: Colors.transparent,
-                      insetPadding: EdgeInsets.zero,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                          child: Container(
-                            width: MediaQuery.of(context).size.width * 0.85,
-                            decoration: BoxDecoration(
-                              color: FlutterFlowTheme.of(context)
-                                  .secondaryBackground
-                                  .withOpacity(0.85),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
+          centerTitle: true,
+          actions: [
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(0, 0, 12, 0),
+              child: FlutterFlowIconButton(
+                borderRadius: 8.0,
+                buttonSize: 40.0,
+                icon: Icon(
+                  Icons.more_vert,
+                  color: FlutterFlowTheme.of(context).primaryText,
+                  size: 24.0,
+                ),
+                onPressed: () async {
+                  await showDialog(
+                    context: context,
+                    builder: (dialogContext) {
+                      return Dialog(
+                        backgroundColor: Colors.transparent,
+                        insetPadding: EdgeInsets.zero,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              width: MediaQuery.of(context).size.width * 0.85,
+                              decoration: BoxDecoration(
                                 color: FlutterFlowTheme.of(context)
-                                    .primary
-                                    .withOpacity(0.2),
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 20,
-                                  spreadRadius: 5,
+                                    .secondaryBackground
+                                    .withOpacity(0.85),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: FlutterFlowTheme.of(context)
+                                      .primary
+                                      .withOpacity(0.2),
+                                  width: 1,
                                 ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    border: Border(
-                                      bottom: BorderSide(
-                                        color: FlutterFlowTheme.of(context)
-                                            .primary
-                                            .withOpacity(0.1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 20,
+                                    spreadRadius: 5,
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: FlutterFlowTheme.of(context)
+                                              .primary
+                                              .withOpacity(0.1),
+                                        ),
                                       ),
                                     ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Options',
+                                          style: FlutterFlowTheme.of(context)
+                                              .titleMedium
+                                              .override(
+                                                fontFamily: 'Outfit',
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(Icons.close),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                                  ListView(
+                                    shrinkWrap: true,
+                                    padding: EdgeInsets.zero,
                                     children: [
-                                      Text(
-                                        'Options',
-                                        style: FlutterFlowTheme.of(context)
-                                            .titleMedium
-                                            .override(
-                                              fontFamily: 'Outfit',
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                      ),
-                                      IconButton(
-                                        icon: Icon(Icons.close),
-                                        onPressed: () => Navigator.pop(context),
-                                      ),
+                                      if (currentUserReference != null)
+                                        StreamBuilder<UserRecord>(
+                                          stream: UserRecord.getDocument(
+                                              currentUserReference!),
+                                          builder: (context, snapshot) {
+                                            if (!snapshot.hasData) {
+                                              return SizedBox.shrink();
+                                            }
+                                            final userDoc = snapshot.data!;
+                                            return Container(
+                                              padding: EdgeInsets.symmetric(
+                                                  horizontal: 16, vertical: 12),
+                                              decoration: BoxDecoration(
+                                                border: Border(
+                                                  bottom: BorderSide(
+                                                    color: FlutterFlowTheme.of(
+                                                            context)
+                                                        .primary
+                                                        .withOpacity(0.1),
+                                                  ),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                children: [
+                                                  StreamBuilder<UserRecord>(
+                                                    stream: UserRecord.getDocument(
+                                                        currentUserReference!),
+                                                    builder: (context,
+                                                        privacySnapshot) {
+                                                      if (!privacySnapshot
+                                                          .hasData) {
+                                                        return SizedBox
+                                                            .shrink();
+                                                      }
+
+                                                      final userRecord =
+                                                          privacySnapshot.data!;
+                                                      return Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .spaceBetween,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Icon(
+                                                                userRecord
+                                                                        .isPrivate
+                                                                    ? Icons
+                                                                        .lock_outline
+                                                                    : Icons
+                                                                        .public,
+                                                                color: FlutterFlowTheme.of(
+                                                                        context)
+                                                                    .primaryText,
+                                                                size: 24.0,
+                                                              ),
+                                                              SizedBox(
+                                                                  width: 16),
+                                                              Text(
+                                                                'Private Account',
+                                                                style: FlutterFlowTheme.of(
+                                                                        context)
+                                                                    .bodyMedium
+                                                                    .override(
+                                                                      fontFamily:
+                                                                          'Figtree',
+                                                                      color: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primaryText,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w500,
+                                                                    ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          Switch(
+                                                            value: userRecord
+                                                                .isPrivate,
+                                                            onChanged:
+                                                                (newValue) async {
+                                                              // Update the user's privacy setting
+                                                              await currentUserReference!
+                                                                  .update(
+                                                                createUserRecordData(
+                                                                  isPrivate:
+                                                                      newValue,
+                                                                ),
+                                                              );
+
+                                                              // Show confirmation
+                                                              Navigator.pop(
+                                                                  context);
+                                                              ScaffoldMessenger
+                                                                      .of(context)
+                                                                  .showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text(
+                                                                    newValue
+                                                                        ? 'Your account is now private'
+                                                                        : 'Your account is now public',
+                                                                    style: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .bodyMedium
+                                                                        .override(
+                                                                          fontFamily:
+                                                                              'Figtree',
+                                                                          color:
+                                                                              Colors.white,
+                                                                        ),
+                                                                  ),
+                                                                  duration:
+                                                                      Duration(
+                                                                          seconds:
+                                                                              2),
+                                                                  backgroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primary,
+                                                                ),
+                                                              );
+                                                            },
+                                                            activeColor:
+                                                                FlutterFlowTheme.of(
+                                                                        context)
+                                                                    .primary,
+                                                            activeTrackColor:
+                                                                FlutterFlowTheme.of(
+                                                                        context)
+                                                                    .accent1,
+                                                            inactiveTrackColor:
+                                                                FlutterFlowTheme.of(
+                                                                        context)
+                                                                    .alternate,
+                                                            inactiveThumbColor:
+                                                                FlutterFlowTheme.of(
+                                                                        context)
+                                                                    .secondaryText,
+                                                          ),
+                                                        ],
+                                                      );
+                                                    },
+                                                  ),
+                                                  SizedBox(height: 12),
+                                                  _buildOptionItem(
+                                                    'Edit Profile',
+                                                    Icons.edit,
+                                                    () => context.pushNamed(
+                                                        EditProfileWidget
+                                                            .routeName),
+                                                  ),
+                                                  SizedBox(height: 12),
+                                                  _buildOptionItem(
+                                                    'Settings',
+                                                    Icons.settings,
+                                                    () => context
+                                                        .pushNamed('Settings'),
+                                                  ),
+                                                  SizedBox(height: 12),
+                                                  _fixSignOutOption(),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
                                     ],
                                   ),
-                                ),
-                                ListView(
-                                  shrinkWrap: true,
-                                  padding: EdgeInsets.zero,
-                                  children: [
-                                    if (currentUserReference != null)
-                                      StreamBuilder<UserRecord>(
-                                        stream: UserRecord.getDocument(
-                                            currentUserReference!),
-                                        builder: (context, snapshot) {
-                                          if (!snapshot.hasData) {
-                                            return SizedBox.shrink();
-                                          }
-                                          final userDoc = snapshot.data!;
-                                          return Container(
-                                            padding: EdgeInsets.symmetric(
-                                                horizontal: 16, vertical: 12),
-                                            decoration: BoxDecoration(
-                                              border: Border(
-                                                bottom: BorderSide(
-                                                  color: FlutterFlowTheme.of(
-                                                          context)
-                                                      .primary
-                                                      .withOpacity(0.1),
-                                                ),
-                                              ),
-                                            ),
-                                            child: Column(
-                                              children: [
-                                                StreamBuilder<UserRecord>(
-                                                  stream: UserRecord.getDocument(
-                                                      currentUserReference!),
-                                                  builder: (context,
-                                                      privacySnapshot) {
-                                                    if (!privacySnapshot
-                                                        .hasData) {
-                                                      return SizedBox.shrink();
-                                                    }
-
-                                                    final userRecord =
-                                                        privacySnapshot.data!;
-                                                    return Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .spaceBetween,
-                                                      children: [
-                                                        Row(
-                                                          children: [
-                                                            Icon(
-                                                              userRecord
-                                                                      .isPrivate
-                                                                  ? Icons
-                                                                      .lock_outline
-                                                                  : Icons
-                                                                      .public,
-                                                              color: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .primaryText,
-                                                              size: 24.0,
-                                                            ),
-                                                            SizedBox(width: 16),
-                                                            Text(
-                                                              'Private Account',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Figtree',
-                                                                    color: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .primaryText,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w500,
-                                                                  ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Switch(
-                                                          value: userRecord
-                                                              .isPrivate,
-                                                          onChanged:
-                                                              (newValue) async {
-                                                            // Update the user's privacy setting
-                                                            await currentUserReference!
-                                                                .update(
-                                                              createUserRecordData(
-                                                                isPrivate:
-                                                                    newValue,
-                                                              ),
-                                                            );
-
-                                                            // Show confirmation
-                                                            Navigator.pop(
-                                                                context);
-                                                            ScaffoldMessenger
-                                                                    .of(context)
-                                                                .showSnackBar(
-                                                              SnackBar(
-                                                                content: Text(
-                                                                  newValue
-                                                                      ? 'Your account is now private'
-                                                                      : 'Your account is now public',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Figtree',
-                                                                        color: Colors
-                                                                            .white,
-                                                                      ),
-                                                                ),
-                                                                duration:
-                                                                    Duration(
-                                                                        seconds:
-                                                                            2),
-                                                                backgroundColor:
-                                                                    FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .primary,
-                                                              ),
-                                                            );
-                                                          },
-                                                          activeColor:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .primary,
-                                                          activeTrackColor:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .accent1,
-                                                          inactiveTrackColor:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .alternate,
-                                                          inactiveThumbColor:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .secondaryText,
-                                                        ),
-                                                      ],
-                                                    );
-                                                  },
-                                                ),
-                                                SizedBox(height: 12),
-                                                _buildOptionItem(
-                                                  'Edit Profile',
-                                                  Icons.edit,
-                                                  () => context.pushNamed(
-                                                      EditProfileWidget
-                                                          .routeName),
-                                                ),
-                                                SizedBox(height: 12),
-                                                _buildOptionItem(
-                                                  'Settings',
-                                                  Icons.settings,
-                                                  () => context
-                                                      .pushNamed('Settings'),
-                                                ),
-                                                SizedBox(height: 12),
-                                                _fixSignOutOption(),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                  ],
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
+          ],
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
           ),
-        ],
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
         ),
-      ),
-      body: LottieBackground(
-        child: Stack(
-          children: [
-            // Content with a slight overlay to make content readable
-            SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Add padding for app bar
-                  SizedBox(height: MediaQuery.of(context).padding.top + 56),
-
-                  // Profile Header Section with Instagram-like layout
-                  Container(
-                    width: double.infinity,
-                    margin: EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    padding: EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: FlutterFlowTheme.of(context)
-                          .secondaryBackground
-                          .withOpacity(0.85),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          spreadRadius: 0,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Left side - Profile Picture
-                        AuthUserStreamWidget(
-                          builder: (context) => Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: FlutterFlowTheme.of(context).primary,
-                                width: 3,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 10,
-                                  spreadRadius: 2,
-                                ),
-                              ],
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 56,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: FlutterFlowTheme.of(context)
+                        .secondaryBackground
+                        .withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AuthUserStreamWidget(
+                        builder: (context) => Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: FlutterFlowTheme.of(context).primary,
+                              width: 3,
                             ),
-                            child: InkWell(
-                              splashColor: Colors.transparent,
-                              focusColor: Colors.transparent,
-                              hoverColor: Colors.transparent,
-                              highlightColor: Colors.transparent,
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  PageTransition(
-                                    type: PageTransitionType.fade,
-                                    child: FlutterFlowExpandedImageView(
-                                      image: Image.network(
-                                        currentUserDocument
-                                                    ?.photoUrl?.isEmpty ==
-                                                true
-                                            ? 'https://ui-avatars.com/api/?name=${currentUserDisplayName.isNotEmpty ? currentUserDisplayName[0] : "U"}&background=random'
-                                            : currentUserDocument?.photoUrl
-                                                        ?.contains(
-                                                            'firebasestorage.googleapis.com') ==
-                                                    true
-                                                ? 'https://ui-avatars.com/api/?name=${currentUserDisplayName.isNotEmpty ? currentUserDisplayName[0] : "U"}&background=random'
-                                                : currentUserDocument
-                                                        ?.photoUrl ??
-                                                    '',
-                                        fit: BoxFit.contain,
-                                        errorBuilder:
-                                            (context, error, stackTrace) {
-                                          print(
-                                              'Error loading profile image: $error');
-                                          return Container(
-                                            color: FlutterFlowTheme.of(context)
-                                                .primary,
-                                            child: Center(
-                                              child: Text(
-                                                currentUserDisplayName
-                                                        .isNotEmpty
-                                                    ? currentUserDisplayName[0]
-                                                        .toUpperCase()
-                                                    : '?',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 48,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: InkWell(
+                            splashColor: Colors.transparent,
+                            focusColor: Colors.transparent,
+                            hoverColor: Colors.transparent,
+                            highlightColor: Colors.transparent,
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                PageTransition(
+                                  type: PageTransitionType.fade,
+                                  child: FlutterFlowExpandedImageView(
+                                    image: Image.network(
+                                      currentUserDocument?.photoUrl?.isEmpty ==
+                                              true
+                                          ? 'https://ui-avatars.com/api/?name=${currentUserDisplayName.isNotEmpty ? currentUserDisplayName[0] : "U"}&background=random'
+                                          : currentUserDocument?.photoUrl?.contains(
+                                                      'firebasestorage.googleapis.com') ==
+                                                  true
+                                              ? 'https://ui-avatars.com/api/?name=${currentUserDisplayName.isNotEmpty ? currentUserDisplayName[0] : "U"}&background=random'
+                                              : currentUserDocument?.photoUrl ??
+                                                  '',
+                                      fit: BoxFit.contain,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        print(
+                                            'Error loading profile image: $error');
+                                        return Container(
+                                          color: FlutterFlowTheme.of(context)
+                                              .primary,
+                                          child: Center(
+                                            child: Text(
+                                              currentUserDisplayName.isNotEmpty
+                                                  ? currentUserDisplayName[0]
+                                                      .toUpperCase()
+                                                  : '?',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 48,
+                                                fontWeight: FontWeight.bold,
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                      allowRotation: false,
-                                      tag: currentUserDocument?.photoUrl ?? '',
-                                      useHeroAnimation: true,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Hero(
-                                tag: currentUserDocument?.photoUrl ?? '',
-                                transitionOnUserGestures: true,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(50),
-                                  child: Image.network(
-                                    currentUserDocument?.photoUrl?.isEmpty ==
-                                            true
-                                        ? 'https://ui-avatars.com/api/?name=${currentUserDisplayName.isNotEmpty ? currentUserDisplayName[0] : "U"}&background=random'
-                                        : currentUserDocument?.photoUrl ?? '',
-                                    width: 100,
-                                    height: 100,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      print(
-                                          'Error loading profile image: $error');
-                                      return Container(
-                                        width: 100,
-                                        height: 100,
-                                        color: FlutterFlowTheme.of(context)
-                                            .primary,
-                                        child: Center(
-                                          child: Text(
-                                            currentUserDisplayName.isNotEmpty
-                                                ? currentUserDisplayName[0]
-                                                    .toUpperCase()
-                                                : '?',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 48,
-                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                            .animate()
-                            .fade(duration: 600.ms, curve: Curves.easeOut)
-                            .slideX(
-                                begin: -0.1,
-                                end: 0,
-                                duration: 600.ms,
-                                curve: Curves.easeOut),
-                        SizedBox(width: 20),
-                        // Right side - Stats and info
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // User Info
-                              AuthUserStreamWidget(
-                                builder: (context) => Text(
-                                  currentUserDisplayName,
-                                  style: FlutterFlowTheme.of(context)
-                                      .titleLarge
-                                      .override(
-                                        fontFamily: 'Outfit',
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                              )
-                                  .animate()
-                                  .fade(
-                                      duration: 600.ms,
-                                      delay: 200.ms,
-                                      curve: Curves.easeOut)
-                                  .slideY(
-                                      begin: -0.2,
-                                      end: 0,
-                                      duration: 600.ms,
-                                      delay: 200.ms,
-                                      curve: Curves.easeOut),
-                              SizedBox(height: 4),
-                              AuthUserStreamWidget(
-                                builder: (context) => Text(
-                                  '@${valueOrDefault(currentUserDocument?.userName, '')}',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        fontFamily: 'Figtree',
-                                        color: FlutterFlowTheme.of(context)
-                                            .secondaryText,
-                                      ),
-                                ),
-                              )
-                                  .animate()
-                                  .fade(
-                                      duration: 600.ms,
-                                      delay: 400.ms,
-                                      curve: Curves.easeOut)
-                                  .slideY(
-                                      begin: -0.2,
-                                      end: 0,
-                                      duration: 600.ms,
-                                      delay: 400.ms,
-                                      curve: Curves.easeOut),
-                              SizedBox(height: 16),
-                              // Stats Row
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    vertical: 12, horizontal: 8),
-                                decoration: BoxDecoration(
-                                  color: FlutterFlowTheme.of(context)
-                                      .primaryBackground
-                                      .withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceAround,
-                                  children: [
-                                    StreamBuilder<List<PostsRecord>>(
-                                      stream: queryPostsRecord(
-                                        queryBuilder: (postsRecord) =>
-                                            postsRecord.where(
-                                          'poster',
-                                          isEqualTo: currentUserReference,
-                                        ),
-                                      ),
-                                      builder: (context, snapshot) {
-                                        if (!snapshot.hasData) {
-                                          return _buildStatColumn(
-                                              '...', 'Dreams');
-                                        }
-                                        return _buildStatColumn(
-                                            snapshot.data!.length.toString(),
-                                            'Dreams');
+                                        );
                                       },
                                     ),
-                                    AuthUserStreamWidget(
-                                      builder: (context) => _buildStatColumn(
-                                        (currentUserDocument
-                                                    ?.usersFollowingMe.length ??
-                                                0)
-                                            .toString(),
-                                        'Followers',
-                                      ),
-                                    ),
-                                    AuthUserStreamWidget(
-                                      builder: (context) => _buildStatColumn(
-                                        (currentUserDocument
-                                                    ?.followingUsers.length ??
-                                                0)
-                                            .toString(),
-                                        'Following',
-                                      ),
-                                    ),
-                                  ],
+                                    allowRotation: false,
+                                    tag: currentUserDocument?.photoUrl ?? '',
+                                    useHeroAnimation: true,
+                                  ),
                                 ),
-                              )
-                                  .animate()
-                                  .fade(
-                                      duration: 600.ms,
-                                      delay: 600.ms,
-                                      curve: Curves.easeOut)
-                                  .scale(
-                                      begin: const Offset(0.95, 0.95),
-                                      end: const Offset(1, 1),
-                                      duration: 600.ms,
-                                      delay: 600.ms,
-                                      curve: Curves.easeOut),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                      .animate()
-                      .fade(duration: 800.ms, curve: Curves.easeOut)
-                      .slideY(
-                          begin: 0.1,
-                          end: 0,
-                          duration: 800.ms,
-                          curve: Curves.easeOut),
-
-                  // Glassmorphic Action buttons
-                  Container(
-                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildGlassmorphicButton(
-                            'Share Dream',
-                            Icons.add_circle_outline,
-                            () => context.pushNamed('DreamEntrySelection'),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: _buildGlassmorphicButton(
-                            'Edit Profile',
-                            Icons.edit_outlined,
-                            () =>
-                                context.pushNamed(EditProfileWidget.routeName),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                      .animate()
-                      .fade(
-                          duration: 800.ms,
-                          delay: 400.ms,
-                          curve: Curves.easeOut)
-                      .slideY(
-                          begin: 0.2,
-                          end: 0,
-                          duration: 800.ms,
-                          delay: 400.ms,
-                          curve: Curves.easeOut),
-
-                  // Dream Stats Card
-                  Container(
-                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    child: _buildGlassmorphicCard(
-                      context,
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Dream Stats',
-                            style: FlutterFlowTheme.of(context)
-                                .titleMedium
-                                .override(
-                                  fontFamily: 'Outfit',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          SizedBox(height: 12),
-                          StreamBuilder<List<PostsRecord>>(
-                            stream: queryPostsRecord(
-                              queryBuilder: (postsRecord) => postsRecord.where(
-                                'poster',
-                                isEqualTo: currentUserReference,
-                              ),
-                            ),
-                            builder: (context, snapshot) {
-                              if (!snapshot.hasData) {
-                                return Center(
-                                    child: CircularProgressIndicator());
-                              }
-
-                              final List<PostsRecord> posts = snapshot.data!;
-                              final int dreamCount = posts.length;
-                              final String weeklyAverage =
-                                  (dreamCount / 4).toStringAsFixed(1);
-
-                              // Calculate dream streak based on post dates
-                              String streakText = '0 days';
-                              if (posts.isNotEmpty) {
-                                // Sort posts by date (most recent first)
-                                posts
-                                    .sort((a, b) => b.date!.compareTo(a.date!));
-
-                                // Check for consecutive days
-                                int streak = 1;
-                                DateTime? lastDate = posts[0].date;
-
-                                // Initialize with today to handle today's posts
-                                DateTime today = DateTime.now();
-                                DateTime yesterday = DateTime(
-                                    today.year, today.month, today.day - 1);
-
-                                // If most recent post is not from today or yesterday, streak is broken
-                                if (lastDate != null) {
-                                  DateTime lastPostDay = DateTime(lastDate.year,
-                                      lastDate.month, lastDate.day);
-                                  DateTime todayDate = DateTime(
-                                      today.year, today.month, today.day);
-
-                                  if (lastPostDay.isAfter(todayDate) ||
-                                      todayDate.difference(lastPostDay).inDays >
-                                          1) {
-                                    streakText = '0 days';
-                                  } else {
-                                    // Check for consecutive days
-                                    DateTime currentDate = lastPostDay;
-                                    streak = 1;
-
-                                    // Group posts by date to handle multiple posts per day
-                                    Map<String, bool> postedDates = {};
-
-                                    for (var post in posts) {
-                                      if (post.date != null) {
-                                        final postDate = post.date!;
-                                        final dateKey =
-                                            '${postDate.year}-${postDate.month}-${postDate.day}';
-                                        postedDates[dateKey] = true;
-                                      }
-                                    }
-
-                                    // Check for continuous streak
-                                    for (int i = 1; i <= 30; i++) {
-                                      // Check up to last 30 days
-                                      DateTime checkDate = DateTime(
-                                          todayDate.year,
-                                          todayDate.month,
-                                          todayDate.day - i);
-
-                                      final dateKey =
-                                          '${checkDate.year}-${checkDate.month}-${checkDate.day}';
-
-                                      if (postedDates.containsKey(dateKey)) {
-                                        streak++;
-                                      } else {
-                                        break; // Streak is broken
-                                      }
-                                    }
-
-                                    streakText = '$streak days';
-                                  }
-                                }
-                              }
-
-                              return Column(
-                                children: [
-                                  _buildStatRow(
-                                      'Total Dreams', dreamCount.toString()),
-                                  Divider(height: 16),
-                                  _buildStatRow(
-                                      'Weekly Average', weeklyAverage),
-                                  Divider(height: 16),
-                                  _buildStatRow('Dream Streak', streakText),
-                                ],
                               );
                             },
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                      .animate()
-                      .fade(
-                          duration: 800.ms,
-                          delay: 600.ms,
-                          curve: Curves.easeOut)
-                      .slideY(
-                          begin: 0.2,
-                          end: 0,
-                          duration: 800.ms,
-                          delay: 600.ms,
-                          curve: Curves.easeOut),
-
-                  // Quick Actions
-                  Container(
-                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildQuickActionButton(
-                            'Dream Analysis',
-                            Icons.psychology,
-                            () => context.pushNamed('DreamAnalysis'),
-                            FlutterFlowTheme.of(context).primary,
-                          )
-                              .animate()
-                              .fade(
-                                  duration: 600.ms,
-                                  delay: 800.ms,
-                                  curve: Curves.easeOut)
-                              .slideY(
-                                  begin: 0.2,
-                                  end: 0,
-                                  duration: 600.ms,
-                                  delay: 800.ms,
-                                  curve: Curves.easeOut),
-                        ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: _buildQuickActionButton(
-                            'Saved Dreams',
-                            Icons.bookmark,
-                            () => context.pushNamed('SavedPosts'),
-                            FlutterFlowTheme.of(context).secondary,
-                          )
-                              .animate()
-                              .fade(
-                                  duration: 600.ms,
-                                  delay: 900.ms,
-                                  curve: Curves.easeOut)
-                              .slideY(
-                                  begin: 0.2,
-                                  end: 0,
-                                  duration: 600.ms,
-                                  delay: 900.ms,
-                                  curve: Curves.easeOut),
-                        ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: _buildQuickActionButton(
-                            'Collection',
-                            Icons.collections,
-                            () => _showBackgroundCollectionDialog(context),
-                            FlutterFlowTheme.of(context).tertiary,
-                          )
-                              .animate()
-                              .fade(
-                                  duration: 600.ms,
-                                  delay: 1000.ms,
-                                  curve: Curves.easeOut)
-                              .slideY(
-                                  begin: 0.2,
-                                  end: 0,
-                                  duration: 600.ms,
-                                  delay: 1000.ms,
-                                  curve: Curves.easeOut),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Recent Dreams Heading and List combined in a single container
-                  Container(
-                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Heading with zero padding
-                        Container(
-                          margin: EdgeInsets.only(bottom: 2),
-                          padding: EdgeInsets.zero,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Recent Dreams',
-                                style:
-                                    FlutterFlowTheme.of(context).headlineSmall,
+                            child: Hero(
+                              tag: currentUserDocument?.photoUrl ?? '',
+                              transitionOnUserGestures: true,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(50),
+                                child: Image.network(
+                                  currentUserDocument?.photoUrl?.isEmpty == true
+                                      ? 'https://ui-avatars.com/api/?name=${currentUserDisplayName.isNotEmpty ? currentUserDisplayName[0] : "U"}&background=random'
+                                      : currentUserDocument?.photoUrl ?? '',
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    print(
+                                        'Error loading profile image: $error');
+                                    return Container(
+                                      width: 100,
+                                      height: 100,
+                                      color:
+                                          FlutterFlowTheme.of(context).primary,
+                                      child: Center(
+                                        child: Text(
+                                          currentUserDisplayName.isNotEmpty
+                                              ? currentUserDisplayName[0]
+                                                  .toUpperCase()
+                                              : '?',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 48,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
-
-                        // Recent Dreams List with enhanced glassmorphism
+                      ),
+                      SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AuthUserStreamWidget(
+                              builder: (context) => Text(
+                                currentUserDisplayName,
+                                style: FlutterFlowTheme.of(context)
+                                    .titleLarge
+                                    .override(
+                                      fontFamily: 'Outfit',
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                            ),
+                            AuthUserStreamWidget(
+                              builder: (context) => Text(
+                                '@${valueOrDefault(currentUserDocument?.userName, '')}',
+                                style: FlutterFlowTheme.of(context)
+                                    .bodyMedium
+                                    .override(
+                                      fontFamily: 'Figtree',
+                                      color: FlutterFlowTheme.of(context)
+                                          .secondaryText,
+                                    ),
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                  vertical: 12, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: FlutterFlowTheme.of(context)
+                                    .primaryBackground
+                                    .withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  StreamBuilder<List<PostsRecord>>(
+                                    stream: queryPostsRecord(
+                                      queryBuilder: (postsRecord) =>
+                                          postsRecord.where(
+                                        'poster',
+                                        isEqualTo: currentUserReference,
+                                      ),
+                                    ),
+                                    builder: (context, snapshot) {
+                                      if (!snapshot.hasData) {
+                                        return _buildStatColumn(
+                                            '...', 'Dreams');
+                                      }
+                                      return _buildStatColumn(
+                                          snapshot.data!.length.toString(),
+                                          'Dreams');
+                                    },
+                                  ),
+                                  AuthUserStreamWidget(
+                                    builder: (context) => _buildStatColumn(
+                                      (currentUserDocument
+                                                  ?.usersFollowingMe.length ??
+                                              0)
+                                          .toString(),
+                                      'Followers',
+                                    ),
+                                  ),
+                                  AuthUserStreamWidget(
+                                    builder: (context) => _buildStatColumn(
+                                      (currentUserDocument
+                                                  ?.followingUsers.length ??
+                                              0)
+                                          .toString(),
+                                      'Following',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildGlassmorphicButton(
+                          'Share Dream',
+                          Icons.add_circle_outline,
+                          () => context.pushNamed('DreamEntrySelection'),
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: _buildGlassmorphicButton(
+                          'Edit Profile',
+                          Icons.edit_outlined,
+                          () => context.pushNamed(EditProfileWidget.routeName),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: _buildGlassmorphicCard(
+                    context,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dream Stats',
+                          style:
+                              FlutterFlowTheme.of(context).titleMedium.override(
+                                    fontFamily: 'Outfit',
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                        ),
+                        SizedBox(height: 12),
                         StreamBuilder<List<PostsRecord>>(
                           stream: queryPostsRecord(
-                            queryBuilder: (postsRecord) => postsRecord
-                                .where('poster',
-                                    isEqualTo: currentUserReference)
-                                .orderBy('date', descending: true),
+                            queryBuilder: (postsRecord) => postsRecord.where(
+                              'poster',
+                              isEqualTo: currentUserReference,
+                            ),
                           ),
                           builder: (context, snapshot) {
                             if (!snapshot.hasData) {
                               return Center(child: CircularProgressIndicator());
                             }
 
-                            List<PostsRecord> posts = snapshot.data!;
-                            if (posts.isEmpty) {
-                              return EmptylistWidget();
+                            final List<PostsRecord> posts = snapshot.data!;
+                            final int dreamCount = posts.length;
+                            final String weeklyAverage =
+                                (dreamCount / 4).toStringAsFixed(1);
+
+                            // Calculate dream streak based on post dates
+                            String streakText = '0 days';
+                            if (posts.isNotEmpty) {
+                              // Sort posts by date (most recent first)
+                              posts.sort((a, b) => b.date!.compareTo(a.date!));
+
+                              // Check for consecutive days
+                              int streak = 1;
+                              DateTime? lastDate = posts[0].date;
+
+                              // Initialize with today to handle today's posts
+                              DateTime today = DateTime.now();
+                              DateTime yesterday = DateTime(
+                                  today.year, today.month, today.day - 1);
+
+                              // If most recent post is not from today or yesterday, streak is broken
+                              if (lastDate != null) {
+                                DateTime lastPostDay = DateTime(lastDate.year,
+                                    lastDate.month, lastDate.day);
+                                DateTime todayDate = DateTime(
+                                    today.year, today.month, today.day);
+
+                                if (lastPostDay.isAfter(todayDate) ||
+                                    todayDate.difference(lastPostDay).inDays >
+                                        1) {
+                                  streakText = '0 days';
+                                } else {
+                                  // Check for consecutive days
+                                  DateTime currentDate = lastPostDay;
+                                  streak = 1;
+
+                                  // Group posts by date to handle multiple posts per day
+                                  Map<String, bool> postedDates = {};
+
+                                  for (var post in posts) {
+                                    if (post.date != null) {
+                                      final postDate = post.date!;
+                                      final dateKey =
+                                          '${postDate.year}-${postDate.month}-${postDate.day}';
+                                      postedDates[dateKey] = true;
+                                    }
+                                  }
+
+                                  // Check for continuous streak
+                                  for (int i = 1; i <= 30; i++) {
+                                    // Check up to last 30 days
+                                    DateTime checkDate = DateTime(
+                                        todayDate.year,
+                                        todayDate.month,
+                                        todayDate.day - i);
+
+                                    final dateKey =
+                                        '${checkDate.year}-${checkDate.month}-${checkDate.day}';
+
+                                    if (postedDates.containsKey(dateKey)) {
+                                      streak++;
+                                    } else {
+                                      break; // Streak is broken
+                                    }
+                                  }
+
+                                  streakText = '$streak days';
+                                }
+                              }
                             }
 
-                            return ListView.separated(
-                              shrinkWrap: true,
-                              physics: NeverScrollableScrollPhysics(),
-                              padding: EdgeInsets.zero,
-                              itemCount: posts.length,
-                              separatorBuilder: (context, index) =>
-                                  SizedBox(height: 16),
-                              itemBuilder: (context, index) {
-                                final post = posts[index];
-                                // Show all posts for current user, including private ones
-                                if (post.isPrivate &&
-                                    post.poster != currentUserReference) {
-                                  return SizedBox.shrink();
-                                }
-                                return Container(
-                                  margin: index == 0 ? EdgeInsets.zero : null,
-                                  child: InkWell(
-                                    onTap: () {
-                                      AppNavigationHelper
-                                          .navigateToDetailedPost(
-                                        context,
-                                        docref: serializeParam(
-                                          post.reference,
-                                          ParamType.DocumentReference,
-                                        ),
-                                        userref: serializeParam(
-                                          post.poster,
-                                          ParamType.DocumentReference,
-                                        ),
-                                      );
-                                    },
-                                    child: _buildEnhancedGlassmorphicCard(
-                                      context,
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  post.title,
-                                                  style: FlutterFlowTheme.of(
-                                                          context)
-                                                      .titleMedium,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: Icon(Icons.edit_outlined),
-                                                onPressed: () async {
-                                                  AnimatedEditDialog.show(
-                                                    context,
-                                                    post.reference,
-                                                  );
-                                                },
-                                              ),
-                                            ],
-                                          ),
-                                          SizedBox(height: 8),
-                                          Text(
-                                            post.dream,
-                                            maxLines: 3,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          SizedBox(height: 16),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  // Like icon and count
-                                                  Icon(
-                                                    Icons.favorite,
-                                                    color: FlutterFlowTheme.of(
-                                                            context)
-                                                        .primary,
-                                                    size: 20,
-                                                  ),
-                                                  SizedBox(width: 4),
-                                                  Text(
-                                                    '${post.likes.length}',
-                                                    style: FlutterFlowTheme.of(
-                                                            context)
-                                                        .bodyMedium,
-                                                  ),
-                                                  SizedBox(width: 16),
-
-                                                  // Comment icon and count
-                                                  StreamBuilder<
-                                                      List<CommentsRecord>>(
-                                                    stream: queryCommentsRecord(
-                                                      queryBuilder:
-                                                          (commentsRecord) =>
-                                                              commentsRecord
-                                                                  .where(
-                                                        'postref',
-                                                        isEqualTo:
-                                                            post.reference,
-                                                      ),
-                                                    ),
-                                                    builder:
-                                                        (context, snapshot) {
-                                                      final commentCount =
-                                                          snapshot.data
-                                                                  ?.length ??
-                                                              0;
-                                                      return InkWell(
-                                                        onTap: () {
-                                                          AppNavigationHelper
-                                                              .navigateToDetailedPost(
-                                                            context,
-                                                            docref:
-                                                                serializeParam(
-                                                              post.reference,
-                                                              ParamType
-                                                                  .DocumentReference,
-                                                            ),
-                                                            userref:
-                                                                serializeParam(
-                                                              post.poster,
-                                                              ParamType
-                                                                  .DocumentReference,
-                                                            ),
-                                                            showComments: true,
-                                                          );
-                                                        },
-                                                        child: Row(
-                                                          children: [
-                                                            Icon(
-                                                              Icons
-                                                                  .mode_comment_outlined,
-                                                              color: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .secondary,
-                                                              size: 20,
-                                                            ),
-                                                            SizedBox(width: 4),
-                                                            Text(
-                                                              '$commentCount',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium,
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      );
-                                                    },
-                                                  ),
-                                                ],
-                                              ),
-                                              Text(
-                                                timeago.format(post.date!),
-                                                style:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodySmall,
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                    .animate()
-                                    .fade(
-                                        duration: 600.ms,
-                                        delay: (1100 + (index * 100)).ms,
-                                        curve: Curves.easeOut)
-                                    .slideY(
-                                        begin: 0.2,
-                                        end: 0,
-                                        duration: 600.ms,
-                                        delay: (1100 + (index * 100)).ms,
-                                        curve: Curves.easeOut);
-                              },
+                            return Column(
+                              children: [
+                                _buildStatRow(
+                                    'Total Dreams', dreamCount.toString()),
+                                Divider(height: 16),
+                                _buildStatRow('Weekly Average', weeklyAverage),
+                                Divider(height: 16),
+                                _buildStatRow('Dream Streak', streakText),
+                              ],
                             );
                           },
                         ),
                       ],
                     ),
-                  )
-                      .animate()
-                      .fade(
-                          duration: 800.ms,
-                          delay: 1100.ms,
-                          curve: Curves.easeOut)
-                      .slideY(
-                          begin: 0.2,
-                          end: 0,
-                          duration: 800.ms,
-                          delay: 1100.ms,
-                          curve: Curves.easeOut),
+                  ),
+                ),
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickActionButton(
+                          'Dream Analysis',
+                          Icons.psychology,
+                          () => context.pushNamed('DreamAnalysis'),
+                          FlutterFlowTheme.of(context).primary,
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: _buildQuickActionButton(
+                          'Saved Dreams',
+                          Icons.bookmark,
+                          () => context.pushNamed('SavedPosts'),
+                          FlutterFlowTheme.of(context).secondary,
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: _buildQuickActionButton(
+                          'Collection',
+                          Icons.collections,
+                          () => _showBackgroundCollectionDialog(context),
+                          FlutterFlowTheme.of(context).tertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        margin: EdgeInsets.only(bottom: 16),
+                        padding: EdgeInsets.zero,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Recent Dreams',
+                              style: FlutterFlowTheme.of(context).headlineSmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      StreamBuilder<List<PostsRecord>>(
+                        stream: queryPostsRecord(
+                          queryBuilder: (postsRecord) => postsRecord
+                              .where('poster', isEqualTo: currentUserReference)
+                              .orderBy('date', descending: true),
+                        ),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return Center(child: CircularProgressIndicator());
+                          }
 
-                  // Add bottom padding for scrolling
-                  SizedBox(height: 80),
-                ],
-              ),
+                          List<PostsRecord> posts = snapshot.data!;
+                          if (posts.isEmpty) {
+                            return EmptylistWidget();
+                          }
+
+                          return ListView.separated(
+                            shrinkWrap: true,
+                            physics: NeverScrollableScrollPhysics(),
+                            padding: EdgeInsets.zero,
+                            itemCount: posts.length,
+                            separatorBuilder: (context, index) =>
+                                SizedBox(height: 16),
+                            itemBuilder: (context, index) {
+                              final post = posts[index];
+                              // Show all posts for current user, including private ones
+                              if (post.isPrivate &&
+                                  post.poster != currentUserReference) {
+                                return SizedBox.shrink();
+                              }
+                              return Container(
+                                margin: index == 0 ? EdgeInsets.zero : null,
+                                child: InkWell(
+                                  onTap: () {
+                                    AppNavigationHelper.navigateToDetailedPost(
+                                      context,
+                                      docref: serializeParam(
+                                        post.reference,
+                                        ParamType.DocumentReference,
+                                      ),
+                                      userref: serializeParam(
+                                        post.poster,
+                                        ParamType.DocumentReference,
+                                      ),
+                                    );
+                                  },
+                                  child: _buildEnhancedGlassmorphicCard(
+                                    context,
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                post.title,
+                                                style:
+                                                    FlutterFlowTheme.of(context)
+                                                        .titleMedium,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(Icons.edit_outlined),
+                                              onPressed: () async {
+                                                AnimatedEditDialog.show(
+                                                  context,
+                                                  post.reference,
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          post.dream,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        SizedBox(height: 16),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                // Like icon and count
+                                                Icon(
+                                                  Icons.favorite,
+                                                  color: FlutterFlowTheme.of(
+                                                          context)
+                                                      .primary,
+                                                  size: 20,
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  '${post.likes.length}',
+                                                  style: FlutterFlowTheme.of(
+                                                          context)
+                                                      .bodyMedium,
+                                                ),
+                                                SizedBox(width: 16),
+
+                                                // Comment icon and count
+                                                StreamBuilder<
+                                                    List<CommentsRecord>>(
+                                                  stream: queryCommentsRecord(
+                                                    queryBuilder:
+                                                        (commentsRecord) =>
+                                                            commentsRecord
+                                                                .where(
+                                                      'postref',
+                                                      isEqualTo: post.reference,
+                                                    ),
+                                                  ),
+                                                  builder: (context, snapshot) {
+                                                    final commentCount =
+                                                        snapshot.data?.length ??
+                                                            0;
+                                                    return InkWell(
+                                                      onTap: () {
+                                                        AppNavigationHelper
+                                                            .navigateToDetailedPost(
+                                                          context,
+                                                          docref:
+                                                              serializeParam(
+                                                            post.reference,
+                                                            ParamType
+                                                                .DocumentReference,
+                                                          ),
+                                                          userref:
+                                                              serializeParam(
+                                                            post.poster,
+                                                            ParamType
+                                                                .DocumentReference,
+                                                          ),
+                                                          showComments: true,
+                                                        );
+                                                      },
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(
+                                                            Icons
+                                                                .mode_comment_outlined,
+                                                            color: FlutterFlowTheme
+                                                                    .of(context)
+                                                                .secondary,
+                                                            size: 20,
+                                                          ),
+                                                          SizedBox(width: 4),
+                                                          Text(
+                                                            '$commentCount',
+                                                            style: FlutterFlowTheme
+                                                                    .of(context)
+                                                                .bodyMedium,
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              timeago.format(post.date!),
+                                              style:
+                                                  FlutterFlowTheme.of(context)
+                                                      .bodySmall,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              )
+                                  .animate()
+                                  .fade(
+                                      duration: 600.ms,
+                                      delay: (1100 + (index * 100)).ms,
+                                      curve: Curves.easeOut)
+                                  .slideY(
+                                      begin: 0.2,
+                                      end: 0,
+                                      duration: 600.ms,
+                                      delay: (1100 + (index * 100)).ms,
+                                      curve: Curves.easeOut);
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 80),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -2231,157 +2054,31 @@ class _Prof1WidgetState extends State<Prof1Widget> {
       'Sign Out',
       Icons.logout,
       () {
-        // Store navigator and context references before async operations
-        final navigatorContext = context;
-
-        // Close the menu
-        Navigator.pop(context);
-
-        // Show a confirmation dialog
+        // Confirm sign-out
         showDialog(
-          context: navigatorContext,
-          barrierColor: Colors.black.withOpacity(0.5),
+          context: context,
           builder: (BuildContext dialogContext) {
-            return TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0.0, end: 1.0),
-              duration: Duration(milliseconds: 350),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, child) {
-                return Transform.scale(
-                  scale: 0.5 + (0.5 * value),
-                  child: Opacity(
-                    opacity: value,
-                    child: child,
-                  ),
-                );
-              },
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                child: Dialog(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  insetPadding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: FlutterFlowTheme.of(context)
-                          .primaryBackground
-                          .withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.1),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: FlutterFlowTheme.of(context)
-                              .primary
-                              .withOpacity(0.2),
-                          blurRadius: 20,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                        child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.logout_rounded,
-                                size: 50,
-                                color: FlutterFlowTheme.of(context)
-                                    .error
-                                    .withOpacity(0.8),
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'Sign Out',
-                                style: FlutterFlowTheme.of(context)
-                                    .headlineSmall
-                                    .copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Are you sure you want to sign out?',
-                                style: FlutterFlowTheme.of(context).bodyMedium,
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 24),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        Navigator.of(dialogContext).pop();
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.transparent,
-                                        foregroundColor:
-                                            FlutterFlowTheme.of(context)
-                                                .secondaryText,
-                                        elevation: 0,
-                                        padding:
-                                            EdgeInsets.symmetric(vertical: 12),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(16),
-                                          side: BorderSide(
-                                            color: FlutterFlowTheme.of(context)
-                                                .secondaryText
-                                                .withOpacity(0.3),
-                                            width: 1,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Text('Cancel'),
-                                    ),
-                                  ),
-                                  SizedBox(width: 16),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () async {
-                                        // Close the dialog first to avoid context issues
-                                        Navigator.of(dialogContext).pop();
-
-                                        // Call the separate method that handles sign out
-                                        await _performSignOut();
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            FlutterFlowTheme.of(context)
-                                                .error
-                                                .withOpacity(0.8),
-                                        foregroundColor: Colors.white,
-                                        elevation: 0,
-                                        padding:
-                                            EdgeInsets.symmetric(vertical: 12),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(16),
-                                        ),
-                                      ),
-                                      child: Text('Sign Out'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+            return AlertDialog(
+              title: Text('Sign Out'),
+              content: Text('Are you sure you want to sign out?'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                  },
+                  child: Text('Cancel'),
                 ),
-              ),
+                TextButton(
+                  onPressed: () {
+                    // Close dialog
+                    Navigator.pop(dialogContext);
+
+                    // Use the safe sign-out method
+                    AuthUtil.signOutSafely();
+                  },
+                  child: Text('Sign Out'),
+                ),
+              ],
             );
           },
         );
@@ -2537,11 +2234,55 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                     child: Stack(
                                                       children: [
                                                         Positioned.fill(
-                                                          child: Lottie.asset(
-                                                            'assets/jsons/${bg['file']}',
-                                                            fit: BoxFit.cover,
-                                                            animate: true,
-                                                            repeat: true,
+                                                          child: Container(
+                                                            color: FlutterFlowTheme
+                                                                    .of(context)
+                                                                .primaryBackground,
+                                                            child: Builder(
+                                                              builder:
+                                                                  (context) {
+                                                                try {
+                                                                  return Lottie
+                                                                      .asset(
+                                                                    'assets/jsons/${bg['file']}',
+                                                                    fit: BoxFit
+                                                                        .cover,
+                                                                    animate:
+                                                                        true,
+                                                                    repeat:
+                                                                        true,
+                                                                    errorBuilder:
+                                                                        (context,
+                                                                            error,
+                                                                            stackTrace) {
+                                                                      print(
+                                                                          'Error loading Lottie: ${bg['file']} - $error');
+                                                                      return Center(
+                                                                        child:
+                                                                            Icon(
+                                                                          Icons
+                                                                              .image_not_supported,
+                                                                          color:
+                                                                              FlutterFlowTheme.of(context).secondaryText,
+                                                                        ),
+                                                                      );
+                                                                    },
+                                                                  );
+                                                                } catch (e) {
+                                                                  print(
+                                                                      'Exception loading Lottie: ${bg['file']} - $e');
+                                                                  return Center(
+                                                                    child: Icon(
+                                                                      Icons
+                                                                          .error_outline,
+                                                                      color: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .error,
+                                                                    ),
+                                                                  );
+                                                                }
+                                                              },
+                                                            ),
                                                           ),
                                                         ),
                                                       ],
@@ -2619,45 +2360,5 @@ class _Prof1WidgetState extends State<Prof1Widget> {
         );
       },
     );
-  }
-
-  // Separate method to perform sign out without using context
-  Future<void> _performSignOut() async {
-    try {
-      if (!mounted) return;
-
-      // Add a flag to track if sign out is in progress
-      bool isSigningOut = true;
-
-      try {
-        await AuthUtil.safeSignOut(
-          context: context,
-          shouldNavigate: true,
-          navigateTo: '/',
-        );
-        // If we reach here, sign-out was successful
-        isSigningOut = false;
-      } catch (e) {
-        // If there's an error, mark sign-out as complete and show error
-        isSigningOut = false;
-        debugPrint('Error during sign out: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error signing out: ${e.toString()}'),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error during sign out: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error signing out: ${e.toString()}'),
-          ),
-        );
-      }
-    }
   }
 }

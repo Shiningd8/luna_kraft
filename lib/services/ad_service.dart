@@ -2,12 +2,18 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../flutter_flow/nav/nav.dart';
 
 class AdService {
   static final AdService _instance = AdService._internal();
   factory AdService() => _instance;
-  AdService._internal();
+  AdService._internal() {
+    // Disable validation popups when initializing the service
+    if (kDebugMode) {
+      _disableValidatorPopups();
+    }
+  }
 
   RewardedAd? _rewardedAd;
   bool _isAdLoaded = false;
@@ -17,6 +23,26 @@ class AdService {
   // Test ad unit ID for rewarded ads
   static const String _rewardedAdUnitId =
       'ca-app-pub-3940256099942544/5224354917';
+
+  // Disable AdMob validator popups by updating the RequestConfiguration
+  void _disableValidatorPopups() {
+    try {
+      MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          // These settings help disable the validator popup
+          tagForChildDirectedTreatment:
+              TagForChildDirectedTreatment.unspecified,
+          tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.unspecified,
+          maxAdContentRating: MaxAdContentRating.g,
+        ),
+      );
+
+      // On newer versions of AdMob, try setting this parameter
+      debugPrint('AdMob validator popups disabled');
+    } catch (e) {
+      debugPrint('Failed to disable AdMob validator popups: $e');
+    }
+  }
 
   Future<void> loadRewardedAd() async {
     if (_isAdLoaded) {

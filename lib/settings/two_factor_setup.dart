@@ -91,18 +91,54 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage> {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final isEnabled =
-        prefs.getBool('is_2fa_enabled_${currentUser.uid}') ?? false;
-    final secretKey =
-        prefs.getString('2fa_secret_key_${currentUser.uid}') ?? '';
+    // Get the user document from Firestore to ensure we have the correct 2FA status
+    try {
+      final userDoc = await UserRecord.collection.doc(currentUser.uid).get();
+      final userData = UserRecord.fromSnapshot(userDoc);
 
-    if (mounted) {
-      setState(() {
-        _is2FAEnabled = isEnabled;
-        _secretKey = secretKey;
-        _userEmail = currentUser.email ?? '';
-      });
+      // Also get SharedPreferences for backward compatibility
+      final prefs = await SharedPreferences.getInstance();
+      final secretKey = userDoc.exists && userData.hasTwoFactorSecretKey()
+          ? userData.twoFactorSecretKey
+          : prefs.getString('2fa_secret_key_${currentUser.uid}') ?? '';
+
+      if (mounted) {
+        setState(() {
+          // Use the Firestore value as the single source of truth
+          _is2FAEnabled = userDoc.exists && userData.hasIs2FAEnabled()
+              ? userData.is2FAEnabled
+              : false;
+          _secretKey = secretKey;
+          _userEmail = currentUser.email ?? '';
+        });
+
+        // Ensure SharedPreferences is in sync with Firestore
+        if (userDoc.exists && userData.hasIs2FAEnabled()) {
+          await prefs.setBool(
+              'is_2fa_enabled_${currentUser.uid}', userData.is2FAEnabled);
+          if (userData.hasTwoFactorSecretKey()) {
+            await prefs.setString('2fa_secret_key_${currentUser.uid}',
+                userData.twoFactorSecretKey);
+          }
+        }
+      }
+    } catch (e) {
+      print('Error checking 2FA state: $e');
+
+      // Fallback to SharedPreferences if Firestore fails
+      final prefs = await SharedPreferences.getInstance();
+      final isEnabled =
+          prefs.getBool('is_2fa_enabled_${currentUser.uid}') ?? false;
+      final secretKey =
+          prefs.getString('2fa_secret_key_${currentUser.uid}') ?? '';
+
+      if (mounted) {
+        setState(() {
+          _is2FAEnabled = isEnabled;
+          _secretKey = secretKey;
+          _userEmail = currentUser.email ?? '';
+        });
+      }
     }
   }
 
@@ -215,10 +251,16 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage> {
       // Save to Firestore using user's document
       final currentUser = _auth.currentUser;
       if (currentUser != null) {
+        // Update Firestore first
         await UserRecord.collection.doc(currentUser.uid).update({
           'is_2fa_enabled': true,
           '2fa_secret_key': _secretKey,
         });
+
+        // Then update SharedPreferences for local storage
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_2fa_enabled_${currentUser.uid}', true);
+        await prefs.setString('2fa_secret_key_${currentUser.uid}', _secretKey);
       }
 
       _safeSetState(() {
@@ -244,10 +286,16 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage> {
       // Remove from Firestore using user's document
       final currentUser = _auth.currentUser;
       if (currentUser != null) {
+        // Update Firestore first
         await UserRecord.collection.doc(currentUser.uid).update({
           'is_2fa_enabled': false,
           '2fa_secret_key': '',
         });
+
+        // Then update SharedPreferences for local storage
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_2fa_enabled_${currentUser.uid}', false);
+        await prefs.setString('2fa_secret_key_${currentUser.uid}', '');
       }
 
       if (!mounted || _isDisposed) return;

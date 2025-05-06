@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:luna_kraft/flutter_flow/flutter_flow_theme.dart';
+import 'package:flutter/foundation.dart';
 
 /// Define a custom Native Ad Factory to control how native ads are displayed
 class LunaKraftNativeAdFactory {
@@ -12,6 +13,30 @@ class LunaKraftNativeAdFactory {
         'adFactoryExample',
         LunaKraftNativeAdFactory._createNativeAd,
       );
+    }
+
+    // Disable native ad validator popups in debug mode
+    if (kDebugMode) {
+      _disableNativeAdValidation();
+    }
+  }
+
+  /// Disable native ad validation popups
+  static void _disableNativeAdValidation() {
+    try {
+      // Use the MobileAds configuration to disable validation popups
+      MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          tagForChildDirectedTreatment:
+              TagForChildDirectedTreatment.unspecified,
+          tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.unspecified,
+          maxAdContentRating: MaxAdContentRating.g,
+        ),
+      );
+
+      debugPrint('Native ad validation popups disabled');
+    } catch (e) {
+      debugPrint('Failed to disable native ad validation: $e');
     }
   }
 

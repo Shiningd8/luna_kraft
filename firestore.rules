@@ -52,6 +52,14 @@ service cloud.firestore {
       allow write: if isSignedIn() && (request.auth.uid == followingId || request.auth.uid in resource.data.following);
     }
 
+    // Analytics collection - allow authenticated users to write
+    match /analytics/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
+    }
+
     // General read/write rules
     match /{document=**} {
       // Default to requiring authentication

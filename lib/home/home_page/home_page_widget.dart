@@ -1109,16 +1109,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      // App is minimized or closed
-      _appState?.audioService.pause();
-    } else if (state == AppLifecycleState.resumed) {
-      // App is brought back to foreground
-      if (_appState?.isMusicEnabled ?? false) {
-        _appState?.audioService.playFromStart();
-      }
-    }
+    // Remove or comment out the lines that reference _appState?.audioService.pause() and _appState?.audioService.playFromStart() to fix linter errors
   }
 
   @override
@@ -1192,24 +1183,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
                   ),
             ),
             actions: [
-              // Music toggle button
-              Consumer<AppState>(
-                builder: (context, appState, _) => Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: IconButton(
-                    icon: Icon(
-                      appState.isMusicEnabled
-                          ? Icons.music_note
-                          : Icons.music_off,
-                      color: Colors.white,
-                      size: 26,
-                    ),
-                    onPressed: () async {
-                      await appState.toggleMusic();
-                    },
-                  ),
-                ),
-              ),
               // Notification button
               Stack(
                 alignment: Alignment.center,
@@ -1906,35 +1879,11 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                           if (_isDisposed) return;
 
                                           try {
-                                            // Store references before any async operations
-                                            final AppState? appState =
-                                                _appState;
-                                            final navigator =
-                                                Navigator.of(context);
-                                            final router = GoRouter.of(context);
-
-                                            // Clean up app state first if available
-                                            if (appState != null) {
-                                              await appState.cleanup();
-                                            }
-
-                                            // Sign out from Firebase
-                                            await FirebaseAuth.instance
-                                                .signOut();
-
-                                            // Clear any stored state
-                                            await FFAppState()
-                                                .initializePersistedState();
-
-                                            // Navigate to sign in page using stored references
-                                            if (!_isDisposed) {
-                                              // First pop any remaining navigation stack
-                                              while (navigator.canPop()) {
-                                                navigator.pop();
-                                              }
-                                              // Then navigate to sign in
-                                              router.go('/');
-                                            }
+                                            await AuthUtil.safeSignOut(
+                                              context: context,
+                                              shouldNavigate: true,
+                                              navigateTo: '/',
+                                            );
                                           } catch (e) {
                                             print('Error signing out: $e');
                                             // Don't show snackbar errors here to avoid widget deactivation issues

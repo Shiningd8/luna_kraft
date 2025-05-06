@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'audio_service.dart';
 import 'zen_audio_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AppState extends ChangeNotifier {
   static final AppState _instance = AppState._internal();
-  final AudioService _audioService = AudioService();
   final ZenAudioService _zenAudioService = ZenAudioService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isMusicEnabled = true;
@@ -32,9 +30,6 @@ class AppState extends ChangeNotifier {
     });
   }
 
-  // Get the audio service instance
-  AudioService get audioService => _audioService;
-
   // Get the zen audio service instance
   ZenAudioService get zenAudioService => _zenAudioService;
 
@@ -49,8 +44,9 @@ class AppState extends ChangeNotifier {
         {'name': 'Hills', 'file': 'hills.json'},
         {'name': 'Ocean', 'file': 'ocean.json'},
         {'name': 'Rainforest', 'file': 'rainforest.json'},
-        {'name': 'Valley', 'file': 'valley.json'},
-        {'name': 'Windmill', 'file': 'windmill.json'},
+        {'name': 'Gradient', 'file': 'gradient.json'},
+        {'name': 'Night Hill', 'file': 'nighthill.json'},
+        {'name': 'Night Lake', 'file': 'nightlake.json'},
       ];
 
   // Get the current user's background selection key
@@ -76,8 +72,30 @@ class AppState extends ChangeNotifier {
   Future<void> _loadBackgroundPreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _selectedBackground =
+      final savedBackground =
           prefs.getString(_userBackgroundKey) ?? 'backgroundanimation.json';
+
+      // Migrate users from removed backgrounds to default
+      if (savedBackground == 'valley.json' ||
+          savedBackground == 'windmill.json') {
+        _selectedBackground = 'backgroundanimation.json';
+        // Save the updated preference
+        await prefs.setString(_userBackgroundKey, _selectedBackground);
+        print('Migrated user from removed background to default');
+      }
+      // Migrate from old file names to new ones
+      else if (savedBackground == 'night_hill.json') {
+        _selectedBackground = 'nighthill.json';
+        await prefs.setString(_userBackgroundKey, _selectedBackground);
+        print('Migrated user from night_hill.json to nighthill.json');
+      } else if (savedBackground == 'night_lake.json') {
+        _selectedBackground = 'nightlake.json';
+        await prefs.setString(_userBackgroundKey, _selectedBackground);
+        print('Migrated user from night_lake.json to nightlake.json');
+      } else {
+        _selectedBackground = savedBackground;
+      }
+
       notifyListeners();
     } catch (e) {
       print('Error loading background preference: $e');
@@ -119,7 +137,6 @@ class AppState extends ChangeNotifier {
     if (_isInitialized) return;
 
     try {
-      await _audioService.initialize();
       await _zenAudioService.initialize();
       await _loadPerformancePreference();
       await _loadBackgroundPreference();
@@ -130,24 +147,8 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  // Toggle music and notify listeners
-  Future<void> toggleMusic() async {
-    if (!_isInitialized) {
-      await initialize();
-    }
-
-    _isMusicEnabled = !_isMusicEnabled;
-    if (_isMusicEnabled) {
-      await _audioService.playFromStart();
-    } else {
-      await _audioService.pause();
-    }
-    notifyListeners();
-  }
-
   // Clean up resources
   Future<void> cleanup() async {
-    await _audioService.dispose();
     await _zenAudioService.dispose();
     _isInitialized = false;
     notifyListeners();

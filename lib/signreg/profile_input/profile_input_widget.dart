@@ -42,6 +42,9 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
   late ProfileInputModel _model;
   final scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isLoading = false;
+  String? _errorMessage;
+  Timer? _longLoadingTimer;
+  bool _showExtendedLoadingMessage = false;
 
   Stream<List<UsernamesRecord>> queryUsernamesRecord({
     DocumentReference? parent,
@@ -72,7 +75,7 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
   @override
   void dispose() {
     _model.dispose();
-
+    _longLoadingTimer?.cancel();
     super.dispose();
   }
 
@@ -1063,41 +1066,121 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
                             Padding(
                               padding: EdgeInsetsDirectional.fromSTEB(
                                   20.0, 24.0, 20.0, 0.0),
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _finalizeProfile,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      FlutterFlowTheme.of(context).primary,
-                                  padding: EdgeInsets.symmetric(vertical: 16),
-                                  minimumSize: Size(double.infinity, 50),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 3,
-                                ),
-                                child: _isLoading
-                                    ? SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                            Colors.white,
-                                          ),
-                                        ),
-                                      )
-                                    : Text(
-                                        'Create Profile',
-                                        style: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .override(
-                                              fontFamily: 'Outfit',
-                                              color: Colors.white,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w500,
-                                            ),
+                              child: Column(
+                                children: [
+                                  ElevatedButton(
+                                    onPressed:
+                                        _isLoading ? null : _finalizeProfile,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          FlutterFlowTheme.of(context).primary,
+                                      padding:
+                                          EdgeInsets.symmetric(vertical: 16),
+                                      minimumSize: Size(double.infinity, 50),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
+                                      elevation: 3,
+                                    ),
+                                    child: _isLoading
+                                        ? Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              SizedBox(
+                                                width: 24,
+                                                height: 24,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                          Color>(
+                                                    Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(width: 12),
+                                              Text(
+                                                _showExtendedLoadingMessage
+                                                    ? 'Still working... please wait'
+                                                    : 'Creating profile...',
+                                                style:
+                                                    FlutterFlowTheme.of(context)
+                                                        .titleSmall
+                                                        .override(
+                                                          fontFamily: 'Outfit',
+                                                          color: Colors.white,
+                                                          fontSize: 16,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                        ),
+                                              ),
+                                            ],
+                                          )
+                                        : Text(
+                                            'Create Profile',
+                                            style: FlutterFlowTheme.of(context)
+                                                .titleSmall
+                                                .override(
+                                                  fontFamily: 'Outfit',
+                                                  color: Colors.white,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                          ),
+                                  ),
+                                  if (_isLoading && _showExtendedLoadingMessage)
+                                    Padding(
+                                      padding: EdgeInsets.only(top: 16),
+                                      child: Text(
+                                        'This is taking longer than expected. The app is still creating your profile. App Check security verification may cause delays.',
+                                        style: FlutterFlowTheme.of(context)
+                                            .bodySmall
+                                            .override(
+                                              fontFamily: 'Figtree',
+                                              color:
+                                                  FlutterFlowTheme.of(context)
+                                                      .warning,
+                                              fontSize: 12,
+                                            ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  if (_isLoading)
+                                    Padding(
+                                      padding: EdgeInsets.only(top: 16),
+                                      child: TextButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _isLoading = false;
+                                            _longLoadingTimer?.cancel();
+                                          });
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  'Operation cancelled. Please try again later.'),
+                                              backgroundColor:
+                                                  FlutterFlowTheme.of(context)
+                                                      .warning,
+                                            ),
+                                          );
+                                        },
+                                        child: Text(
+                                          'Cancel',
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                fontFamily: 'Figtree',
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .error,
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                           ],
@@ -1139,7 +1222,20 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
 
   Future<void> _finalizeProfile() async {
     if (_model.formKey.currentState?.validate() ?? false) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+        _showExtendedLoadingMessage = false;
+      });
+
+      // Start a timer to show extended message if operation takes more than 10 seconds
+      _longLoadingTimer = Timer(Duration(seconds: 10), () {
+        if (mounted && _isLoading) {
+          setState(() {
+            _showExtendedLoadingMessage = true;
+          });
+        }
+      });
 
       try {
         // First check if the user is authenticated
@@ -1163,33 +1259,57 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
           return;
         }
 
-        // Check if username is already taken
+        // Check if username is already taken with retry mechanism
         final username = _model.userIDTextController.text.toLowerCase();
-        try {
-          final usernameDoc = await FirebaseFirestore.instance
-              .collection('usernames')
-              .doc(username)
-              .get();
+        bool usernameTaken = false;
+        int retryCount = 0;
+        const int maxRetries = 3;
 
-          if (usernameDoc.exists) {
-            setState(() => _isLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Username is already taken. Please choose another one.',
-                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                        fontFamily: 'Figtree',
-                        color: Colors.white,
-                      ),
-                ),
-                backgroundColor: FlutterFlowTheme.of(context).error,
-              ),
-            );
-            return;
+        while (retryCount < maxRetries) {
+          try {
+            final usernameDoc = await FirebaseFirestore.instance
+                .collection('usernames')
+                .doc(username)
+                .get()
+                .timeout(Duration(seconds: 5));
+
+            if (usernameDoc.exists) {
+              usernameTaken = true;
+              break;
+            }
+            break; // Success, no retry needed
+          } catch (e) {
+            print('Error checking username (attempt ${retryCount + 1}): $e');
+            retryCount++;
+            if (e.toString().contains('App Check') ||
+                e.toString().contains('permission-denied') ||
+                e.toString().contains('network') ||
+                e is TimeoutException) {
+              // App Check or network error, retry after delay
+              await Future.delayed(Duration(seconds: 2));
+              continue;
+            } else {
+              // Other error, just continue with profile creation
+              break;
+            }
           }
-        } catch (e) {
-          print('Error checking username: $e');
-          // Continue with profile creation even if username check fails
+        }
+
+        if (usernameTaken) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Username is already taken. Please choose another one.',
+                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                      fontFamily: 'Figtree',
+                      color: Colors.white,
+                    ),
+              ),
+              backgroundColor: FlutterFlowTheme.of(context).error,
+            ),
+          );
+          return;
         }
 
         String? photoUrl;
@@ -1226,128 +1346,204 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
 
             print('Uploading file to Firebase Storage...');
 
-            // Upload the image bytes
-            final uploadTask = await storageRef.putData(
-                _model.uploadedLocalFile1.bytes!, metadata);
+            // Upload the image bytes with retry mechanism
+            bool uploadSuccess = false;
+            retryCount = 0;
 
-            if (uploadTask.state == TaskState.success) {
-              // Get the download URL
-              photoUrl = await storageRef.getDownloadURL();
-              print('Successfully uploaded profile picture. URL: $photoUrl');
-            } else {
-              print('Upload task failed: ${uploadTask.state}');
-              throw Exception('Failed to upload profile picture');
+            while (retryCount < maxRetries && !uploadSuccess) {
+              try {
+                final uploadTask = await storageRef
+                    .putData(_model.uploadedLocalFile1.bytes!, metadata)
+                    .timeout(Duration(seconds: 15));
+
+                if (uploadTask.state == TaskState.success) {
+                  // Get the download URL
+                  photoUrl = await storageRef.getDownloadURL();
+                  print(
+                      'Successfully uploaded profile picture. URL: $photoUrl');
+                  uploadSuccess = true;
+                } else {
+                  print('Upload task failed: ${uploadTask.state}');
+                  retryCount++;
+                  if (retryCount < maxRetries) {
+                    await Future.delayed(Duration(seconds: 2));
+                  }
+                }
+              } catch (e) {
+                print(
+                    'Error uploading profile picture (attempt ${retryCount + 1}): $e');
+                retryCount++;
+                if (e.toString().contains('App Check') ||
+                    e.toString().contains('permission-denied') ||
+                    e.toString().contains('network') ||
+                    e is TimeoutException) {
+                  // App Check or network error, retry after delay
+                  await Future.delayed(Duration(seconds: 2));
+                } else {
+                  // Other error type, stop retrying
+                  break;
+                }
+              }
+            }
+
+            if (!uploadSuccess) {
+              // Failed after all retries, but continue with profile creation
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      'Could not upload profile picture, but continuing with profile creation.'),
+                  backgroundColor: FlutterFlowTheme.of(context).warning,
+                ),
+              );
             }
           } catch (e) {
             print('Error uploading profile picture: $e');
+            // Continue with profile creation even if image upload fails
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content:
-                    Text('Error uploading profile picture. Please try again.'),
-                backgroundColor: FlutterFlowTheme.of(context).error,
+                content: Text(
+                    'Error uploading profile picture, but continuing with profile creation.'),
+                backgroundColor: FlutterFlowTheme.of(context).warning,
               ),
             );
-            // Continue with profile creation even if image upload fails
           }
         }
 
-        // Update the user's profile in Firestore
-        try {
-          // First update the currentUser profile in Firebase Auth
-          await currentUser.updateProfile(
-            displayName: _model.displayNameTextController.text,
-            photoURL: photoUrl,
-          );
+        // Update the user's profile in Firestore with retry mechanism
+        bool profileUpdateSuccess = false;
+        retryCount = 0;
 
-          // Then update the Firestore document
-          if (currentUserReference != null) {
-            final updateData = {
-              'display_name': _model.displayNameTextController.text,
-              'user_name': _model.userIDTextController.text.toLowerCase(),
-              'last_updated': getCurrentTimestamp,
-              'date_of_birth': _model.datePicked,
-              'gender': _model.selectedGender,
-            };
-
-            // Only add photo_url if we have one
-            if (photoUrl != null) {
-              updateData['photo_url'] = photoUrl;
-            }
-
-            await currentUserReference!.update(updateData);
-          } else {
-            // If the currentUserReference is null, create a new document
-            final userDocRef = FirebaseFirestore.instance
-                .collection('User')
-                .doc(currentUser.uid);
-
-            final userData = {
-              'display_name': _model.displayNameTextController.text,
-              'user_name': _model.userIDTextController.text.toLowerCase(),
-              'email': currentUser.email,
-              'created_time': getCurrentTimestamp,
-              'last_updated': getCurrentTimestamp,
-              'date_of_birth': _model.datePicked,
-              'gender': _model.selectedGender,
-              'uid': currentUser.uid,
-              'phone_number': currentUser.phoneNumber,
-            };
-
-            // Only add photo_url if we have one
-            if (photoUrl != null) {
-              userData['photo_url'] = photoUrl;
-            }
-
-            await userDocRef.set(userData);
-          }
-
-          print('Successfully updated user profile with photo: $photoUrl');
-
-          // Create username record
+        while (retryCount < maxRetries && !profileUpdateSuccess) {
           try {
-            await FirebaseFirestore.instance
-                .collection('usernames')
-                .doc(_model.userIDTextController.text.toLowerCase())
-                .set({
-              'userId': currentUserReference ??
-                  FirebaseFirestore.instance
-                      .collection('User')
-                      .doc(currentUser.uid),
-              'username': _model.userIDTextController.text.toLowerCase(),
-              'created_time': getCurrentTimestamp,
-            });
-          } catch (e) {
-            print('Error creating username record: $e');
-            // Continue even if username record creation fails
-          }
-
-          // Only navigate if the widget is still mounted
-          if (mounted) {
-            // Show onboarding before going to home page
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => OnboardingScreen(
-                  onComplete: () async {
-                    await OnboardingManager.markOnboardingComplete();
-                    if (mounted) {
-                      context.goNamed('HomePage');
-                    }
-                  },
-                ),
-              ),
+            // First update the currentUser profile in Firebase Auth
+            await currentUser.updateProfile(
+              displayName: _model.displayNameTextController.text,
+              photoURL: photoUrl,
             );
+
+            // Then update the Firestore document
+            if (currentUserReference != null) {
+              final updateData = {
+                'display_name': _model.displayNameTextController.text,
+                'user_name': _model.userIDTextController.text.toLowerCase(),
+                'last_updated': getCurrentTimestamp,
+                'date_of_birth': _model.datePicked,
+                'gender': _model.selectedGender,
+              };
+
+              // Only add photo_url if we have one
+              if (photoUrl != null) {
+                updateData['photo_url'] = photoUrl;
+              }
+
+              await currentUserReference!
+                  .update(updateData)
+                  .timeout(Duration(seconds: 10));
+            } else {
+              // If the currentUserReference is null, create a new document
+              final userDocRef = FirebaseFirestore.instance
+                  .collection('User')
+                  .doc(currentUser.uid);
+
+              final userData = {
+                'display_name': _model.displayNameTextController.text,
+                'user_name': _model.userIDTextController.text.toLowerCase(),
+                'email': currentUser.email,
+                'created_time': getCurrentTimestamp,
+                'last_updated': getCurrentTimestamp,
+                'date_of_birth': _model.datePicked,
+                'gender': _model.selectedGender,
+                'uid': currentUser.uid,
+                'phone_number': currentUser.phoneNumber,
+              };
+
+              // Only add photo_url if we have one
+              if (photoUrl != null) {
+                userData['photo_url'] = photoUrl;
+              }
+
+              await userDocRef.set(userData).timeout(Duration(seconds: 10));
+            }
+
+            print('Successfully updated user profile with photo: $photoUrl');
+            profileUpdateSuccess = true;
+
+            // Create username record with retry mechanism
+            try {
+              bool usernameCreationSuccess = false;
+              int usernameRetryCount = 0;
+
+              while (
+                  usernameRetryCount < maxRetries && !usernameCreationSuccess) {
+                try {
+                  await FirebaseFirestore.instance
+                      .collection('usernames')
+                      .doc(_model.userIDTextController.text.toLowerCase())
+                      .set({
+                    'userId': currentUserReference ??
+                        FirebaseFirestore.instance
+                            .collection('User')
+                            .doc(currentUser.uid),
+                    'username': _model.userIDTextController.text.toLowerCase(),
+                    'created_time': getCurrentTimestamp,
+                  }).timeout(Duration(seconds: 10));
+
+                  usernameCreationSuccess = true;
+                } catch (e) {
+                  print(
+                      'Error creating username record (attempt ${usernameRetryCount + 1}): $e');
+                  usernameRetryCount++;
+                  if (e.toString().contains('App Check') ||
+                      e.toString().contains('permission-denied') ||
+                      e.toString().contains('network') ||
+                      e is TimeoutException) {
+                    await Future.delayed(Duration(seconds: 2));
+                  } else {
+                    break;
+                  }
+                }
+              }
+            } catch (e) {
+              print('Error creating username record: $e');
+              // Continue even if username record creation fails
+            }
+          } catch (e) {
+            print(
+                'Error updating user profile (attempt ${retryCount + 1}): $e');
+            retryCount++;
+            if (e.toString().contains('App Check') ||
+                e.toString().contains('permission-denied') ||
+                e.toString().contains('network') ||
+                e is TimeoutException) {
+              // App Check or network error, retry after delay
+              await Future.delayed(Duration(seconds: 2));
+            } else {
+              // Other error type, stop retrying
+              throw e;
+            }
           }
-        } catch (e) {
-          print('Error updating user profile: $e');
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error updating profile: ${e.toString()}'),
-              backgroundColor: FlutterFlowTheme.of(context).error,
+        }
+
+        if (!profileUpdateSuccess) {
+          throw Exception('Failed to update profile after multiple attempts');
+        }
+
+        // Only navigate if the widget is still mounted
+        if (mounted) {
+          // Show onboarding before going to home page
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OnboardingScreen(
+                onComplete: () async {
+                  await OnboardingManager.markOnboardingComplete();
+                  if (mounted) {
+                    context.goNamed('HomePage');
+                  }
+                },
+              ),
             ),
           );
-          return;
         }
       } catch (e) {
         print('Error in profile creation process: $e');

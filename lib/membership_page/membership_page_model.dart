@@ -1,22 +1,32 @@
-import '/flutter_flow/flutter_flow_util.dart';
-import 'membership_page_widget.dart' show MembershipPageWidget;
-import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'membership_page_widget.dart';
 
-class MembershipPageModel extends FlutterFlowModel<MembershipPageWidget> {
-  ///  State fields for stateful widgets in this page.
+class MembershipPageModel extends ChangeNotifier {
+  // State fields
+  bool _isLoading = false;
+  ScrollController _scrollController = ScrollController();
+  AnimationController? _animationController;
 
-  // State field(s) for Carousel widget.
-  CarouselSliderController? carouselController;
-  int carouselCurrentIndex = 1;
+  // Getters
+  bool get isLoading => _isLoading;
+  ScrollController get scrollController => _scrollController;
+  AnimationController? get animationController => _animationController;
 
-  @override
-  void initState(BuildContext context) {
-    // No need to initialize dreamModeToggle
+  // Setters
+  set isLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
+  set animationController(AnimationController? value) {
+    _animationController = value;
+    notifyListeners();
   }
 
   @override
   void dispose() {
-    // No need to dispose dreamModeToggle
+    _scrollController.dispose();
+    _animationController?.dispose();
+    super.dispose();
   }
 }

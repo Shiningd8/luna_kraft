@@ -19,9 +19,11 @@ class StandardizedPostItem extends StatefulWidget {
   final UserRecord user;
   final VoidCallback? onLike;
   final VoidCallback? onSave;
+  final VoidCallback? onDelete;
   final bool showUserInfo;
   final bool animateEntry;
   final int animationIndex;
+  final bool showDeleteOption;
 
   const StandardizedPostItem({
     Key? key,
@@ -29,9 +31,11 @@ class StandardizedPostItem extends StatefulWidget {
     required this.user,
     this.onLike,
     this.onSave,
+    this.onDelete,
     this.showUserInfo = true,
     this.animateEntry = false,
     this.animationIndex = 0,
+    this.showDeleteOption = false,
   }) : super(key: key);
 
   @override
@@ -166,6 +170,9 @@ class _StandardizedPostItemState extends State<StandardizedPostItem> {
           ParamType.DocumentReference,
         ),
       ),
+      onLongPress: widget.showDeleteOption && widget.onDelete != null
+          ? () => _showDeleteOverlay(context)
+          : null,
       child: Stack(
         children: [
           // Background Image
@@ -495,6 +502,80 @@ class _StandardizedPostItemState extends State<StandardizedPostItem> {
     return PostBackgroundWidget(
       imagePath: post.videoBackgroundUrl,
       opacity: post.videoBackgroundOpacity ?? 0.75,
+    );
+  }
+
+  void _showDeleteOverlay(BuildContext context) {
+    // Use the built-in showModalBottomSheet instead of a custom overlay
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.bookmark_remove,
+                color: FlutterFlowTheme.of(context).primary,
+              ),
+              title: Text(
+                'Unsave this dream',
+                style: FlutterFlowTheme.of(context).titleSmall.override(
+                      fontFamily: 'Figtree',
+                      color: Colors.white,
+                    ),
+              ),
+              subtitle: Text(
+                'Remove from your saved dreams collection',
+                style: FlutterFlowTheme.of(context).bodySmall.override(
+                      fontFamily: 'Figtree',
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                if (widget.onDelete != null) {
+                  widget.onDelete!();
+                }
+              },
+            ),
+            Divider(color: Colors.white.withOpacity(0.1)),
+            ListTile(
+              leading: Icon(
+                Icons.cancel_outlined,
+                color: Colors.white.withOpacity(0.7),
+              ),
+              title: Text(
+                'Cancel',
+                style: FlutterFlowTheme.of(context).titleSmall.override(
+                      fontFamily: 'Figtree',
+                      color: Colors.white,
+                    ),
+              ),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
