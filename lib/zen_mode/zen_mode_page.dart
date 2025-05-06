@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '/services/app_state.dart';
 import '/services/zen_audio_service.dart';
@@ -69,10 +70,7 @@ class _AnimatedSoundCardState extends State<AnimatedSoundCard>
       child: AnimatedScale(
         scale: widget.isActive ? 1.05 : 1.0,
         duration: Duration(milliseconds: 300),
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: widget.child,
-        ),
+        child: ScaleTransition(scale: _scaleAnimation, child: widget.child),
       ),
     );
   }
@@ -83,11 +81,8 @@ class RippleAnimation extends StatefulWidget {
   final Widget child;
   final bool isActive;
 
-  const RippleAnimation({
-    Key? key,
-    required this.child,
-    this.isActive = false,
-  }) : super(key: key);
+  const RippleAnimation({Key? key, required this.child, this.isActive = false})
+      : super(key: key);
 
   @override
   State<RippleAnimation> createState() => _RippleAnimationState();
@@ -156,9 +151,9 @@ class _RippleAnimationState extends State<RippleAnimation>
                           height: size,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: FlutterFlowTheme.of(context)
-                                .primary
-                                .withOpacity(0.2 - index * 0.05),
+                            color: FlutterFlowTheme.of(
+                              context,
+                            ).primary.withOpacity(0.2 - index * 0.05),
                           ),
                         ),
                       ),
@@ -200,26 +195,24 @@ class _DelayedAnimationState extends State<DelayedAnimation>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    );
+    _controller = AnimationController(vsync: this, duration: widget.duration);
 
-    _opacityAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Interval(0.0, 1.0, curve: Curves.easeOut),
-    ));
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Interval(0.0, 1.0, curve: Curves.easeOut),
+      ),
+    );
 
     _slideAnimation = Tween<Offset>(
       begin: Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Interval(0.0, 1.0, curve: Curves.easeOut),
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Interval(0.0, 1.0, curve: Curves.easeOut),
+      ),
+    );
 
     if (widget.delay == 0) {
       _controller.forward();
@@ -242,10 +235,7 @@ class _DelayedAnimationState extends State<DelayedAnimation>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _opacityAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: widget.child,
-      ),
+      child: SlideTransition(position: _slideAnimation, child: widget.child),
     );
   }
 }
@@ -314,6 +304,21 @@ class _ZenModePageState extends State<ZenModePage>
   // For the ripple effect on timer icon
   late AnimationController _timerRippleController;
   bool _isDisposed = false;
+
+  // Ensure UI is in sync with audio service
+  void _syncUIWithAudioService() {
+    if (mounted && !_isDisposed) {
+      setState(() {
+        final serviceIsPlaying = zenAudioService.isPlaying;
+        if (_isPlaying != serviceIsPlaying) {
+          print(
+            'Syncing UI: _isPlaying=$_isPlaying, service.isPlaying=$serviceIsPlaying',
+          );
+          _isPlaying = serviceIsPlaying;
+        }
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -397,11 +402,15 @@ class _ZenModePageState extends State<ZenModePage>
     // Update UI when returning to the page
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // Use the stored reference instead of accessing Provider again
+        // Immediately sync UI with service state
+        _syncUIWithAudioService();
+
         setState(() {
-          _isPlaying = zenAudioService.isPlaying;
           _selectedTimerMinutes = zenAudioService.timerDurationMinutes;
           _updateBackgroundImage();
+          print(
+            'ZenMode initialized: isPlaying=$_isPlaying, service.isPlaying=${zenAudioService.isPlaying}',
+          );
         });
       }
     });
@@ -470,6 +479,7 @@ class _ZenModePageState extends State<ZenModePage>
     if (mounted && !_isDisposed) {
       setState(() {
         _isPlaying = zenAudioService.isPlaying;
+        print("SERVICE STATE CHANGED: isPlaying=$_isPlaying");
       });
     }
   }
@@ -510,13 +520,16 @@ class _ZenModePageState extends State<ZenModePage>
     if (activeSounds.isNotEmpty) {
       // Prioritize certain backgrounds
       if (activeSounds.any(
-          (dynamic sound) => sound.name == 'Rain' || sound.name == 'Thunder')) {
+        (dynamic sound) => sound.name == 'Rain' || sound.name == 'Thunder',
+      )) {
         newBackground = 'images/zen/rain_background.jpg';
-      } else if (activeSounds
-          .any((dynamic sound) => sound.name == 'Fireplace')) {
+      } else if (activeSounds.any(
+        (dynamic sound) => sound.name == 'Fireplace',
+      )) {
         newBackground = 'images/zen/fire_background.jpg';
       } else if (activeSounds.any(
-          (dynamic sound) => sound.name == 'Forest' || sound.name == 'Birds')) {
+        (dynamic sound) => sound.name == 'Forest' || sound.name == 'Birds',
+      )) {
         newBackground = 'images/zen/forest_background.jpg';
       } else if (activeSounds.any((dynamic sound) => sound.name == 'Ocean')) {
         newBackground = 'images/zen/ocean_background.jpg';
@@ -530,16 +543,21 @@ class _ZenModePageState extends State<ZenModePage>
 
   // Toggle a specific sound
   void _toggleSound(String soundName) {
-    setState(() {
-      // Set a temporary visual indication that we're toggling
-    });
+    print('TOGGLING SOUND: $soundName');
+
+    // Set loading state to give immediate feedback
+    setState(() {});
 
     // Toggle this sound's state and update background
     zenAudioService.toggleSound(soundName).then((_) {
       if (mounted) {
+        print(
+          'TOGGLED SOUND: $soundName, isPlaying=${zenAudioService.isPlaying}',
+        );
+
+        // Force a full UI update
         setState(() {
-          _isPlaying =
-              zenAudioService.isPlaying; // Make sure play state is in sync
+          _isPlaying = zenAudioService.isPlaying;
           _updateBackgroundImage();
         });
       }
@@ -547,45 +565,44 @@ class _ZenModePageState extends State<ZenModePage>
       print("Error toggling sound: $error");
       // Force refresh UI state to keep in sync with service
       if (mounted) {
-        setState(() {});
+        setState(() {
+          _isPlaying = zenAudioService.isPlaying;
+        });
       }
     });
   }
 
   // Toggle play/pause for all sounds
   void _togglePlayPause() {
-    if (zenAudioService.isPlaying) {
-      // If sounds are playing, pause them
-      zenAudioService.pauseAllSounds().then((_) {
-        if (mounted) {
-          setState(() {
-            _isPlaying = zenAudioService.isPlaying;
-          });
-        }
-      }).catchError((error) {
-        print("Error pausing sounds: $error");
-        if (mounted) {
-          setState(() {
-            _isPlaying = zenAudioService.isPlaying;
-          });
-        }
-      });
+    bool isCurrentlyPlaying = zenAudioService.isPlaying;
+    print(
+        "TOGGLE PLAY/PAUSE - Current state: ${isCurrentlyPlaying ? 'PLAYING' : 'PAUSED'}");
+
+    // Count active sounds
+    int activeSoundsCount =
+        zenAudioService.availableSounds.where((s) => s.isActive).length;
+
+    if (activeSoundsCount == 0) {
+      // No active sounds - show message to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Tap on a sound to activate it first'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    if (isCurrentlyPlaying) {
+      // Currently playing, so PAUSE
+      print("PAUSING all sounds");
+      zenAudioService.pauseAllSounds();
+      setState(() {}); // Force UI update
     } else {
-      // If no sounds are playing or they're paused, resume them
-      zenAudioService.resumeAllSounds().then((_) {
-        if (mounted) {
-          setState(() {
-            _isPlaying = zenAudioService.isPlaying;
-          });
-        }
-      }).catchError((error) {
-        print("Error resuming sounds: $error");
-        if (mounted) {
-          setState(() {
-            _isPlaying = zenAudioService.isPlaying;
-          });
-        }
-      });
+      // Currently paused, so PLAY
+      print("PLAYING all sounds");
+      zenAudioService.resumeAllSounds();
+      setState(() {}); // Force UI update
     }
   }
 
@@ -602,8 +619,9 @@ class _ZenModePageState extends State<ZenModePage>
         child: Container(
           padding: EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color:
-                FlutterFlowTheme.of(context).primaryBackground.withOpacity(0.9),
+            color: FlutterFlowTheme.of(
+              context,
+            ).primaryBackground.withOpacity(0.9),
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -620,24 +638,25 @@ class _ZenModePageState extends State<ZenModePage>
                 position: Tween<Offset>(
                   begin: Offset(0, -0.1),
                   end: Offset.zero,
-                ).animate(CurvedAnimation(
-                  parent: AnimationController(
-                    vsync: this,
-                    duration: Duration(milliseconds: 400),
-                  )..forward(),
-                  curve: Curves.easeOut,
-                )),
-                child: FadeTransition(
-                  opacity: Tween<double>(
-                    begin: 0.0,
-                    end: 1.0,
-                  ).animate(CurvedAnimation(
+                ).animate(
+                  CurvedAnimation(
                     parent: AnimationController(
                       vsync: this,
                       duration: Duration(milliseconds: 400),
                     )..forward(),
                     curve: Curves.easeOut,
-                  )),
+                  ),
+                ),
+                child: FadeTransition(
+                  opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
+                    CurvedAnimation(
+                      parent: AnimationController(
+                        vsync: this,
+                        duration: Duration(milliseconds: 400),
+                      )..forward(),
+                      curve: Curves.easeOut,
+                    ),
+                  ),
                   child: Text(
                     'Save Your Zen Mix',
                     style: FlutterFlowTheme.of(context).headlineSmall,
@@ -656,8 +675,10 @@ class _ZenModePageState extends State<ZenModePage>
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                 ),
               ),
               SizedBox(height: 24),
@@ -667,7 +688,9 @@ class _ZenModePageState extends State<ZenModePage>
                   TextButton(
                     child: Text(
                       'Cancel',
-                      style: FlutterFlowTheme.of(context).bodyMedium.override(
+                      style: FlutterFlowTheme.of(
+                        context,
+                      ).bodyMedium.override(
                             fontFamily: 'Readex Pro',
                             color: Colors.white.withOpacity(0.7),
                           ),
@@ -678,25 +701,32 @@ class _ZenModePageState extends State<ZenModePage>
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: FlutterFlowTheme.of(context).primary,
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     child: Text(
                       'Save',
-                      style: FlutterFlowTheme.of(context).bodyMedium.override(
+                      style: FlutterFlowTheme.of(
+                        context,
+                      ).bodyMedium.override(
                             fontFamily: 'Readex Pro',
                             color: Colors.white,
                           ),
                     ),
                     onPressed: () async {
                       if (_presetNameController.text.isNotEmpty) {
-                        final appState =
-                            Provider.of<AppState>(context, listen: false);
-                        await appState.zenAudioService
-                            .savePreset(_presetNameController.text);
+                        final appState = Provider.of<AppState>(
+                          context,
+                          listen: false,
+                        );
+                        await appState.zenAudioService.savePreset(
+                          _presetNameController.text,
+                        );
                         Navigator.pop(context);
 
                         // Show success animation
@@ -704,7 +734,10 @@ class _ZenModePageState extends State<ZenModePage>
                           SnackBar(
                             content: Row(
                               children: [
-                                Icon(Icons.check_circle, color: Colors.white),
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.white,
+                                ),
                                 SizedBox(width: 10),
                                 Text('Mix saved successfully!'),
                               ],
@@ -744,9 +777,9 @@ class _ZenModePageState extends State<ZenModePage>
             width: double.infinity,
             padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: FlutterFlowTheme.of(context)
-                  .primaryBackground
-                  .withOpacity(0.9),
+              color: FlutterFlowTheme.of(
+                context,
+              ).primaryBackground.withOpacity(0.9),
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -802,9 +835,9 @@ class _ZenModePageState extends State<ZenModePage>
                                   child: ListTile(
                                     title: Text(
                                       preset.name,
-                                      style: FlutterFlowTheme.of(context)
-                                          .titleMedium
-                                          .override(
+                                      style: FlutterFlowTheme.of(
+                                        context,
+                                      ).titleMedium.override(
                                             fontFamily: 'Outfit',
                                             color: Colors.white,
                                           ),
@@ -813,8 +846,10 @@ class _ZenModePageState extends State<ZenModePage>
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
-                                          icon: Icon(Icons.play_arrow,
-                                              color: Colors.white),
+                                          icon: Icon(
+                                            Icons.play_arrow,
+                                            color: Colors.white,
+                                          ),
                                           onPressed: () async {
                                             await appState.zenAudioService
                                                 .loadPreset(preset.name);
@@ -826,8 +861,10 @@ class _ZenModePageState extends State<ZenModePage>
                                           },
                                         ),
                                         IconButton(
-                                          icon: Icon(Icons.delete,
-                                              color: Colors.red),
+                                          icon: Icon(
+                                            Icons.delete,
+                                            color: Colors.red,
+                                          ),
                                           onPressed: () async {
                                             await appState.zenAudioService
                                                 .deletePreset(preset.name);
@@ -939,34 +976,81 @@ class _ZenModePageState extends State<ZenModePage>
   void _showTimerCompleteNotification() {
     if (!mounted) return;
 
-    // Stop all sounds
+    try {
+      // Stop all sounds safely
+      Future.microtask(() async {
+        try {
+          await zenAudioService.stopAllSounds();
+
+          // Only update state if component is still mounted
+          if (mounted) {
+            setState(() {
+              _isPlaying = false;
+            });
+          }
+        } catch (e) {
+          print('Error stopping sounds on timer completion: $e');
+          // Fallback approach if the primary method fails
+          if (mounted) {
+            for (var sound in zenAudioService.availableSounds) {
+              if (sound.isActive) {
+                zenAudioService.toggleSound(sound.name);
+              }
+            }
+          }
+        }
+      });
+
+      // Show notification after ensuring we've handled the audio state
+      Future.delayed(Duration(milliseconds: 300), () {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.timer_off, color: Colors.white),
+                SizedBox(width: 10),
+                Text('Time\'s up! Your zen session has ended.'),
+              ],
+            ),
+            backgroundColor: FlutterFlowTheme.of(context).primary,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      });
+    } catch (e) {
+      print('Error in timer completion handler: $e');
+    }
+  }
+
+  // Stop all active sounds
+  void _stopAllSounds() {
+    print("STOPPING ALL SOUNDS");
+
+    // Stop all sounds in the service
     zenAudioService.stopAllSounds();
 
+    // Force UI update
+    setState(() {});
+
+    // Give user feedback
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.timer_off, color: Colors.white),
-            SizedBox(width: 10),
-            Text('Time\'s up! Your zen session has ended.'),
-          ],
-        ),
-        backgroundColor: FlutterFlowTheme.of(context).primary,
+        content: Text('All sounds stopped'),
+        duration: Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        duration: Duration(seconds: 5),
-        action: SnackBarAction(
-          label: 'OK',
-          textColor: Colors.white,
-          onPressed: () {},
-        ),
       ),
     );
-
-    // Could also trigger system notification here if app is in background
-    // Would need to add proper notification permissions and package
   }
 
   @override
@@ -998,13 +1082,9 @@ class _ZenModePageState extends State<ZenModePage>
                             colors: [
                               Colors.white,
                               Colors.white.withOpacity(0.5),
-                              Colors.white
+                              Colors.white,
                             ],
-                            stops: [
-                              0.0,
-                              _titleShimmerController.value,
-                              1.0,
-                            ],
+                            stops: [0.0, _titleShimmerController.value, 1.0],
                           ).createShader(bounds);
                         },
                         child: Text(
@@ -1032,15 +1112,19 @@ class _ZenModePageState extends State<ZenModePage>
                     return Padding(
                       padding: const EdgeInsets.only(right: 12.0),
                       child: Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(
-                              0.3 + (_timerPulseController.value * 0.2)),
+                            0.3 + (_timerPulseController.value * 0.2),
+                          ),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: Colors.white.withOpacity(
-                                0.5 + (_timerPulseController.value * 0.3)),
+                              0.5 + (_timerPulseController.value * 0.3),
+                            ),
                             width: 1.0,
                           ),
                         ),
@@ -1050,7 +1134,8 @@ class _ZenModePageState extends State<ZenModePage>
                             Icon(
                               Icons.timer,
                               color: Colors.white.withOpacity(
-                                  0.7 + (_timerPulseController.value * 0.3)),
+                                0.7 + (_timerPulseController.value * 0.3),
+                              ),
                               size: 18,
                             ),
                             SizedBox(width: 5),
@@ -1058,7 +1143,8 @@ class _ZenModePageState extends State<ZenModePage>
                               _timerDisplay,
                               style: TextStyle(
                                 color: Colors.white.withOpacity(
-                                    0.8 + (_timerPulseController.value * 0.2)),
+                                  0.8 + (_timerPulseController.value * 0.2),
+                                ),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -1085,7 +1171,9 @@ class _ZenModePageState extends State<ZenModePage>
               Positioned.fill(
                 child: ColorFiltered(
                   colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(0.5), BlendMode.darken),
+                    Colors.black.withOpacity(0.5),
+                    BlendMode.darken,
+                  ),
                   child: _isInitialized && _lottieController != null
                       ? Lottie.asset(
                           'assets/jsons/boat.json',
@@ -1113,58 +1201,70 @@ class _ZenModePageState extends State<ZenModePage>
                         mainAxisSize: MainAxisSize.max,
                         mainAxisAlignment: MainAxisAlignment.start,
                         children: sounds
-                            .where((dynamic sound) => sound.isActive as bool)
-                            .map<Widget>((dynamic sound) => Padding(
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                      8, 0, 8, 0),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .primary
-                                          .withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(24),
-                                      border: Border.all(
-                                        color: FlutterFlowTheme.of(context)
-                                            .primary,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Padding(
-                                      padding: EdgeInsetsDirectional.fromSTEB(
-                                          12, 8, 12, 8),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            _getSoundIcon(sound.name),
-                                            size: 24,
-                                            color: Colors.white,
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            sound.name,
-                                            style: FlutterFlowTheme.of(context)
-                                                .bodyMedium
-                                                .override(
-                                                  fontFamily: 'Readex Pro',
-                                                  color: Colors.white,
-                                                ),
-                                          ),
-                                          SizedBox(width: 8),
-                                          GestureDetector(
-                                            onTap: () =>
-                                                _toggleSound(sound.name),
-                                            child: Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 16,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                            .where(
+                              (dynamic sound) => sound.isActive as bool,
+                            )
+                            .map<Widget>(
+                              (dynamic sound) => Padding(
+                                padding: EdgeInsetsDirectional.fromSTEB(
+                                  8,
+                                  0,
+                                  8,
+                                  0,
+                                ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: FlutterFlowTheme.of(
+                                      context,
+                                    ).primary.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: FlutterFlowTheme.of(
+                                        context,
+                                      ).primary,
+                                      width: 1,
                                     ),
                                   ),
-                                ))
+                                  child: Padding(
+                                    padding: EdgeInsetsDirectional.fromSTEB(
+                                      12,
+                                      8,
+                                      12,
+                                      8,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _getSoundIcon(sound.name),
+                                          size: 24,
+                                          color: Colors.white,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          sound.name,
+                                          style: FlutterFlowTheme.of(
+                                            context,
+                                          ).bodyMedium.override(
+                                                fontFamily: 'Readex Pro',
+                                                color: Colors.white,
+                                              ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        GestureDetector(
+                                          onTap: () => _toggleSound(sound.name),
+                                          child: Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
                             .toList(),
                       ),
                     ),
@@ -1199,26 +1299,28 @@ class _ZenModePageState extends State<ZenModePage>
                                 duration: Duration(milliseconds: 300),
                                 decoration: BoxDecoration(
                                   color: isActive
-                                      ? FlutterFlowTheme.of(context)
-                                          .primary
-                                          .withOpacity(0.3)
+                                      ? FlutterFlowTheme.of(
+                                          context,
+                                        ).primary.withOpacity(0.3)
                                       : Colors.black.withOpacity(0.3),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: isActive
-                                        ? FlutterFlowTheme.of(context).primary
+                                        ? FlutterFlowTheme.of(
+                                            context,
+                                          ).primary
                                         : Colors.white.withOpacity(0.2),
                                     width: isActive ? 2 : 1,
                                   ),
                                   boxShadow: isActive
                                       ? [
                                           BoxShadow(
-                                            color: FlutterFlowTheme.of(context)
-                                                .primary
-                                                .withOpacity(0.3),
+                                            color: FlutterFlowTheme.of(
+                                              context,
+                                            ).primary.withOpacity(0.3),
                                             blurRadius: 10,
                                             spreadRadius: 1,
-                                          )
+                                          ),
                                         ]
                                       : null,
                                 ),
@@ -1234,9 +1336,9 @@ class _ZenModePageState extends State<ZenModePage>
                                     SizedBox(height: 12),
                                     Text(
                                       sound.name,
-                                      style: FlutterFlowTheme.of(context)
-                                          .bodyMedium
-                                          .override(
+                                      style: FlutterFlowTheme.of(
+                                        context,
+                                      ).bodyMedium.override(
                                             fontFamily: 'Readex Pro',
                                             color: Colors.white,
                                           ),
@@ -1249,15 +1351,19 @@ class _ZenModePageState extends State<ZenModePage>
                                         duration: Duration(milliseconds: 300),
                                         child: Padding(
                                           padding: EdgeInsets.symmetric(
-                                              horizontal: 8.0, vertical: 4.0),
+                                            horizontal: 8.0,
+                                            vertical: 4.0,
+                                          ),
                                           child: SliderTheme(
                                             data: SliderThemeData(
                                               trackHeight: 4,
                                               thumbShape: RoundSliderThumbShape(
-                                                  enabledThumbRadius: 6),
+                                                enabledThumbRadius: 6,
+                                              ),
                                               overlayShape:
                                                   RoundSliderOverlayShape(
-                                                      overlayRadius: 14),
+                                                overlayRadius: 14,
+                                              ),
                                               thumbColor: Colors.white,
                                               activeTrackColor:
                                                   Colors.white.withOpacity(0.7),
@@ -1270,8 +1376,9 @@ class _ZenModePageState extends State<ZenModePage>
                                               max: 1.0,
                                               onChanged: (value) {
                                                 zenAudioService.setSoundVolume(
-                                                    sound.name as String,
-                                                    value);
+                                                  sound.name as String,
+                                                  value,
+                                                );
                                                 setState(() {});
                                               },
                                             ),
@@ -1294,78 +1401,87 @@ class _ZenModePageState extends State<ZenModePage>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Play/pause button
-                          GestureDetector(
-                            onTap: _togglePlayPause,
-                            child: Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: FlutterFlowTheme.of(context)
-                                    .primary
-                                    .withOpacity(0.2),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: FlutterFlowTheme.of(context).primary,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Icon(
-                                zenAudioService.isPlaying
-                                    ? Icons.pause
-                                    : Icons.play_arrow,
-                                color: Colors.white,
-                                size: 32,
-                              ),
-                            ),
-                          ),
+                          // Only show stop button when there are active sounds
+                          Consumer<AppState>(
+                            builder: (context, appState, _) {
+                              // Check if any sounds are active
+                              bool anySoundsActive = appState
+                                  .zenAudioService.availableSounds
+                                  .where((s) => s.isActive)
+                                  .isNotEmpty;
 
-                          // Shuffle button
-                          Padding(
-                            padding: EdgeInsets.only(left: 10),
-                            child: GestureDetector(
-                              onTap: () async {
-                                await zenAudioService.stopAllSounds();
+                              if (!anySoundsActive) {
+                                // Don't show any button when no sounds are active
+                                return SizedBox();
+                              }
 
-                                final List<String> shuffledSounds = List.from(
-                                    sounds.map<String>((dynamic sound) =>
-                                        sound.name as String))
-                                  ..shuffle();
-                                final selectedCount =
-                                    2 + (DateTime.now().millisecond % 2);
+                              // Show a modern stop button
+                              return AnimatedBuilder(
+                                animation: _pulseController,
+                                builder: (context, child) {
+                                  final double scale =
+                                      1.0 + (_pulseController.value * 0.05);
 
-                                for (int i = 0;
-                                    i < selectedCount &&
-                                        i < shuffledSounds.length;
-                                    i++) {
-                                  await zenAudioService
-                                      .toggleSound(shuffledSounds[i]);
-                                }
-
-                                await zenAudioService.playAllActiveSounds();
-
-                                setState(() {
-                                  _isPlaying = true;
-                                  _updateBackgroundImage();
-                                });
-                              },
-                              child: Container(
-                                padding: EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.3),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.shuffle,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
+                                  return GestureDetector(
+                                    onTap: _stopAllSounds,
+                                    child: Transform.scale(
+                                      scale: scale,
+                                      child: Container(
+                                        width: 64,
+                                        height: 64,
+                                        decoration: BoxDecoration(
+                                          color: FlutterFlowTheme.of(context)
+                                              .primary
+                                              .withOpacity(0.2),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: FlutterFlowTheme.of(context)
+                                                .primary
+                                                .withOpacity(0.5 +
+                                                    (_pulseController.value *
+                                                        0.5)),
+                                            width: 2,
+                                          ),
+                                          // Add subtle gradient for modern look
+                                          gradient: RadialGradient(
+                                            colors: [
+                                              FlutterFlowTheme.of(context)
+                                                  .primary
+                                                  .withOpacity(0.6),
+                                              FlutterFlowTheme.of(context)
+                                                  .primary
+                                                  .withOpacity(0.2),
+                                            ],
+                                            radius: 0.8,
+                                          ),
+                                          // Add subtle shadow
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color:
+                                                  FlutterFlowTheme.of(context)
+                                                      .primary
+                                                      .withOpacity(0.1 +
+                                                          (_pulseController
+                                                                  .value *
+                                                              0.2)),
+                                              blurRadius: 12,
+                                              spreadRadius: 2,
+                                            )
+                                          ],
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.stop_rounded,
+                                            color: Colors.white,
+                                            size: 32,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -1382,112 +1498,239 @@ class _ZenModePageState extends State<ZenModePage>
 
   // Show timer selection bottom sheet
   void _showTimerBottomSheet(BuildContext context) {
+    // Default timer values
+    int hours = 0;
+    int minutes = 30;
+
+    if (_selectedTimerMinutes != null) {
+      hours = _selectedTimerMinutes! ~/ 60;
+      minutes = _selectedTimerMinutes! % 60;
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
-        return Container(
-          height: 300,
-          padding: EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color:
-                FlutterFlowTheme.of(context).primaryBackground.withOpacity(0.9),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(30),
-              topRight: Radius.circular(30),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Set Timer',
-                style: FlutterFlowTheme.of(context).headlineSmall,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.5,
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: FlutterFlowTheme.of(
+                  context,
+                ).primaryBackground.withOpacity(0.9),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
               ),
-              SizedBox(height: 20),
-              Expanded(
-                child: GridView.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 1.5,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 5,
+                    margin: EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
-                  itemCount: _timerOptions.length + 1, // +1 for cancel option
-                  itemBuilder: (context, index) {
-                    if (index < _timerOptions.length) {
-                      final minutes = _timerOptions[index];
-                      final isSelected = _selectedTimerMinutes == minutes;
-                      String text = minutes < 60
-                          ? '$minutes min'
-                          : '${minutes ~/ 60} hour${minutes ~/ 60 > 1 ? 's' : ''}';
-
-                      return GestureDetector(
-                        onTap: () {
-                          _setTimer(minutes);
-                          Navigator.pop(context);
-                        },
-                        child: AnimatedContainer(
-                          duration: Duration(milliseconds: 200),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? FlutterFlowTheme.of(context).primary
-                                : Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? FlutterFlowTheme.of(context).primary
-                                  : Colors.white.withOpacity(0.3),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              text,
-                              style: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .override(
-                                    fontFamily: 'Readex Pro',
+                  Text(
+                    'Set Timer',
+                    style: FlutterFlowTheme.of(context).headlineSmall,
+                  ),
+                  SizedBox(height: 20),
+                  // Cupertino-style time picker
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Hours picker
+                        Expanded(
+                          child: CupertinoPicker(
+                            itemExtent: 44,
+                            backgroundColor: Colors.transparent,
+                            onSelectedItemChanged: (int index) {
+                              setState(() {
+                                hours = index;
+                              });
+                            },
+                            children: List<Widget>.generate(12, (int index) {
+                              return Center(
+                                child: Text(
+                                  '$index',
+                                  style: TextStyle(
                                     color: Colors.white,
+                                    fontSize: 24,
                                   ),
+                                ),
+                              );
+                            }),
+                            scrollController: FixedExtentScrollController(
+                              initialItem: hours,
                             ),
                           ),
                         ),
-                      );
-                    } else {
+                        Text(
+                          'hours',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                          ),
+                        ),
+                        SizedBox(width: 20),
+                        // Minutes picker
+                        Expanded(
+                          child: CupertinoPicker(
+                            itemExtent: 44,
+                            backgroundColor: Colors.transparent,
+                            onSelectedItemChanged: (int index) {
+                              setState(() {
+                                minutes = index * 5;
+                              });
+                            },
+                            children: List<Widget>.generate(12, (int index) {
+                              return Center(
+                                child: Text(
+                                  '${index * 5}',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                  ),
+                                ),
+                              );
+                            }),
+                            scrollController: FixedExtentScrollController(
+                              initialItem: minutes ~/ 5,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          'min',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Cancel button
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                          },
+                          child: Container(
+                            height: 50,
+                            margin: EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.red.withOpacity(0.5),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Cancel',
+                                style: FlutterFlowTheme.of(
+                                  context,
+                                ).bodyMedium.override(
+                                      fontFamily: 'Readex Pro',
+                                      color: Colors.white,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Start button
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            final totalMinutes = (hours * 60) + minutes;
+                            if (totalMinutes > 0) {
+                              _setTimer(totalMinutes);
+                            } else {
+                              _setTimer(0); // Cancel timer if zero
+                            }
+                            Navigator.pop(context);
+                          },
+                          child: Container(
+                            height: 50,
+                            margin: EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: FlutterFlowTheme.of(context)
+                                  .primary
+                                  .withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: FlutterFlowTheme.of(context).primary,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Start Timer',
+                                style: FlutterFlowTheme.of(
+                                  context,
+                                ).bodyMedium.override(
+                                      fontFamily: 'Readex Pro',
+                                      color: Colors.white,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 20),
+                  // Quick presets
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [15, 30, 45, 60].map((preset) {
                       return GestureDetector(
                         onTap: () {
-                          _setTimer(0); // Cancel timer
+                          _setTimer(preset);
                           Navigator.pop(context);
                         },
                         child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.3),
+                            color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: Colors.red.withOpacity(0.5),
+                              color: Colors.white.withOpacity(0.3),
                               width: 1.5,
                             ),
                           ),
-                          child: Center(
-                            child: Text(
-                              'Cancel',
-                              style: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .override(
-                                    fontFamily: 'Readex Pro',
-                                    color: Colors.white,
-                                  ),
+                          child: Text(
+                            '$preset min',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
                             ),
                           ),
                         ),
                       );
-                    }
-                  },
-                ),
+                    }).toList(),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -1539,9 +1782,9 @@ class SoundCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: (sound.isActive as bool)
               ? FlutterFlowTheme.of(context).primary.withOpacity(0.7)
-              : FlutterFlowTheme.of(context)
-                  .secondaryBackground
-                  .withOpacity(0.2),
+              : FlutterFlowTheme.of(
+                  context,
+                ).secondaryBackground.withOpacity(0.2),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: (sound.isActive as bool)
@@ -1561,10 +1804,9 @@ class SoundCard extends StatelessWidget {
             SizedBox(height: 8),
             Text(
               sound.name as String,
-              style: FlutterFlowTheme.of(context).titleMedium.override(
-                    fontFamily: 'Outfit',
-                    color: Colors.white,
-                  ),
+              style: FlutterFlowTheme.of(
+                context,
+              ).titleMedium.override(fontFamily: 'Outfit', color: Colors.white),
             ),
             if (sound.isActive as bool)
               Padding(

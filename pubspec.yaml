@@ -122,6 +122,7 @@ dependencies:
   stream_transform: 2.1.0
   substring_highlight: 1.0.33
   supercharged: ^2.1.1
+  table_calendar: ^3.0.9
   text_search: 1.0.1
   timeago: 3.6.1
   url_launcher: 6.3.0

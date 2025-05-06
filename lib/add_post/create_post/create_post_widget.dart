@@ -13,6 +13,8 @@ import 'package:simple_gradient_text/simple_gradient_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
+import 'dart:ui';
 
 // Add import for DreamPostedMessage component
 import '/components/dream_posted_message.dart';
@@ -40,19 +42,28 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _tagsController = TextEditingController();
+  final _tagsFocusNode = FocusNode();
+  final List<String> _tags = [];
+  bool _showHashtagWarning = false;
+  Map<String, int> _tagPostCounts = {};
+  Timer? _tagSearchDebounce;
+  int _maxTags = 15;
+  String _errorMessage = '';
+
+  // Add missing variables
+  int _wordCount = 0;
+  int _minWordCount = 25; // Changing from 5 to 25 words required
+  int _lunaCoins = 0;
+  int _remainingFreeUploads = 0;
+
   bool _isLoading = false;
   String _selectedBackground = '';
   bool _isPrivate = false;
 
   // Upload limits
   bool _uploadsChecked = false;
-  int _remainingFreeUploads = 0;
-  int _lunaCoins = 0;
 
-  // Word count tracking
-  int _wordCount = 0;
-  static const int _minWordCount = 25;
-
+  // Add the backgrounds array
   final List<Map<String, dynamic>> backgrounds = [
     {
       'name': 'Love',
@@ -88,26 +99,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
     },
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _contentController.text = widget.generatedText;
-    _checkUploadAvailability();
-
-    // Initialize word count and listen for changes
-    _updateWordCount();
-    _contentController.addListener(_updateWordCount);
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
-    _tagsController.dispose();
-    super.dispose();
-  }
-
-  // Calculate word count from text content
+  // Word count tracking
   void _updateWordCount() {
     final text = _contentController.text.trim();
     // Split by whitespace and filter out empty strings
@@ -130,6 +122,123 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
       });
     } catch (e) {
       print('Error checking upload availability: $e');
+    }
+  }
+
+  // Improved tag post count retrieval with more accurate counting
+  Future<void> _checkTagPostCount(String tag) async {
+    if (tag.isEmpty) return;
+
+    // Cancel any existing debounce timer
+    _tagSearchDebounce?.cancel();
+
+    // Create a new debounce timer
+    _tagSearchDebounce = Timer(Duration(milliseconds: 300), () async {
+      try {
+        final String searchTag = tag.toLowerCase().trim();
+
+        // Simpler query that doesn't require composite index - just get public posts
+        final publicPostsQuery = await FirebaseFirestore.instance
+            .collection('posts')
+            .where('is_private', isEqualTo: false)
+            .limit(100) // Reasonable limit to avoid too many reads
+            .get();
+
+        // Reset counts
+        Map<String, int> tagCounts = {};
+
+        for (var doc in publicPostsQuery.docs) {
+          // Get tags string from document
+          final String tagsString = doc.data()['tags'] as String? ?? '';
+
+          // Split tags, normalize and filter empty ones
+          final List<String> tagList = tagsString
+              .toLowerCase()
+              .split(',')
+              .map((t) => t.trim())
+              .where((t) => t.isNotEmpty)
+              .toList();
+
+          // Count exact matches and similar tags
+          for (var postTag in tagList) {
+            // Increment count for this tag
+            tagCounts[postTag] = (tagCounts[postTag] ?? 0) + 1;
+          }
+        }
+
+        // If searchTag isn't found, ensure it exists with 0 count
+        if (!tagCounts.containsKey(searchTag)) {
+          tagCounts[searchTag] = 0;
+        }
+
+        // Update the UI with the tag counts
+        if (mounted) {
+          setState(() {
+            _tagPostCounts = tagCounts;
+          });
+        }
+      } catch (e) {
+        print('Error checking tag post count: $e');
+      }
+    });
+  }
+
+  // Add a method to add the current tag to the list
+  void _addCurrentTagIfNeeded() {
+    final currentTag = _tagsController.text.trim();
+    if (currentTag.isNotEmpty && _tags.length < _maxTags) {
+      if (!_tags.contains(currentTag)) {
+        setState(() {
+          _tags.add(currentTag);
+          _tagsController.clear();
+        });
+      } else {
+        _tagsController.clear();
+      }
+    }
+  }
+
+  // Add a method to handle tag input
+  void _handleTagInput(String value) {
+    if (value.contains(' ')) {
+      // Space pressed - add the tag
+      final currentTag = value.split(' ')[0].trim();
+      if (currentTag.isNotEmpty && _tags.length < _maxTags) {
+        if (!_tags.contains(currentTag)) {
+          setState(() {
+            _tags.add(currentTag);
+            _tagsController.clear();
+          });
+        } else {
+          _tagsController.clear();
+        }
+      } else {
+        _tagsController.text = value.split(' ')[0];
+        _tagsController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _tagsController.text.length),
+        );
+      }
+    } else if (value.contains('#')) {
+      // Show warning and remove the # character
+      setState(() {
+        _showHashtagWarning = true;
+        _tagsController.text = value.replaceAll('#', '');
+        _tagsController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _tagsController.text.length),
+        );
+      });
+
+      // Hide warning after a delay
+      Future.delayed(Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _showHashtagWarning = false;
+          });
+        }
+      });
+    } else {
+      // Check post count for the current tag
+      _checkTagPostCount(value);
     }
   }
 
@@ -180,18 +289,22 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
     setState(() => _isLoading = true);
 
     try {
+      // Prepare tags for Firestore - convert tags list to comma-separated string
+      final String formattedTags =
+          _tags.map((tag) => tag.toLowerCase()).join(', ');
+
       final postData = {
         'title': _titleController.text,
         'dream': _contentController.text,
-        'tags': _tagsController.text,
+        'tags': formattedTags,
         'date': getCurrentTimestamp,
         'post_is_edited': false,
         'poster': currentUserReference,
         'userref': currentUserReference,
-        'video_background_url': _selectedBackground,
-        'video_background_opacity': 0.75,
         'likes': [],
         'Post_saved_by': [],
+        'video_background_url': _selectedBackground,
+        'video_background_opacity': 0.75,
         'is_private': _isPrivate,
       };
 
@@ -233,13 +346,17 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
       }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _errorMessage = 'Error posting dream: $e';
+          _isLoading = false;
+        });
+
         // Show error message with the new component
         DreamPostedMessage.show(
           context,
           isError: true,
-          errorMessage: 'Failed to post dream',
+          errorMessage: _errorMessage,
         );
-        setState(() => _isLoading = false);
       }
     } finally {
       if (mounted) {
@@ -299,6 +416,370 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
         ],
       ),
     );
+  }
+
+  // Modify the tag input field to show post counts in a dropdown
+  Widget _buildTagsField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.1),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Display selected tags as chips
+              if (_tags.isNotEmpty)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _tags.map((tag) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              FlutterFlowTheme.of(context)
+                                  .primary
+                                  .withOpacity(0.6),
+                              FlutterFlowTheme.of(context)
+                                  .secondary
+                                  .withOpacity(0.6),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () {
+                              setState(() {
+                                _tags.remove(tag);
+                              });
+                            },
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '#$tag',
+                                    style: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Figtree',
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+              // Input field for new tags
+              if (_tags.length < _maxTags)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _tagsController,
+                      focusNode: _tagsFocusNode,
+                      style: FlutterFlowTheme.of(context).bodyLarge.override(
+                            fontFamily: 'Figtree',
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                      decoration: InputDecoration(
+                        labelText: _tags.isEmpty ? 'Tags (Optional)' : null,
+                        hintText: 'Type and press space to add a tag',
+                        labelStyle:
+                            FlutterFlowTheme.of(context).bodyMedium.override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                ),
+                        hintStyle:
+                            FlutterFlowTheme.of(context).bodyMedium.override(
+                                  fontFamily: 'Figtree',
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: EdgeInsets.all(20),
+                        suffixIcon: _tagsController.text.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(Icons.add_circle_outline,
+                                    color: Colors.white),
+                                onPressed: () {
+                                  _addCurrentTagIfNeeded();
+                                },
+                              )
+                            : null,
+                      ),
+                      onChanged: _handleTagInput,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        _addCurrentTagIfNeeded();
+                      },
+                    ),
+
+                    // Display tag suggestions with post counts
+                    if (_tagsController.text.isNotEmpty)
+                      Container(
+                        margin: EdgeInsets.only(top: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: FlutterFlowTheme.of(context)
+                                .primary
+                                .withOpacity(0.3),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 10,
+                              offset: Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Builder(builder: (context) {
+                          // Get similar tags with posts > 0, except the exact match
+                          final similarTagsWithPosts = _tagPostCounts.entries
+                              .where((entry) =>
+                                  entry.key.startsWith(_tagsController.text) &&
+                                  entry.key != _tagsController.text &&
+                                  entry.value > 0)
+                              .take(5)
+                              .toList();
+
+                          return Column(
+                            children: [
+                              // Show current tag with count if available
+                              if (_tagPostCounts
+                                  .containsKey(_tagsController.text))
+                                _buildTagSuggestion(
+                                  _tagsController.text,
+                                  _tagPostCounts[_tagsController.text] ?? 0,
+                                ),
+
+                              // Add header if we have similar tags with posts
+                              if (similarTagsWithPosts.isNotEmpty)
+                                Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: Text(
+                                    'Similar tags:',
+                                    style: FlutterFlowTheme.of(context)
+                                        .bodySmall
+                                        .override(
+                                          fontFamily: 'Figtree',
+                                          color: Colors.white.withOpacity(0.7),
+                                        ),
+                                  ),
+                                ),
+
+                              // Show the similar tags with posts > 0
+                              ...similarTagsWithPosts
+                                  .map((entry) => _buildTagSuggestion(
+                                      entry.key, entry.value))
+                                  .toList(),
+
+                              // If no tags found, show a message
+                              if (_tagPostCounts.isEmpty ||
+                                  (!_tagPostCounts
+                                          .containsKey(_tagsController.text) &&
+                                      similarTagsWithPosts.isEmpty))
+                                Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    'No matching tags found. Create a new one!',
+                                    style: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Figtree',
+                                          color: Colors.white.withOpacity(0.7),
+                                        ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                            ],
+                          );
+                        }),
+                      ),
+                  ],
+                ),
+
+              // Show tag limit indicator
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (_showHashtagWarning)
+                      Expanded(
+                        child: Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.amber.withOpacity(0.5),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            'No need to add # - hashtags are added automatically',
+                            style:
+                                FlutterFlowTheme.of(context).bodySmall.override(
+                                      fontFamily: 'Figtree',
+                                      color: Colors.amber,
+                                    ),
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        '${_tags.length}/$_maxTags tags',
+                        style: FlutterFlowTheme.of(context).bodySmall.override(
+                              fontFamily: 'Figtree',
+                              color: _tags.length >= _maxTags
+                                  ? FlutterFlowTheme.of(context).error
+                                  : Colors.white.withOpacity(0.5),
+                            ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ).animate().fadeIn(
+        delay: Duration(milliseconds: 400),
+        duration: Duration(milliseconds: 600),
+        curve: Curves.easeOut);
+  }
+
+  // Add a helper method to build tag suggestions
+  Widget _buildTagSuggestion(String tag, int count) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _tagsController.text = tag;
+            _addCurrentTagIfNeeded();
+          });
+        },
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.tag,
+                color: FlutterFlowTheme.of(context).primary,
+                size: 18,
+              ),
+              SizedBox(width: 12),
+              Text(
+                tag, // Remove the # since it's already shown in the icon
+                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                      fontFamily: 'Figtree',
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+              Spacer(),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color:
+                        FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  '$count ' + (count == 1 ? 'post' : 'posts'),
+                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                        fontFamily: 'Figtree',
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _contentController.text = widget.generatedText;
+    _checkUploadAvailability();
+
+    // Initialize word count and listen for changes
+    _updateWordCount();
+    _contentController.addListener(_updateWordCount);
+
+    _tagsFocusNode.addListener(() {
+      if (!_tagsFocusNode.hasFocus) {
+        _addCurrentTagIfNeeded();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    _tagsController.dispose();
+    _tagsFocusNode.dispose();
+    _tagSearchDebounce?.cancel();
+    super.dispose();
   }
 
   @override
@@ -679,52 +1160,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
 
                       SizedBox(height: 24),
 
-                      // Tags field with glassmorphism
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
-                            width: 1,
-                          ),
-                        ),
-                        child: TextFormField(
-                          controller: _tagsController,
-                          style:
-                              FlutterFlowTheme.of(context).bodyLarge.override(
-                                    fontFamily: 'Figtree',
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                  ),
-                          decoration: InputDecoration(
-                            labelText: 'Tags (Optional)',
-                            labelStyle: FlutterFlowTheme.of(context)
-                                .bodyMedium
-                                .override(
-                                  fontFamily: 'Figtree',
-                                  color: Colors.white.withOpacity(0.5),
-                                  fontSize: 16,
-                                ),
-                            hintText: 'Add tags separated by commas',
-                            hintStyle: FlutterFlowTheme.of(context)
-                                .bodyMedium
-                                .override(
-                                  fontFamily: 'Figtree',
-                                  color: Colors.white.withOpacity(0.5),
-                                  fontSize: 16,
-                                ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: EdgeInsets.all(20),
-                          ),
-                        ),
-                      ).animate().fadeIn(
-                          delay: Duration(milliseconds: 400),
-                          duration: Duration(milliseconds: 600),
-                          curve: Curves.easeOut),
+                      _buildTagsField(),
 
                       SizedBox(height: 24),
 

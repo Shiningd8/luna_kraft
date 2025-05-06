@@ -15,17 +15,42 @@ class LottieBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, _) {
+        final bgFile = appState.selectedBackground;
+        final isImage = bgFile.endsWith('.png') ||
+            bgFile.endsWith('.jpg') ||
+            bgFile.endsWith('.jpeg');
+
+        // Debug logs
+        print('LottieBackground: Selected background file = $bgFile');
+        print('LottieBackground: Is image? $isImage');
+
         return Stack(
           fit: StackFit.expand,
           children: [
-            // Lottie animation background
+            // Background - either Lottie animation or Image
             Positioned.fill(
-              child: Lottie.asset(
-                'assets/jsons/${appState.selectedBackground}',
-                fit: BoxFit.cover,
-                repeat: true,
-                animate: true,
-              ),
+              child: isImage
+                  ? Image.asset(
+                      'assets/images/$bgFile',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        print('ERROR LOADING IMAGE: $error');
+                        print('Stack trace: $stackTrace');
+                        print('Attempted to load: assets/images/$bgFile');
+
+                        // Fallback to a default image that we know works
+                        return Image.asset(
+                          'assets/images/applogo.png',
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    )
+                  : Lottie.asset(
+                      'assets/jsons/$bgFile',
+                      fit: BoxFit.cover,
+                      repeat: true,
+                      animate: true,
+                    ),
             ),
 
             // Content

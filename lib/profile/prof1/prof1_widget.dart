@@ -3,6 +3,7 @@ import '/backend/backend.dart' hide getCurrentTimestamp;
 import '/components/editdialog_widget.dart';
 import '/components/emptylist_widget.dart';
 import '/components/userprofoptions_widget.dart';
+import '/components/dream_calendar_dialog.dart';
 import '/flutter_flow/flutter_flow_expanded_image_view.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -134,285 +135,319 @@ class _Prof1WidgetState extends State<Prof1Widget> {
         key: scaffoldKey,
         backgroundColor: Colors.transparent,
         extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          automaticallyImplyLeading: false,
-          elevation: 0,
-          title: Text(
-            'Profile',
-            style: FlutterFlowTheme.of(context).headlineMedium.override(
-                  fontFamily: 'Outfit',
-                  color: FlutterFlowTheme.of(context).primaryText,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+        appBar: PreferredSize(
+          preferredSize: Size.fromHeight(kToolbarHeight),
+          child: ClipRRect(
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(20),
+            ),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+              child: AppBar(
+                backgroundColor: Colors.transparent,
+                automaticallyImplyLeading: false,
+                elevation: 0,
+                flexibleSpace: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.05),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 0.5,
+                      ),
+                    ),
+                  ),
                 ),
-          ),
-          centerTitle: true,
-          actions: [
-            Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(0, 0, 12, 0),
-              child: FlutterFlowIconButton(
-                borderRadius: 8.0,
-                buttonSize: 40.0,
-                icon: Icon(
-                  Icons.more_vert,
-                  color: FlutterFlowTheme.of(context).primaryText,
-                  size: 24.0,
+                title: Text(
+                  'Profile',
+                  style: FlutterFlowTheme.of(context).headlineMedium.override(
+                        fontFamily: 'Outfit',
+                        color: FlutterFlowTheme.of(context).primaryText,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-                onPressed: () async {
-                  await showDialog(
-                    context: context,
-                    builder: (dialogContext) {
-                      return Dialog(
-                        backgroundColor: Colors.transparent,
-                        insetPadding: EdgeInsets.zero,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                            child: Container(
-                              width: MediaQuery.of(context).size.width * 0.85,
-                              decoration: BoxDecoration(
-                                color: FlutterFlowTheme.of(context)
-                                    .secondaryBackground
-                                    .withOpacity(0.85),
+                centerTitle: true,
+                actions: [
+                  Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(0, 0, 12, 0),
+                    child: FlutterFlowIconButton(
+                      borderRadius: 8.0,
+                      buttonSize: 40.0,
+                      icon: Icon(
+                        Icons.more_vert,
+                        color: FlutterFlowTheme.of(context).primaryText,
+                        size: 24.0,
+                      ),
+                      onPressed: () async {
+                        await showDialog(
+                          context: context,
+                          builder: (dialogContext) {
+                            return Dialog(
+                              backgroundColor: Colors.transparent,
+                              insetPadding: EdgeInsets.zero,
+                              child: ClipRRect(
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: FlutterFlowTheme.of(context)
-                                      .primary
-                                      .withOpacity(0.2),
-                                  width: 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 20,
-                                    spreadRadius: 5,
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: EdgeInsets.all(16),
+                                child: BackdropFilter(
+                                  filter:
+                                      ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                  child: Container(
+                                    width: MediaQuery.of(context).size.width *
+                                        0.85,
                                     decoration: BoxDecoration(
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: FlutterFlowTheme.of(context)
-                                              .primary
-                                              .withOpacity(0.1),
-                                        ),
+                                      color: FlutterFlowTheme.of(context)
+                                          .secondaryBackground
+                                          .withOpacity(0.85),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: FlutterFlowTheme.of(context)
+                                            .primary
+                                            .withOpacity(0.2),
+                                        width: 1,
                                       ),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Options',
-                                          style: FlutterFlowTheme.of(context)
-                                              .titleMedium
-                                              .override(
-                                                fontFamily: 'Outfit',
-                                                fontWeight: FontWeight.bold,
-                                              ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 20,
+                                          spreadRadius: 5,
                                         ),
-                                        IconButton(
-                                          icon: Icon(Icons.close),
-                                          onPressed: () =>
-                                              Navigator.pop(context),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .primary
+                                                        .withOpacity(0.1),
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Options',
+                                                style:
+                                                    FlutterFlowTheme.of(context)
+                                                        .titleMedium
+                                                        .override(
+                                                          fontFamily: 'Outfit',
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                              ),
+                                              IconButton(
+                                                icon: Icon(Icons.close),
+                                                onPressed: () =>
+                                                    Navigator.pop(context),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        ListView(
+                                          shrinkWrap: true,
+                                          padding: EdgeInsets.zero,
+                                          children: [
+                                            if (currentUserReference != null)
+                                              StreamBuilder<UserRecord>(
+                                                stream: UserRecord.getDocument(
+                                                    currentUserReference!),
+                                                builder: (context, snapshot) {
+                                                  if (!snapshot.hasData) {
+                                                    return SizedBox.shrink();
+                                                  }
+                                                  final userDoc =
+                                                      snapshot.data!;
+                                                  return Container(
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                            horizontal: 16,
+                                                            vertical: 12),
+                                                    decoration: BoxDecoration(
+                                                      border: Border(
+                                                        bottom: BorderSide(
+                                                          color: FlutterFlowTheme
+                                                                  .of(context)
+                                                              .primary
+                                                              .withOpacity(0.1),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    child: Column(
+                                                      children: [
+                                                        StreamBuilder<
+                                                            UserRecord>(
+                                                          stream: UserRecord
+                                                              .getDocument(
+                                                                  currentUserReference!),
+                                                          builder: (context,
+                                                              privacySnapshot) {
+                                                            if (!privacySnapshot
+                                                                .hasData) {
+                                                              return SizedBox
+                                                                  .shrink();
+                                                            }
+
+                                                            final userRecord =
+                                                                privacySnapshot
+                                                                    .data!;
+                                                            return Row(
+                                                              mainAxisAlignment:
+                                                                  MainAxisAlignment
+                                                                      .spaceBetween,
+                                                              children: [
+                                                                Row(
+                                                                  children: [
+                                                                    Icon(
+                                                                      userRecord.isPrivate
+                                                                          ? Icons
+                                                                              .lock_outline
+                                                                          : Icons
+                                                                              .public,
+                                                                      color: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primaryText,
+                                                                      size:
+                                                                          24.0,
+                                                                    ),
+                                                                    SizedBox(
+                                                                        width:
+                                                                            16),
+                                                                    Text(
+                                                                      'Private Account',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Figtree',
+                                                                            color:
+                                                                                FlutterFlowTheme.of(context).primaryText,
+                                                                            fontWeight:
+                                                                                FontWeight.w500,
+                                                                          ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                Switch(
+                                                                  value: userRecord
+                                                                      .isPrivate,
+                                                                  onChanged:
+                                                                      (newValue) async {
+                                                                    // Update the user's privacy setting
+                                                                    await currentUserReference!
+                                                                        .update(
+                                                                      createUserRecordData(
+                                                                        isPrivate:
+                                                                            newValue,
+                                                                      ),
+                                                                    );
+
+                                                                    // Show confirmation
+                                                                    Navigator.pop(
+                                                                        context);
+                                                                    ScaffoldMessenger.of(
+                                                                            context)
+                                                                        .showSnackBar(
+                                                                      SnackBar(
+                                                                        content:
+                                                                            Text(
+                                                                          newValue
+                                                                              ? 'Your account is now private'
+                                                                              : 'Your account is now public',
+                                                                          style: FlutterFlowTheme.of(context)
+                                                                              .bodyMedium
+                                                                              .override(
+                                                                                fontFamily: 'Figtree',
+                                                                                color: Colors.white,
+                                                                              ),
+                                                                        ),
+                                                                        duration:
+                                                                            Duration(seconds: 2),
+                                                                        backgroundColor:
+                                                                            FlutterFlowTheme.of(context).primary,
+                                                                      ),
+                                                                    );
+                                                                  },
+                                                                  activeColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primary,
+                                                                  activeTrackColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .accent1,
+                                                                  inactiveTrackColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .alternate,
+                                                                  inactiveThumbColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .secondaryText,
+                                                                ),
+                                                              ],
+                                                            );
+                                                          },
+                                                        ),
+                                                        SizedBox(height: 12),
+                                                        _buildOptionItem(
+                                                          'Edit Profile',
+                                                          Icons.edit,
+                                                          () => context.pushNamed(
+                                                              EditProfileWidget
+                                                                  .routeName),
+                                                        ),
+                                                        SizedBox(height: 12),
+                                                        _buildOptionItem(
+                                                          'Settings',
+                                                          Icons.settings,
+                                                          () =>
+                                                              context.pushNamed(
+                                                                  'Settings'),
+                                                        ),
+                                                        SizedBox(height: 12),
+                                                        _fixSignOutOption(),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                          ],
                                         ),
                                       ],
                                     ),
                                   ),
-                                  ListView(
-                                    shrinkWrap: true,
-                                    padding: EdgeInsets.zero,
-                                    children: [
-                                      if (currentUserReference != null)
-                                        StreamBuilder<UserRecord>(
-                                          stream: UserRecord.getDocument(
-                                              currentUserReference!),
-                                          builder: (context, snapshot) {
-                                            if (!snapshot.hasData) {
-                                              return SizedBox.shrink();
-                                            }
-                                            final userDoc = snapshot.data!;
-                                            return Container(
-                                              padding: EdgeInsets.symmetric(
-                                                  horizontal: 16, vertical: 12),
-                                              decoration: BoxDecoration(
-                                                border: Border(
-                                                  bottom: BorderSide(
-                                                    color: FlutterFlowTheme.of(
-                                                            context)
-                                                        .primary
-                                                        .withOpacity(0.1),
-                                                  ),
-                                                ),
-                                              ),
-                                              child: Column(
-                                                children: [
-                                                  StreamBuilder<UserRecord>(
-                                                    stream: UserRecord.getDocument(
-                                                        currentUserReference!),
-                                                    builder: (context,
-                                                        privacySnapshot) {
-                                                      if (!privacySnapshot
-                                                          .hasData) {
-                                                        return SizedBox
-                                                            .shrink();
-                                                      }
-
-                                                      final userRecord =
-                                                          privacySnapshot.data!;
-                                                      return Row(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .spaceBetween,
-                                                        children: [
-                                                          Row(
-                                                            children: [
-                                                              Icon(
-                                                                userRecord
-                                                                        .isPrivate
-                                                                    ? Icons
-                                                                        .lock_outline
-                                                                    : Icons
-                                                                        .public,
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .primaryText,
-                                                                size: 24.0,
-                                                              ),
-                                                              SizedBox(
-                                                                  width: 16),
-                                                              Text(
-                                                                'Private Account',
-                                                                style: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .override(
-                                                                      fontFamily:
-                                                                          'Figtree',
-                                                                      color: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .primaryText,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w500,
-                                                                    ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                          Switch(
-                                                            value: userRecord
-                                                                .isPrivate,
-                                                            onChanged:
-                                                                (newValue) async {
-                                                              // Update the user's privacy setting
-                                                              await currentUserReference!
-                                                                  .update(
-                                                                createUserRecordData(
-                                                                  isPrivate:
-                                                                      newValue,
-                                                                ),
-                                                              );
-
-                                                              // Show confirmation
-                                                              Navigator.pop(
-                                                                  context);
-                                                              ScaffoldMessenger
-                                                                      .of(context)
-                                                                  .showSnackBar(
-                                                                SnackBar(
-                                                                  content: Text(
-                                                                    newValue
-                                                                        ? 'Your account is now private'
-                                                                        : 'Your account is now public',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Figtree',
-                                                                          color:
-                                                                              Colors.white,
-                                                                        ),
-                                                                  ),
-                                                                  duration:
-                                                                      Duration(
-                                                                          seconds:
-                                                                              2),
-                                                                  backgroundColor:
-                                                                      FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .primary,
-                                                                ),
-                                                              );
-                                                            },
-                                                            activeColor:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .primary,
-                                                            activeTrackColor:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .accent1,
-                                                            inactiveTrackColor:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .alternate,
-                                                            inactiveThumbColor:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryText,
-                                                          ),
-                                                        ],
-                                                      );
-                                                    },
-                                                  ),
-                                                  SizedBox(height: 12),
-                                                  _buildOptionItem(
-                                                    'Edit Profile',
-                                                    Icons.edit,
-                                                    () => context.pushNamed(
-                                                        EditProfileWidget
-                                                            .routeName),
-                                                  ),
-                                                  SizedBox(height: 12),
-                                                  _buildOptionItem(
-                                                    'Settings',
-                                                    Icons.settings,
-                                                    () => context
-                                                        .pushNamed('Settings'),
-                                                  ),
-                                                  SizedBox(height: 12),
-                                                  _fixSignOutOption(),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                    ],
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                systemOverlayStyle: SystemUiOverlayStyle(
+                  statusBarColor: Colors.transparent,
+                  statusBarIconBrightness: Brightness.dark,
+                  statusBarBrightness: Brightness.light,
+                ),
               ),
             ),
-          ],
-          systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.dark,
-            statusBarBrightness: Brightness.light,
           ),
         ),
         body: SingleChildScrollView(
@@ -647,9 +682,9 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                     children: [
                       Expanded(
                         child: _buildGlassmorphicButton(
-                          'Share Dream',
-                          Icons.add_circle_outline,
-                          () => context.pushNamed('DreamEntrySelection'),
+                          'Dream Calendar',
+                          Icons.calendar_month_outlined,
+                          () => _showDreamCalendarDialog(context),
                         ),
                       ),
                       SizedBox(width: 10),
@@ -2018,42 +2053,45 @@ class _Prof1WidgetState extends State<Prof1Widget> {
     }
   }
 
-  // Helper method to build option items for the menu
-  Widget _buildOptionItem(String label, IconData icon, VoidCallback onTap,
-      {Color? optionColor}) {
+  // Helper method to build option items
+  Widget _buildOptionItem(String title, IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: optionColor ?? FlutterFlowTheme.of(context).primaryText,
-              size: 24,
-            ),
-            SizedBox(width: 16),
-            Text(
-              label,
-              style: FlutterFlowTheme.of(context).bodyMedium.override(
-                    fontFamily: 'Figtree',
-                    color:
-                        optionColor ?? FlutterFlowTheme.of(context).primaryText,
-                    fontWeight: FontWeight.w500,
-                  ),
-            ),
-          ],
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                color: FlutterFlowTheme.of(context).primaryText,
+                size: 24.0,
+              ),
+              SizedBox(width: 16),
+              Text(
+                title,
+                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                      fontFamily: 'Figtree',
+                      color: FlutterFlowTheme.of(context).primaryText,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ],
+          ),
+          Icon(
+            Icons.arrow_forward_ios,
+            color: FlutterFlowTheme.of(context).primaryText,
+            size: 16.0,
+          ),
+        ],
       ),
     );
   }
 
-  // Create a super simple sign out approach
+  // Helper method for sign out option
   Widget _fixSignOutOption() {
-    return _buildOptionItem(
-      'Sign Out',
-      Icons.logout,
-      () {
+    return InkWell(
+      onTap: () async {
         // Confirm sign-out
         showDialog(
           context: context,
@@ -2083,282 +2121,403 @@ class _Prof1WidgetState extends State<Prof1Widget> {
           },
         );
       },
-      optionColor: FlutterFlowTheme.of(context).error,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.logout,
+                color: FlutterFlowTheme.of(context).error,
+                size: 24.0,
+              ),
+              SizedBox(width: 16),
+              Text(
+                'Sign Out',
+                style: FlutterFlowTheme.of(context).bodyMedium.override(
+                      fontFamily: 'Figtree',
+                      color: FlutterFlowTheme.of(context).error,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ],
+          ),
+          Icon(
+            Icons.arrow_forward_ios,
+            color: FlutterFlowTheme.of(context).error,
+            size: 16.0,
+          ),
+        ],
+      ),
     );
   }
 
   // Create a dialog to select background options
   void _showBackgroundCollectionDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (BuildContext dialogContext) {
-        return Consumer<AppState>(
-          builder: (context, appState, _) {
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              insetPadding: EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                width: double.infinity,
-                constraints: BoxConstraints(
-                  maxWidth: 400,
-                  maxHeight: MediaQuery.of(context).size.height * 0.7,
-                ),
-                decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context)
-                      .primaryBackground
-                      .withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color:
-                        FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-                    width: 1,
+    // Get the AppState instance and force a refresh
+    final appState = Provider.of<AppState>(context, listen: false);
+    appState.forceReinitialize().then((_) {
+      print('Showing dialog after reinitialization');
+
+      // Now show the dialog
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (BuildContext dialogContext) {
+          return Consumer<AppState>(
+            builder: (context, appState, _) {
+              // Debug log to check what backgrounds are available
+              print('Available background options in dialog:');
+              for (var bg in appState.backgroundOptions) {
+                print('Background: ${bg['name']} - ${bg['file']}');
+              }
+
+              return Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  width: double.infinity,
+                  constraints: BoxConstraints(
+                    maxWidth: 400,
+                    maxHeight: MediaQuery.of(context).size.height * 0.7,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 10,
-                      spreadRadius: 0,
+                  decoration: BoxDecoration(
+                    color: FlutterFlowTheme.of(context)
+                        .primaryBackground
+                        .withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color:
+                          FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                      width: 1,
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Header
-                        Container(
-                          padding: EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(
-                                color: FlutterFlowTheme.of(context)
-                                    .primary
-                                    .withOpacity(0.1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 10,
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Header
+                          Container(
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: FlutterFlowTheme.of(context)
+                                      .primary
+                                      .withOpacity(0.1),
+                                ),
                               ),
                             ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Background Collection',
+                                  style: FlutterFlowTheme.of(context)
+                                      .titleMedium
+                                      .override(
+                                        fontFamily: 'Outfit',
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.close),
+                                  onPressed: () => Navigator.pop(context),
+                                ),
+                              ],
+                            ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Background Collection',
-                                style: FlutterFlowTheme.of(context)
-                                    .titleMedium
-                                    .override(
-                                      fontFamily: 'Outfit',
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.close),
-                                onPressed: () => Navigator.pop(context),
-                              ),
-                            ],
-                          ),
-                        ),
 
-                        // Background Options
-                        Flexible(
-                          child: SingleChildScrollView(
-                            child: Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Column(
-                                children: appState.backgroundOptions
-                                    .map<Widget>((bg) {
-                                  final isSelected =
-                                      appState.selectedBackground == bg['file'];
-                                  return Container(
-                                    margin: EdgeInsets.only(bottom: 16),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? FlutterFlowTheme.of(context)
-                                              .primary
-                                              .withOpacity(0.1)
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
+                          // Background Options
+                          Flexible(
+                            child: SingleChildScrollView(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Column(
+                                  children: appState.backgroundOptions
+                                      .map<Widget>((bg) {
+                                    final isSelected =
+                                        appState.selectedBackground ==
+                                            bg['file'];
+                                    return Container(
+                                      margin: EdgeInsets.only(bottom: 16),
+                                      decoration: BoxDecoration(
                                         color: isSelected
                                             ? FlutterFlowTheme.of(context)
                                                 .primary
-                                            : FlutterFlowTheme.of(context)
-                                                .primary
-                                                .withOpacity(0.2),
-                                        width: 1.5,
+                                                .withOpacity(0.1)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? FlutterFlowTheme.of(context)
+                                                  .primary
+                                              : FlutterFlowTheme.of(context)
+                                                  .primary
+                                                  .withOpacity(0.2),
+                                          width: 1.5,
+                                        ),
                                       ),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: () {
-                                            appState.setBackground(bg['file']!);
-                                          },
-                                          child: Padding(
-                                            padding: EdgeInsets.all(12),
-                                            child: Row(
-                                              children: [
-                                                // Preview
-                                                Container(
-                                                  width: 60,
-                                                  height: 60,
-                                                  decoration: BoxDecoration(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8),
-                                                    border: Border.all(
-                                                      color:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .primary
-                                                              .withOpacity(0.3),
-                                                      width: 1,
-                                                    ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: Colors.black
-                                                            .withOpacity(0.1),
-                                                        blurRadius: 4,
-                                                        spreadRadius: 0,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () {
+                                              appState
+                                                  .setBackground(bg['file']!);
+                                            },
+                                            child: Padding(
+                                              padding: EdgeInsets.all(12),
+                                              child: Row(
+                                                children: [
+                                                  // Preview
+                                                  Container(
+                                                    width: 60,
+                                                    height: 60,
+                                                    decoration: BoxDecoration(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
+                                                      border: Border.all(
+                                                        color: FlutterFlowTheme
+                                                                .of(context)
+                                                            .primary
+                                                            .withOpacity(0.3),
+                                                        width: 1,
                                                       ),
-                                                    ],
-                                                  ),
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8),
-                                                    child: Stack(
-                                                      children: [
-                                                        Positioned.fill(
-                                                          child: Container(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .primaryBackground,
-                                                            child: Builder(
-                                                              builder:
-                                                                  (context) {
-                                                                try {
-                                                                  return Lottie
-                                                                      .asset(
-                                                                    'assets/jsons/${bg['file']}',
-                                                                    fit: BoxFit
-                                                                        .cover,
-                                                                    animate:
-                                                                        true,
-                                                                    repeat:
-                                                                        true,
-                                                                    errorBuilder:
-                                                                        (context,
-                                                                            error,
-                                                                            stackTrace) {
-                                                                      print(
-                                                                          'Error loading Lottie: ${bg['file']} - $error');
-                                                                      return Center(
-                                                                        child:
-                                                                            Icon(
-                                                                          Icons
-                                                                              .image_not_supported,
-                                                                          color:
-                                                                              FlutterFlowTheme.of(context).secondaryText,
-                                                                        ),
-                                                                      );
-                                                                    },
-                                                                  );
-                                                                } catch (e) {
-                                                                  print(
-                                                                      'Exception loading Lottie: ${bg['file']} - $e');
-                                                                  return Center(
-                                                                    child: Icon(
-                                                                      Icons
-                                                                          .error_outline,
-                                                                      color: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .error,
-                                                                    ),
-                                                                  );
-                                                                }
-                                                              },
-                                                            ),
-                                                          ),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: Colors.black
+                                                              .withOpacity(0.1),
+                                                          blurRadius: 4,
+                                                          spreadRadius: 0,
                                                         ),
                                                       ],
                                                     ),
-                                                  ),
-                                                ),
-                                                SizedBox(width: 16),
+                                                    child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
+                                                      child: Stack(
+                                                        children: [
+                                                          Positioned.fill(
+                                                            child: Container(
+                                                              color: FlutterFlowTheme
+                                                                      .of(context)
+                                                                  .primaryBackground,
+                                                              child: Builder(
+                                                                builder:
+                                                                    (context) {
+                                                                  try {
+                                                                    final bgFile =
+                                                                        bg['file']!;
+                                                                    final isImage = bgFile
+                                                                            .endsWith(
+                                                                                '.png') ||
+                                                                        bgFile.endsWith(
+                                                                            '.jpg') ||
+                                                                        bgFile.endsWith(
+                                                                            '.jpeg');
 
-                                                // Name and selection indicator
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        bg['name']!,
-                                                        style:
-                                                            FlutterFlowTheme.of(
-                                                                    context)
-                                                                .bodyLarge
-                                                                .override(
-                                                                  fontFamily:
-                                                                      'Figtree',
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
-                                                                ),
+                                                                    if (isImage) {
+                                                                      return Image
+                                                                          .asset(
+                                                                        'assets/images/$bgFile',
+                                                                        fit: BoxFit
+                                                                            .cover,
+                                                                        errorBuilder: (context,
+                                                                            error,
+                                                                            stackTrace) {
+                                                                          print(
+                                                                              'Error loading image in preview: $bgFile - $error');
+                                                                          print(
+                                                                              'Stack trace: $stackTrace');
+                                                                          print(
+                                                                              'Attempted to load: assets/images/$bgFile');
+
+                                                                          // Try fallback to a known working image
+                                                                          return Image
+                                                                              .asset(
+                                                                            'assets/images/applogo.png',
+                                                                            fit:
+                                                                                BoxFit.cover,
+                                                                            errorBuilder: (context,
+                                                                                err,
+                                                                                st) {
+                                                                              return Center(
+                                                                                child: Icon(
+                                                                                  Icons.image_not_supported,
+                                                                                  color: FlutterFlowTheme.of(context).secondaryText,
+                                                                                ),
+                                                                              );
+                                                                            },
+                                                                          );
+                                                                        },
+                                                                      );
+                                                                    } else {
+                                                                      return Lottie
+                                                                          .asset(
+                                                                        'assets/jsons/${bg['file']}',
+                                                                        fit: BoxFit
+                                                                            .cover,
+                                                                        animate:
+                                                                            true,
+                                                                        repeat:
+                                                                            true,
+                                                                        errorBuilder: (context,
+                                                                            error,
+                                                                            stackTrace) {
+                                                                          print(
+                                                                              'Error loading Lottie: ${bg['file']} - $error');
+                                                                          return Center(
+                                                                            child:
+                                                                                Icon(
+                                                                              Icons.image_not_supported,
+                                                                              color: FlutterFlowTheme.of(context).secondaryText,
+                                                                            ),
+                                                                          );
+                                                                        },
+                                                                      );
+                                                                    }
+                                                                  } catch (e) {
+                                                                    print(
+                                                                        'Exception loading Lottie: ${bg['file']} - $e');
+                                                                    return Center(
+                                                                      child:
+                                                                          Icon(
+                                                                        Icons
+                                                                            .error_outline,
+                                                                        color: FlutterFlowTheme.of(context)
+                                                                            .error,
+                                                                      ),
+                                                                    );
+                                                                  }
+                                                                },
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ),
-                                                      if (isSelected)
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 16),
+
+                                                  // Name and selection indicator
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
                                                         Text(
-                                                          'Currently Selected',
+                                                          bg['name']!,
                                                           style: FlutterFlowTheme
                                                                   .of(context)
-                                                              .bodySmall
+                                                              .bodyLarge
                                                               .override(
                                                                 fontFamily:
                                                                     'Figtree',
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .primary,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
                                                               ),
                                                         ),
-                                                    ],
+                                                        if (isSelected)
+                                                          Text(
+                                                            'Currently Selected',
+                                                            style: FlutterFlowTheme
+                                                                    .of(context)
+                                                                .bodySmall
+                                                                .override(
+                                                                  fontFamily:
+                                                                      'Figtree',
+                                                                  color: FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .primary,
+                                                                ),
+                                                          ),
+                                                      ],
+                                                    ),
                                                   ),
-                                                ),
 
-                                                // Selection indicator
-                                                if (isSelected)
-                                                  Icon(
-                                                    Icons.check_circle,
-                                                    color: FlutterFlowTheme.of(
-                                                            context)
-                                                        .primary,
-                                                  ),
-                                              ],
+                                                  // Selection indicator
+                                                  if (isSelected)
+                                                    Icon(
+                                                      Icons.check_circle,
+                                                      color:
+                                                          FlutterFlowTheme.of(
+                                                                  context)
+                                                              .primary,
+                                                    ),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  );
-                                }).toList(),
+                                    );
+                                  }).toList(),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          );
+        },
+      );
+    });
+  }
+
+  Future<void> _showDreamCalendarDialog(BuildContext context) async {
+    if (currentUserReference == null) return;
+
+    try {
+      // Fetch user's dreams using the stream
+      final List<PostsRecord> dreams = await queryPostsRecord(
+        queryBuilder: (postsRecord) => postsRecord
+            .where('poster', isEqualTo: currentUserReference)
+            .orderBy('date', descending: true),
+      ).first;
+
+      if (!mounted) return;
+
+      // Show the dream calendar dialog
+      return showDialog(
+        context: context,
+        builder: (dialogContext) {
+          return DreamCalendarDialog(
+            dreams: dreams,
+            userReference: currentUserReference!,
+          );
+        },
+      );
+    } catch (e) {
+      print('Error loading dreams for calendar: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading dreams: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
-      },
-    );
+      }
+    }
   }
 }

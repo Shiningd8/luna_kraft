@@ -32,6 +32,7 @@ import 'package:luna_kraft/components/standardized_post_item.dart';
 import '/components/dream_fact_widget.dart';
 import '/components/share_options_dialog.dart';
 import 'package:luna_kraft/components/native_ad_post.dart';
+import '/utils/tag_formatter.dart';
 
 // Separate class for home feed content
 class _HomeFeedContent extends StatefulWidget {
@@ -607,16 +608,14 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
                   if (latestPost.tags != null && latestPost.tags.isNotEmpty)
                     Padding(
                       padding: EdgeInsets.only(top: 8),
-                      child: GradientText(
+                      child: TagFormatter.buildTagsWidget(
+                        context,
                         latestPost.tags,
                         style: FlutterFlowTheme.of(context).bodySmall.override(
                               fontFamily: 'Figtree',
                               fontWeight: FontWeight.w500,
+                              color: FlutterFlowTheme.of(context).primary,
                             ),
-                        colors: [
-                          FlutterFlowTheme.of(context).primary,
-                          FlutterFlowTheme.of(context).secondary,
-                        ],
                       ),
                     ),
                   SizedBox(height: 12),

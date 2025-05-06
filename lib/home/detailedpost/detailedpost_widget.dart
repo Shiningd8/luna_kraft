@@ -21,6 +21,7 @@ import 'package:flutter/rendering.dart';
 import '/components/save_post_popup.dart';
 import '/components/animated_like_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '/utils/tag_formatter.dart';
 export 'detailedpost_model.dart';
 
 T createModel<T>(BuildContext context, T Function() model) => model();
@@ -294,7 +295,8 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                     width: 1,
                   ),
                 ),
-                child: Text(
+                child: TagFormatter.buildTagsWidget(
+                  context,
                   post.tags,
                   style: FlutterFlowTheme.of(context).bodyMedium.override(
                         fontFamily: 'Outfit',

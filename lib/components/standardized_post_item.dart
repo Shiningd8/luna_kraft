@@ -13,6 +13,7 @@ import 'package:luna_kraft/components/share_options_dialog.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:ui';
 import '/flutter_flow/app_navigation_helper.dart';
+import '/utils/tag_formatter.dart';
 
 class StandardizedPostItem extends StatefulWidget {
   final PostsRecord post;
@@ -268,7 +269,8 @@ class _StandardizedPostItemState extends State<StandardizedPostItem> {
                       color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
+                    child: TagFormatter.buildTagsWidget(
+                      context,
                       widget.post.tags,
                       style: FlutterFlowTheme.of(context).bodySmall.override(
                             fontFamily: 'Figtree',

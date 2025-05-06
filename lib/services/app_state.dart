@@ -39,15 +39,18 @@ class AppState extends ChangeNotifier {
   String get selectedBackground => _selectedBackground;
 
   // Available background options
-  List<Map<String, String>> get backgroundOptions => [
-        {'name': 'Default', 'file': 'backgroundanimation.json'},
-        {'name': 'Hills', 'file': 'hills.json'},
-        {'name': 'Ocean', 'file': 'ocean.json'},
-        {'name': 'Rainforest', 'file': 'rainforest.json'},
-        {'name': 'Gradient', 'file': 'gradient.json'},
-        {'name': 'Night Hill', 'file': 'nighthill.json'},
-        {'name': 'Night Lake', 'file': 'nightlake.json'},
-      ];
+  List<Map<String, String>> get backgroundOptions {
+    print('Accessing backgroundOptions - returning Lottie files only');
+    return [
+      {'name': 'Default', 'file': 'backgroundanimation.json'},
+      {'name': 'Hills', 'file': 'hills.json'},
+      {'name': 'Ocean', 'file': 'ocean.json'},
+      {'name': 'Rainforest', 'file': 'rainforest.json'},
+      {'name': 'Gradient', 'file': 'gradient.json'},
+      {'name': 'Night Hill', 'file': 'nighthill.json'},
+      {'name': 'Night Lake', 'file': 'nightlake.json'},
+    ];
+  }
 
   // Get the current user's background selection key
   String get _userBackgroundKey {
@@ -152,5 +155,17 @@ class AppState extends ChangeNotifier {
     await _zenAudioService.dispose();
     _isInitialized = false;
     notifyListeners();
+  }
+
+  // Force reinitialize to make sure changes are applied
+  Future<void> forceReinitialize() async {
+    print('Force reinitializing AppState');
+    try {
+      await _loadBackgroundPreference();
+      notifyListeners();
+      print('AppState reinitialized');
+    } catch (e) {
+      print('Error reinitializing AppState: $e');
+    }
   }
 }
