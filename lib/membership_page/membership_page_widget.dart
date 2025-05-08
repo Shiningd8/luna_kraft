@@ -194,10 +194,6 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
   // Create enough hover states for all interactive elements (3 membership options, 3 coin packs, and extra for safety)
   final List<bool> _hoverStates = List.generate(10, (index) => false);
 
-  // Video player controller
-  VideoPlayerController? _videoController;
-  bool _isVideoInitialized = false;
-
   // Add a class level future that will be initialized once
   late Future<List<CoinProduct>> _coinProductsFuture;
 
@@ -293,9 +289,6 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
     // Initialize the coin products future
     _coinProductsFuture = PaywallManager.getCoinProducts();
 
-    // Initialize video background
-    _initializeVideoPlayer();
-
     // Listen for purchase results
     _coinPurchaseSubscription = CoinService.instance.purchaseResultsStream
         .listen(_handlePurchaseResult);
@@ -346,33 +339,9 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
     });
   }
 
-  // Initialize the video player
-  Future<void> _initializeVideoPlayer() async {
-    try {
-      // Load video file from assets
-      _videoController = VideoPlayerController.asset(
-        'assets/videos/space_background.mp4',
-      );
-
-      await _videoController!.initialize();
-      _videoController!.setLooping(true);
-      _videoController!.setVolume(0.0);
-      _videoController!.play();
-
-      if (mounted) {
-        setState(() {
-          _isVideoInitialized = true;
-        });
-      }
-    } catch (e) {
-      print('Error initializing video player: $e');
-    }
-  }
-
   @override
   void deactivate() {
-    // Pause video when widget is deactivated
-    _videoController?.pause();
+    // Previous video player code removed
     super.deactivate();
   }
 
@@ -383,9 +352,6 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
     // Remove all listeners first
     _scrollController.removeListener(() {});
     _scrollController.dispose();
-
-    // Dispose video controller
-    _videoController?.dispose();
 
     // Cancel purchase subscription
     _coinPurchaseSubscription?.cancel();
@@ -1948,11 +1914,6 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
     }
   }
 
-  // Instead of using a custom particle effect, we'll use a simple static placeholder
-  Widget _buildParticleEffect() {
-    return Container(); // Empty container instead of heavy animation
-  }
-
   // Load subscription products from the service
   Future<void> _loadSubscriptionProducts() async {
     try {
@@ -1977,6 +1938,17 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
           _isLoadingProducts = false;
         });
       }
+    }
+  }
+
+  // Helper method to get appropriate color based on coin amount
+  Color _getCoinColor(int amount) {
+    if (amount <= 100) {
+      return Color(0xFFF9A825); // Yellow/gold for small amounts
+    } else if (amount <= 500) {
+      return Color(0xFFE65100); // Orange for medium amounts
+    } else {
+      return Color(0xFFD32F2F); // Red for large amounts
     }
   }
 
@@ -2210,17 +2182,6 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
     }
   }
 
-  // Helper method to get appropriate color based on coin amount
-  Color _getCoinColor(int amount) {
-    if (amount <= 100) {
-      return Color(0xFFF9A825); // Yellow/gold for small amounts
-    } else if (amount <= 500) {
-      return Color(0xFFE65100); // Orange for medium amounts
-    } else {
-      return Color(0xFFD32F2F); // Red for large amounts
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2246,73 +2207,26 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
       ),
       body: Stack(
         children: [
-          // Animated video background
-          if (_isVideoInitialized && _videoController != null)
-            SizedBox.expand(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: _videoController!.value.size.width,
-                  height: _videoController!.value.size.height,
-                  child: VideoPlayer(_videoController!),
-                ),
-              ),
+          // Static Image background
+          SizedBox.expand(
+            child: Image.asset(
+              'assets/images/starrybg.png',
+              fit: BoxFit.cover,
             ),
-
-          // Overlay gradient on top of video
-          AnimatedBuilder(
-            animation: _animationController,
-            builder: (context, child) {
-              return Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF1A1A2E).withOpacity(0.7),
-                      Color(0xFF0F0F1B).withOpacity(0.9),
-                    ],
-                  ),
-                ),
-                child: ShaderMask(
-                  shaderCallback: (Rect bounds) {
-                    return LinearGradient(
-                      begin: Alignment(
-                        _shimmerAnimation.value,
-                        _shimmerAnimation.value,
-                      ),
-                      end: Alignment(
-                        -_shimmerAnimation.value,
-                        -_shimmerAnimation.value,
-                      ),
-                      colors: [
-                        Colors.transparent,
-                        Colors.white.withOpacity(0.05),
-                        Colors.transparent,
-                      ],
-                      stops: [0.35, 0.5, 0.65],
-                    ).createShader(bounds);
-                  },
-                  blendMode: BlendMode.srcATop,
-                  child: Container(
-                    color: Colors.black.withOpacity(0.3),
-                  ),
-                ),
-              );
-            },
           ),
 
-          // Animated particles
-          AnimatedBuilder(
-            animation: _animationController,
-            builder: (context, child) {
-              return CustomPaint(
-                painter: StarryBackgroundPainter(
-                  animation: _animationController.value,
-                ),
-                child: Container(),
-              );
-            },
+          // Simple gradient overlay without animations
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF1A1A2E).withOpacity(0.4),
+                  Color(0xFF0F0F1B).withOpacity(0.6),
+                ],
+              ),
+            ),
           ),
 
           // Content with staggered animations
@@ -2418,67 +2332,5 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
         ],
       ),
     );
-  }
-}
-
-// Custom painter for starry background effect
-class StarryBackgroundPainter extends CustomPainter {
-  final double animation;
-
-  StarryBackgroundPainter({required this.animation});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final random = math.Random(42); // Fixed seed for consistent stars
-
-    // Draw 100 stars with varying opacity based on animation
-    for (int i = 0; i < 100; i++) {
-      final x = random.nextDouble() * size.width;
-      final y = random.nextDouble() * size.height;
-      final radius = random.nextDouble() * 1.5 + 0.5;
-
-      // Vary star brightness with animation
-      final opacity =
-          (0.3 + 0.7 * math.sin((animation * math.pi * 2) + i * 0.2))
-              .clamp(0.2, 0.9);
-
-      final paint = Paint()
-        ..color = Colors.white.withOpacity(opacity)
-        ..style = PaintingStyle.fill;
-
-      canvas.drawCircle(Offset(x, y), radius, paint);
-    }
-
-    // Draw 20 larger stars with glow effect
-    for (int i = 0; i < 20; i++) {
-      final x = random.nextDouble() * size.width;
-      final y = random.nextDouble() * size.height;
-      final radius = random.nextDouble() * 1.0 + 1.0;
-
-      // Vary large star brightness with different phase
-      final opacity = (0.5 +
-              0.5 * math.sin((animation * math.pi * 2) + i * 0.5 + math.pi / 3))
-          .clamp(0.3, 1.0);
-
-      // Draw glow
-      final glowPaint = Paint()
-        ..color = Colors.white.withOpacity(opacity * 0.3)
-        ..style = PaintingStyle.fill
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 3);
-
-      canvas.drawCircle(Offset(x, y), radius * 2, glowPaint);
-
-      // Draw star
-      final paint = Paint()
-        ..color = Colors.white.withOpacity(opacity)
-        ..style = PaintingStyle.fill;
-
-      canvas.drawCircle(Offset(x, y), radius, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(StarryBackgroundPainter oldDelegate) {
-    return oldDelegate.animation != animation;
   }
 }

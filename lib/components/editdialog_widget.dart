@@ -3,6 +3,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/index.dart';
+import '/utils/serialization_helpers.dart';
 import 'package:flutter/material.dart';
 import 'editdialog_model.dart';
 export 'editdialog_model.dart';

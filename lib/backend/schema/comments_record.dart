@@ -37,11 +37,29 @@ class CommentsRecord extends FirestoreRecord {
   DocumentReference? get userref => _userref;
   bool hasUserref() => _userref != null;
 
+  // "likes" field - list of user references who liked this comment
+  List<DocumentReference>? _likes;
+  List<DocumentReference> get likes => _likes ?? [];
+  bool hasLikes() => _likes != null;
+
+  // "parentCommentRef" field - reference to parent comment if this is a reply
+  DocumentReference? _parentCommentRef;
+  DocumentReference? get parentCommentRef => _parentCommentRef;
+  bool hasParentCommentRef() => _parentCommentRef != null;
+
+  // "isReply" field - whether this comment is a reply to another comment
+  bool? _isReply;
+  bool get isReply => _isReply ?? false;
+  bool hasIsReply() => _isReply != null;
+
   void _initializeFields() {
     _comment = snapshotData['comment'] as String?;
     _date = snapshotData['date'] as DateTime?;
     _postref = snapshotData['postref'] as DocumentReference?;
     _userref = snapshotData['userref'] as DocumentReference?;
+    _likes = getDataList(snapshotData['likes']);
+    _parentCommentRef = snapshotData['parentCommentRef'] as DocumentReference?;
+    _isReply = snapshotData['isReply'] as bool?;
   }
 
   static const _documentPath = 'comments';

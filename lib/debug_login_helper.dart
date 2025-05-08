@@ -68,7 +68,7 @@ class DebugLoginHelper {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text('Debug Login'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -88,7 +88,12 @@ class DebugLoginHelper {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              // Dispose controllers before closing dialog
+              emailController.dispose();
+              passwordController.dispose();
+              Navigator.pop(dialogContext);
+            },
             child: Text('Cancel'),
           ),
           ElevatedButton(
@@ -97,13 +102,17 @@ class DebugLoginHelper {
               final password = passwordController.text;
 
               if (email.isEmpty || password.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
                   SnackBar(content: Text('Please enter email and password')),
                 );
                 return;
               }
 
-              Navigator.pop(context);
+              // Dispose controllers before closing dialog and navigating
+              emailController.dispose();
+              passwordController.dispose();
+              Navigator.pop(dialogContext);
+
               debugDirectLogin(
                 context,
                 email: email,

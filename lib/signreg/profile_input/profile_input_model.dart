@@ -30,6 +30,9 @@ class ProfileInputModel extends FlutterFlowModel<ProfileInputWidget> {
   DateTime? datePicked;
   String? selectedGender;
 
+  // Flag to track whether validation errors should be displayed
+  bool showValidationErrors = false;
+
   @override
   void initState(BuildContext context) {}
 

@@ -8,6 +8,7 @@ import 'package:luna_kraft/home/home_page/home_page_widget.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:luna_kraft/auth/firebase_auth/auth_util.dart';
 import 'package:otp/otp.dart';
+import 'package:luna_kraft/auth/auth_redirect_handler.dart';
 
 class TwoFactorVerificationPage extends StatefulWidget {
   final String email;
@@ -30,9 +31,17 @@ class _TwoFactorVerificationPageState extends State<TwoFactorVerificationPage> {
   final TextEditingController _verificationCodeController =
       TextEditingController();
   bool _isVerifying = false;
+  bool _mounted = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _mounted = true;
+  }
 
   @override
   void dispose() {
+    _mounted = false;
     _verificationCodeController.dispose();
     super.dispose();
   }
@@ -44,29 +53,26 @@ class _TwoFactorVerificationPageState extends State<TwoFactorVerificationPage> {
 
     if (_isVerifying) return;
 
+    if (!_mounted) return;
+
     setState(() {
       _isVerifying = true;
     });
 
     try {
+      // Capture the code value before any async operations
       final code = _verificationCodeController.text.trim();
       final isValid = await AuthUtil.verifyTwoFactorCode(code);
 
-      if (!mounted) return;
+      if (!_mounted) return;
 
       if (isValid) {
-        context.pushNamedAuth(
-          HomePageWidget.routeName,
-          context.mounted,
-          extra: <String, dynamic>{
-            kTransitionInfoKey: TransitionInfo(
-              hasTransition: true,
-              transitionType: PageTransitionType.fade,
-              duration: Duration(milliseconds: 1000),
-            ),
-          },
-        );
+        // Use the redirect handler to properly navigate after successful verification
+        // This will check if the user has a profile and navigate accordingly
+        await AuthRedirectHandler.navigateAfterAuth(context);
       } else {
+        if (!_mounted) return;
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Invalid verification code. Please try again.'),
@@ -75,20 +81,20 @@ class _TwoFactorVerificationPageState extends State<TwoFactorVerificationPage> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An error occurred while verifying the code.'),
-            backgroundColor: FlutterFlowTheme.of(context).error,
-          ),
-        );
-      }
+      if (!_mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An error occurred while verifying the code.'),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isVerifying = false;
-        });
-      }
+      if (!_mounted) return;
+
+      setState(() {
+        _isVerifying = false;
+      });
     }
   }
 
@@ -174,7 +180,9 @@ class _TwoFactorVerificationPageState extends State<TwoFactorVerificationPage> {
                       selectedColor: FlutterFlowTheme.of(context).primary,
                     ),
                     onCompleted: (value) {
-                      _verifyCode();
+                      if (_mounted) {
+                        _verifyCode();
+                      }
                     },
                     beforeTextPaste: (text) {
                       // Only allow digits

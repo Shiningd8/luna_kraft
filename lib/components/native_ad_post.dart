@@ -120,17 +120,41 @@ class _NativeAdPostState extends State<NativeAdPost> {
   @override
   Widget build(BuildContext context) {
     Widget adWidget = Container(
-      height: 120, // Reduced from 140 to 120
-      margin: EdgeInsets.symmetric(horizontal: 16), // Keep horizontal margin
+      height: 130, // Increased from 120 to 130 to accommodate content
+      margin: EdgeInsets.symmetric(horizontal: 0),
+      padding: EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+          width: 1,
+        ),
       ),
       child: Stack(
         children: [
           if (_isAdLoaded && _nativeAd != null)
             // Display the ad
             Positioned.fill(
-              child: AdWidget(ad: _nativeAd!),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(left: 12, top: 4, bottom: 2),
+                    child: Text(
+                      'Sponsored',
+                      style: FlutterFlowTheme.of(context).labelSmall.override(
+                            fontFamily: 'Figtree',
+                            fontSize: 11,
+                            color: Colors.white.withOpacity(0.6),
+                          ),
+                    ),
+                  ),
+                  Expanded(
+                    child: AdWidget(ad: _nativeAd!),
+                  ),
+                ],
+              ),
             )
           else if (_isAdError)
             // Show error message (styled like posts)
@@ -139,6 +163,7 @@ class _NativeAdPostState extends State<NativeAdPost> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min, // Added to prevent overflow
                 children: [
                   Text(
                     'Sponsored Content',
@@ -167,6 +192,7 @@ class _NativeAdPostState extends State<NativeAdPost> {
               padding: EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min, // Added to prevent overflow
                 children: [
                   Row(
                     children: [
@@ -180,6 +206,8 @@ class _NativeAdPostState extends State<NativeAdPost> {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize:
+                              MainAxisSize.min, // Added to prevent overflow
                           children: [
                             Container(
                               height: 12,
@@ -207,7 +235,7 @@ class _NativeAdPostState extends State<NativeAdPost> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 12),
+                  SizedBox(height: 10), // Reduced from 12 to 10
                   Container(
                     height: 16,
                     width: double.infinity,
@@ -216,7 +244,7 @@ class _NativeAdPostState extends State<NativeAdPost> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  SizedBox(height: 6),
+                  SizedBox(height: 4), // Reduced from 6 to 4
                   Container(
                     height: 12,
                     width: double.infinity,

@@ -193,6 +193,7 @@ flutter:
   assets:
     - assets/fonts/
     - assets/images/
+    - assets/images/lunathemes/
     - assets/images/bg/
     - assets/videos/
     - assets/videos/postbg/

@@ -14,6 +14,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:ui';
 import '/flutter_flow/app_navigation_helper.dart';
 import '/utils/tag_formatter.dart';
+import '/utils/serialization_helpers.dart';
+import '../services/comments_service.dart';
 
 class StandardizedPostItem extends StatefulWidget {
   final PostsRecord post;
@@ -157,6 +159,21 @@ class _StandardizedPostItemState extends State<StandardizedPostItem> {
     }
   }
 
+  // Stream to get comment count for a post
+  Stream<int> _getCommentCountStream() {
+    return FirebaseFirestore.instance
+        .collection('comments')
+        .where('postref', isEqualTo: widget.post.reference)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        // Check if the comment is not deleted
+        return data['deleted'] != true;
+      }).length;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget postWidget = GestureDetector(
@@ -293,16 +310,11 @@ class _StandardizedPostItemState extends State<StandardizedPostItem> {
                       inactiveColor: Colors.white.withOpacity(0.8),
                       onTap: _handleLike,
                     ),
-                    // Comments button with StreamBuilder to get the actual count
-                    StreamBuilder<List<CommentsRecord>>(
-                      stream: queryCommentsRecord(
-                        queryBuilder: (commentsRecord) => commentsRecord.where(
-                          'postref',
-                          isEqualTo: widget.post.reference,
-                        ),
-                      ),
+                    // Comments button with StreamBuilder for real-time updates
+                    StreamBuilder<int>(
+                      stream: _getCommentCountStream(),
                       builder: (context, snapshot) {
-                        final commentCount = snapshot.data?.length ?? 0;
+                        final commentCount = snapshot.data ?? 0;
                         return _buildInteractionButton(
                           context: context,
                           icon: Icons.mode_comment_outlined,

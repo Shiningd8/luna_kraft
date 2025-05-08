@@ -62,6 +62,15 @@ final List<OnboardingPageData> onboardingPages = [
     animationType: AnimationType.lottie,
   ),
 
+  // LunaCoins Usage Page
+  OnboardingPageData(
+    title: "LunaCoins: Unlock More",
+    description:
+        "Earn and use LunaCoins to unlock premium features, exclusive dream themes, and special content.\nUpgrade your experience and personalize your dream world!",
+    animationPath: "assets/images/lunacoin.png",
+    animationType: AnimationType.custom,
+  ),
+
   // 5. Premium Insights
   OnboardingPageData(
     title: "Premium Insights",
@@ -76,8 +85,8 @@ final List<OnboardingPageData> onboardingPages = [
     title: "Zen Mode",
     description:
         "Sleep soundly with Zen Mode.\nMix & match calming sounds to craft your perfect nightscape.",
-    animationPath: "assets/lottie/sound_waves.json",
-    animationType: AnimationType.custom,
+    animationPath: "assets/lottie/sound.json",
+    animationType: AnimationType.lottie,
   ),
 
   // 7. Permission Requests
@@ -96,5 +105,6 @@ final List<OnboardingPageData> onboardingPages = [
     description: "Start your Lunakraft journey.",
     backgroundImage: "assets/images/bg/starry_bg.png",
     animationType: AnimationType.particles,
+    ctaText: "Enter Lunakraft",
   ),
 ];

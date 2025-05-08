@@ -730,3 +730,41 @@ bool isAppCheckError(String errorMessage) {
   return appCheckKeywords.any(
       (keyword) => errorMessage.toLowerCase().contains(keyword.toLowerCase()));
 }
+
+Future<bool> checkUserProfileExists() async {
+  try {
+    if (!loggedIn || currentUser == null) {
+      print('checkUserProfileExists: User not logged in');
+      return false;
+    }
+
+    print(
+        'checkUserProfileExists: Checking profile for user ID ${currentUser!.uid}');
+
+    // Get the user document
+    final userDoc = await UserRecord.getDocumentOnce(
+        UserRecord.collection.doc(currentUser!.uid));
+
+    // Check if the user document exists and has required profile fields completed
+    if (userDoc == null) {
+      print('checkUserProfileExists: User document not found');
+      return false;
+    }
+
+    print('checkUserProfileExists: User document found with data:');
+    print('  - displayName: ${userDoc.displayName}');
+    print('  - userName: ${userDoc.userName}');
+
+    // Check if essential profile fields are completed
+    final isProfileComplete = userDoc.displayName != null &&
+        userDoc.displayName!.isNotEmpty &&
+        userDoc.userName != null &&
+        userDoc.userName!.isNotEmpty;
+
+    print('checkUserProfileExists: Profile is complete: $isProfileComplete');
+    return isProfileComplete;
+  } catch (e) {
+    print('Error checking user profile: $e');
+    return false;
+  }
+}

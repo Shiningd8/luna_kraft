@@ -2,13 +2,11 @@ import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart' hide getCurrentTimestamp;
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/utils/serialization_helpers.dart';
 import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:timeago/timeago.dart' as timeago;
-import 'package:flutter_animate/flutter_animate.dart';
 import 'notificationpage_model.dart';
-import 'package:provider/provider.dart';
 export 'notificationpage_model.dart';
 
 class NotificationpageWidget extends StatefulWidget {

@@ -65,38 +65,25 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
 
   // Add the backgrounds array
   final List<Map<String, dynamic>> backgrounds = [
+    {'name': 'Healing', 'path': 'assets/images/lunathemes/HEALING.png'},
+    {'name': 'Tragic', 'path': 'assets/images/lunathemes/TRAGIC.png'},
+    {'name': 'Fantasy', 'path': 'assets/images/lunathemes/FANTASY.png'},
+    {'name': 'Adventure', 'path': 'assets/images/lunathemes/ADVENTURE.png'},
+    {'name': 'Horror', 'path': 'assets/images/lunathemes/HORROR.png'},
+    {'name': 'Spiritual', 'path': 'assets/images/lunathemes/SPIRITUAL.png'},
     {
-      'name': 'Love',
-      'path': 'assets/images/bg/love.png',
+      'name': 'Apocalyptptic',
+      'path': 'assets/images/lunathemes/APOCALYTPTIC.png'
     },
-    {
-      'name': 'Sad',
-      'path': 'assets/images/bg/sad.png',
-    },
-    {
-      'name': 'Fantasy',
-      'path': 'assets/images/bg/fantasy.png',
-    },
-    {
-      'name': 'Space',
-      'path': 'assets/images/bg/night.png',
-    },
-    {
-      'name': 'Horror',
-      'path': 'assets/images/bg/horror.png',
-    },
-    {
-      'name': 'Future',
-      'path': 'assets/images/bg/future.png',
-    },
-    {
-      'name': 'Happy',
-      'path': 'assets/images/bg/happy.png',
-    },
-    {
-      'name': 'Old',
-      'path': 'assets/images/bg/old.png',
-    },
+    {'name': 'Romantic', 'path': 'assets/images/lunathemes/ROMANTIC.png'},
+    {'name': 'Scifi', 'path': 'assets/images/lunathemes/SCIFI.PNG'},
+    {'name': 'Lucid', 'path': 'assets/images/lunathemes/LUCID.png'},
+    {'name': 'Mysterious', 'path': 'assets/images/lunathemes/MYSTERIOUS.png'},
+    {'name': 'Lively', 'path': 'assets/images/lunathemes/LIVELY.png'},
+    {'name': 'Surreal', 'path': 'assets/images/lunathemes/SURREAL.png'},
+    {'name': 'Drama', 'path': 'assets/images/lunathemes/DRAMA.png'},
+    {'name': 'Historical', 'path': 'assets/images/lunathemes/HISTORICAL.png'},
+    {'name': 'Comedy', 'path': 'assets/images/lunathemes/COMEDY.png'},
   ];
 
   // Word count tracking

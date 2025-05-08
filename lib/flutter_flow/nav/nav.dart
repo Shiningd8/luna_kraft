@@ -1,11 +1,17 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../flutter_flow_theme.dart';
+import '../../index.dart';
+export 'package:go_router/go_router.dart';
+
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter/rendering.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:luna_kraft/app_state.dart';
@@ -13,14 +19,14 @@ import '/backend/schema/structs/index.dart';
 import '/auth/firebase_auth/firebase_user_provider.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/auth/two_factor_verification.dart';
+import '/onboarding/onboarding_manager.dart';
+import '/onboarding/onboarding_screen.dart';
 
 import '/auth/base_auth_user_provider.dart';
 import '/backend/backend.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 
-import '/index.dart';
 import '/signreg/signin/signin_widget.dart';
 import '/signreg/forgot_password/forgot_password_widget.dart';
 import '/signreg/profile_input/profile_input_widget.dart';
@@ -49,9 +55,125 @@ import '/dream_analysis/analysis/dream_analysis_page.dart';
 import '/examples/transitions_demo_page.dart';
 import '/examples/second_page.dart';
 import '/zen_mode/zen_mode_page.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../lat_lng.dart';
+import '../place.dart';
 
-export 'package:go_router/go_router.dart';
-export 'serialization_util.dart';
+enum ParamType {
+  int,
+  double,
+  String,
+  bool,
+  DateTime,
+  DateTimeRange,
+  DocumentReference,
+}
+
+String? serializeParam(
+  dynamic param,
+  ParamType paramType, {
+  bool isList = false,
+}) {
+  try {
+    if (param == null) {
+      return null;
+    }
+    if (isList) {
+      final serializedValues = (param as Iterable)
+          .map((p) => serializeParam(p, paramType, isList: false))
+          .where((p) => p != null)
+          .toList();
+      return jsonEncode(serializedValues);
+    }
+    switch (paramType) {
+      case ParamType.int:
+        return param.toString();
+      case ParamType.double:
+        return param.toString();
+      case ParamType.String:
+        return param;
+      case ParamType.bool:
+        return param ? 'true' : 'false';
+      case ParamType.DateTime:
+        final dateTime = param as DateTime;
+        return dateTime.millisecondsSinceEpoch.toString();
+      case ParamType.DateTimeRange:
+        final dateTimeRange = param as DateTimeRange;
+        return jsonEncode({
+          'start': dateTimeRange.start.millisecondsSinceEpoch,
+          'end': dateTimeRange.end.millisecondsSinceEpoch,
+        });
+      case ParamType.DocumentReference:
+        final reference = param as DocumentReference;
+        return reference.path;
+      default:
+        return null;
+    }
+  } catch (e) {
+    print('Error serializing parameter: $e');
+    return null;
+  }
+}
+
+dynamic deserializeParam<T>(
+  String? param,
+  ParamType paramType,
+  bool isList, {
+  List<String>? collectionNamePath,
+}) {
+  try {
+    if (param == null) {
+      return null;
+    }
+    if (isList) {
+      final paramValues = jsonDecode(param) as Iterable;
+      if (paramValues.isEmpty) {
+        return [];
+      }
+      return paramValues
+          .map((p) => deserializeParam<T>(
+                p,
+                paramType,
+                false,
+                collectionNamePath: collectionNamePath,
+              ))
+          .where((p) => p != null)
+          .map((p) => p as T)
+          .toList();
+    }
+    switch (paramType) {
+      case ParamType.int:
+        return int.tryParse(param);
+      case ParamType.double:
+        return double.tryParse(param);
+      case ParamType.String:
+        return param;
+      case ParamType.bool:
+        return param == 'true';
+      case ParamType.DateTime:
+        final milliseconds = int.tryParse(param);
+        return milliseconds != null
+            ? DateTime.fromMillisecondsSinceEpoch(milliseconds)
+            : null;
+      case ParamType.DateTimeRange:
+        final dateTimeRangeMap = jsonDecode(param) as Map<String, dynamic>;
+        return DateTimeRange(
+          start: DateTime.fromMillisecondsSinceEpoch(
+              dateTimeRangeMap['start'] as int),
+          end: DateTime.fromMillisecondsSinceEpoch(
+              dateTimeRangeMap['end'] as int),
+        );
+      case ParamType.DocumentReference:
+        return FirebaseFirestore.instance.doc(param);
+      default:
+        return null;
+    }
+  } catch (e) {
+    print('Error deserializing parameter: $e');
+    return null;
+  }
+}
 
 const kTransitionInfoKey = '__transition_info__';
 
@@ -116,6 +238,78 @@ GoRouter createRouter(AppStateNotifier appStateNotifier, [Widget? entryPage]) =>
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
+      redirect: (_, GoRouterState state) async {
+        if (state.matchedLocation == '/show-onboarding') {
+          // Don't redirect if already going to onboarding
+          return null;
+        }
+
+        if (appStateNotifier.loggedIn) {
+          // Don't redirect if going to profile input
+          if (state.matchedLocation == ProfileInputWidget.routePath) {
+            return null;
+          }
+
+          // Check if user has completed profile setup
+          final hasCompletedProfile = await checkUserProfileExists();
+
+          if (!hasCompletedProfile) {
+            // User is logged in but hasn't completed profile setup
+
+            // Check if this is a new user who needs onboarding
+            try {
+              final isNewUser = await OnboardingManager.isNewUser();
+              final hasCompletedOnboarding =
+                  await OnboardingManager.hasCompletedOnboarding();
+
+              // Only show onboarding to new users who haven't completed it yet
+              if (isNewUser && !hasCompletedOnboarding) {
+                // Redirect to a temporary route that will show onboarding
+                print('Redirecting to onboarding for new user');
+                return '/show-onboarding';
+              }
+            } catch (e) {
+              print('Error checking onboarding status: $e');
+            }
+
+            // Only redirect to profile input if they don't have a profile
+            print(
+                'Redirecting to profile input - user needs to complete profile');
+            return ProfileInputWidget.routePath;
+          } else {
+            // If they have a complete profile, mark profile setup as complete
+            await OnboardingManager.markProfileSetupComplete();
+
+            // For existing users with profiles, skip onboarding and mark as not new
+            final isNewUser = await OnboardingManager.isNewUser();
+            final hasCompletedOnboarding =
+                await OnboardingManager.hasCompletedOnboarding();
+
+            if (isNewUser) {
+              // If they have a profile but are marked as new, correct this
+              await OnboardingManager.markUserAsNotNew();
+              print('User with complete profile marked as not new');
+            }
+
+            if (!hasCompletedOnboarding) {
+              // Returning users should skip onboarding and mark it as complete
+              await OnboardingManager.markOnboardingComplete();
+              print('Existing user with profile - skipping onboarding');
+            }
+          }
+
+          // Returning users with completed profiles don't need to see onboarding again
+        } else {
+          // If user is not logged in, make sure they're not being directed
+          // to the profile input page or onboarding page
+          if (state.matchedLocation == ProfileInputWidget.routePath ||
+              state.matchedLocation == '/show-onboarding') {
+            // Redirect unauthenticated users to the signin page
+            return SigninWidget.routePath;
+          }
+        }
+        return null;
+      },
       errorBuilder: (context, state) => appStateNotifier.loggedIn
           ? entryPage ?? NavBarPage()
           : SigninWidget(),
@@ -126,6 +320,27 @@ GoRouter createRouter(AppStateNotifier appStateNotifier, [Widget? entryPage]) =>
           builder: (context, _) => appStateNotifier.loggedIn
               ? entryPage ?? NavBarPage()
               : SigninWidget(),
+        ),
+        // Add a special route for showing onboarding
+        FFRoute(
+          name: 'ShowOnboarding',
+          path: '/show-onboarding',
+          builder: (context, _) => OnboardingScreen(
+            onComplete: () async {
+              // When onboarding is complete, mark it as such
+              await OnboardingManager.markOnboardingComplete();
+
+              // Explicitly mark the user as not new
+              await OnboardingManager.markUserAsNotNew();
+              print('User marked as not new after completing onboarding');
+
+              // Re-enable auth navigation for future events
+              AppStateNotifier.instance.updateNotifyOnAuthChange(true);
+
+              // Go to home page since profile input is already completed
+              context.goNamed(HomePageWidget.routeName);
+            },
+          ),
         ),
         FFRoute(
           name: SigninWidget.routeName,
@@ -576,6 +791,7 @@ class FFRoute {
             appStateNotifier.setRedirectLocationIfUnset(state.uri.toString());
             return '/signin';
           }
+
           return null;
         },
         pageBuilder: (context, state) {

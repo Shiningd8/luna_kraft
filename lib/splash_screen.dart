@@ -112,68 +112,72 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Subtle gradient background
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.black,
-              gradient: RadialGradient(
-                center: Alignment(0.0, 0.2),
-                radius: 0.8,
-                colors: [
-                  Color(0xFF121212),
-                  Colors.black,
-                ],
-                stops: [0.0, 1.0],
+    return Material(
+      color: Colors.black,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Subtle gradient background
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.black,
+                gradient: RadialGradient(
+                  center: Alignment(0.0, 0.2),
+                  radius: 0.8,
+                  colors: [
+                    Color(0xFF121212),
+                    Colors.black,
+                  ],
+                  stops: [0.0, 1.0],
+                ),
               ),
             ),
-          ),
 
-          // Centered logo text with animations
-          Center(
-            child: AnimatedBuilder(
-              animation: Listenable.merge([_fadeIn, _scale, _glow]),
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeIn.value,
-                  child: Transform.scale(
-                    scale: _scale.value,
-                    child: ShaderMask(
-                      blendMode: BlendMode.srcIn,
-                      shaderCallback: (bounds) => LinearGradient(
-                        colors: [
-                          Color(0xFFFFD700), // Gold
-                          Color(0xFFF5DEB3), // Wheat
-                          Color(0xFFDAA520), // GoldenRod
-                        ],
-                        stops: [0.0, 0.5, 1.0],
-                      ).createShader(bounds),
-                      child: Text(
-                        'LunaKraft',
-                        style: GoogleFonts.montserrat(
-                          fontSize: 48,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.5,
-                          shadows: [
-                            Shadow(
-                              color: Color(0xFFFFD700).withOpacity(_glow.value),
-                              blurRadius: 15.0,
-                              offset: Offset(0, 0),
-                            ),
+            // Centered logo text with animations
+            Center(
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_fadeIn, _scale, _glow]),
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _fadeIn.value,
+                    child: Transform.scale(
+                      scale: _scale.value,
+                      child: ShaderMask(
+                        blendMode: BlendMode.srcIn,
+                        shaderCallback: (bounds) => LinearGradient(
+                          colors: [
+                            Color(0xFFFFD700), // Gold
+                            Color(0xFFF5DEB3), // Wheat
+                            Color(0xFFDAA520), // GoldenRod
                           ],
+                          stops: [0.0, 0.5, 1.0],
+                        ).createShader(bounds),
+                        child: Text(
+                          'LunaKraft',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 48,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.5,
+                            shadows: [
+                              Shadow(
+                                color:
+                                    Color(0xFFFFD700).withOpacity(_glow.value),
+                                blurRadius: 15.0,
+                                offset: Offset(0, 0),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

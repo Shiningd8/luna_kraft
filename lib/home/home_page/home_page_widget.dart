@@ -4,6 +4,7 @@ import '/components/emptylist_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart' as util;
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/nav/nav.dart';
 import '/pages/notification_page/notification_page_widget.dart';
 import '/widgets/space_background.dart';
 import '/services/app_state.dart';
@@ -33,6 +34,8 @@ import '/components/dream_fact_widget.dart';
 import '/components/share_options_dialog.dart';
 import 'package:luna_kraft/components/native_ad_post.dart';
 import '/utils/tag_formatter.dart';
+import '/utils/serialization_helpers.dart';
+import '/services/comments_service.dart';
 
 // Separate class for home feed content
 class _HomeFeedContent extends StatefulWidget {
@@ -55,7 +58,7 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
       'ca-app-pub-3940256099942544/2247696110';
 
   // Frequency of ads (show an ad after this many posts)
-  static const int _adFrequency = 8;
+  static const int _adFrequency = 5;
 
   @override
   void initState() {
@@ -231,6 +234,21 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
     }
   }
 
+  // Stream to get comment count for a post
+  Stream<int> _getCommentCountStream(DocumentReference postRef) {
+    return FirebaseFirestore.instance
+        .collection('comments')
+        .where('postref', isEqualTo: postRef)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        // Check if the comment is not deleted
+        return data['deleted'] != true;
+      }).length;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<PostsRecord>>(
@@ -386,7 +404,9 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
         // Calculate the number of items in the list, including ads
         final int regularItems =
             (latestPost != null ? 1 : 0) + validPosts.length;
+        // Calculate ads - one per 5 posts
         final int adItems = (regularItems / _adFrequency).floor();
+        // No maximum cap on ads since we want one per 5 posts
         final int totalItems = regularItems + adItems;
 
         return RefreshIndicator(
@@ -410,13 +430,16 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
               postIndex = index - adsBeforeIndex;
 
               // Check if this position should show an ad
-              // We want to show an ad after every _adFrequency posts (not including the ad itself)
+              // We want to show an ad after every _adFrequency posts
               if ((postIndex + 1) % (_adFrequency + 1) == 0 && postIndex > 0) {
                 // Check if the previous item was also an ad
                 final int previousIndex = index - 1;
+
+                // Skip this ad if the previous item was an ad (prevent consecutive ads)
                 if (previousIndex >= 0) {
                   final int previousPostIndex = previousIndex -
                       (previousIndex / (_adFrequency + 1)).floor();
+
                   if ((previousPostIndex + 1) % (_adFrequency + 1) == 0) {
                     // Skip this ad position to avoid consecutive ads
                     return SizedBox();
@@ -424,7 +447,7 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
                 }
 
                 return Padding(
-                  padding: EdgeInsets.only(bottom: 3),
+                  padding: EdgeInsets.only(bottom: 16),
                   child: NativeAdPost(
                     adUnitId: _nativeAdUnitId,
                     animateEntry: true,
@@ -692,16 +715,11 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
                       ),
                       Row(
                         children: [
-                          StreamBuilder<List<CommentsRecord>>(
-                            stream: queryCommentsRecord(
-                              queryBuilder: (commentsRecord) =>
-                                  commentsRecord.where(
-                                'postref',
-                                isEqualTo: latestPost.reference,
-                              ),
-                            ),
+                          StreamBuilder<int>(
+                            stream:
+                                _getCommentCountStream(latestPost.reference),
                             builder: (context, snapshot) {
-                              final commentCount = snapshot.data?.length ?? 0;
+                              final commentCount = snapshot.data ?? 0;
                               return _buildInteractionButton(
                                 context: context,
                                 icon: Icons.mode_comment_outlined,
@@ -2162,6 +2180,21 @@ class PostItemWidget extends StatelessWidget {
     required this.onSave,
   }) : super(key: key);
 
+  // Stream to get comment count for the post
+  Stream<int> _getCommentCountStream() {
+    return FirebaseFirestore.instance
+        .collection('comments')
+        .where('postref', isEqualTo: post.reference)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        // Check if the comment is not deleted
+        return data['deleted'] != true;
+      }).length;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -2270,16 +2303,11 @@ class PostItemWidget extends StatelessWidget {
                       onLike();
                     },
                   ),
-                  // Comments button with StreamBuilder to get the actual count
-                  StreamBuilder<List<CommentsRecord>>(
-                    stream: queryCommentsRecord(
-                      queryBuilder: (commentsRecord) => commentsRecord.where(
-                        'postref',
-                        isEqualTo: post.reference,
-                      ),
-                    ),
+                  // Comments button with StreamBuilder for real-time updates
+                  StreamBuilder<int>(
+                    stream: _getCommentCountStream(),
                     builder: (context, snapshot) {
-                      final commentCount = snapshot.data?.length ?? 0;
+                      final commentCount = snapshot.data ?? 0;
                       return _buildInteractionButton(
                         context: context,
                         icon: Icons.mode_comment_outlined,

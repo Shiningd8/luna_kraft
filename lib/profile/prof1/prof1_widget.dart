@@ -1,45 +1,29 @@
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart' hide getCurrentTimestamp;
-import '/components/editdialog_widget.dart';
 import '/components/emptylist_widget.dart';
-import '/components/userprofoptions_widget.dart';
 import '/components/dream_calendar_dialog.dart';
 import '/flutter_flow/flutter_flow_expanded_image_view.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/utils/serialization_helpers.dart';
 import '/index.dart';
-import '/backend/firebase_storage/storage.dart';
 import '/profile/edit_profile/edit_profile_widget.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:simple_gradient_text/simple_gradient_text.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
-import 'dart:convert';
-import 'dart:typed_data';
-import 'dart:math';
 import 'dart:ui';
+import 'dart:async';
 import 'prof1_model.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import '/pendingfollows/pendingfollows_widget.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:timeago/timeago.dart' as timeago;
-import 'package:luna_kraft/components/standardized_post_item.dart';
-import 'package:luna_kraft/components/editdialog_widget.dart';
 import 'package:luna_kraft/components/animated_edit_dialog.dart';
 import '/flutter_flow/app_navigation_helper.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '/services/app_state.dart';
-import 'package:go_router/go_router.dart';
-import 'dart:async';
-import 'package:flutter/services.dart';
 import '/widgets/lottie_background.dart';
+import '/services/comments_service.dart';
 export 'prof1_model.dart';
 
 class Prof1Widget extends StatefulWidget {
@@ -126,6 +110,21 @@ class _Prof1WidgetState extends State<Prof1Widget> {
         });
       }
     }
+  }
+
+  // Stream to get comment count for a specific post
+  Stream<int> _getCommentCountStream(DocumentReference postRef) {
+    return FirebaseFirestore.instance
+        .collection('comments')
+        .where('postref', isEqualTo: postRef)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        // Check if the comment is not deleted
+        return data['deleted'] != true;
+      }).length;
+    });
   }
 
   @override
@@ -972,22 +971,14 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                 ),
                                                 SizedBox(width: 16),
 
-                                                // Comment icon and count
-                                                StreamBuilder<
-                                                    List<CommentsRecord>>(
-                                                  stream: queryCommentsRecord(
-                                                    queryBuilder:
-                                                        (commentsRecord) =>
-                                                            commentsRecord
-                                                                .where(
-                                                      'postref',
-                                                      isEqualTo: post.reference,
-                                                    ),
-                                                  ),
+                                                // Comment icon and count with StreamBuilder
+                                                StreamBuilder<int>(
+                                                  stream:
+                                                      _getCommentCountStream(
+                                                          post.reference),
                                                   builder: (context, snapshot) {
                                                     final commentCount =
-                                                        snapshot.data?.length ??
-                                                            0;
+                                                        snapshot.data ?? 0;
                                                     return InkWell(
                                                       onTap: () {
                                                         AppNavigationHelper

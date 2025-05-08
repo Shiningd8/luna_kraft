@@ -23,6 +23,25 @@ service cloud.firestore {
          getUserId(resource.data.userref) == request.auth.uid);
     }
 
+    // Helper function to check if a post exists
+    function postExists(postRef) {
+      return exists(postRef);
+    }
+
+    // Helper function to check if user is comment owner
+    function isCommentOwner(comment) {
+      return request.auth.uid == getUserId(comment.userref);
+    }
+
+    // Helper function to check if user is the owner of the post that a comment belongs to
+    function isCommentPostOwner(comment) {
+      let postRef = comment.postref;
+      return postRef != null && 
+             exists(postRef) && 
+             (getUserId(get(postRef).data.poster) == request.auth.uid || 
+              getUserId(get(postRef).data.userref) == request.auth.uid);
+    }
+
     match /posts/{document} {
       allow create: if isAuthenticated();
       allow read: if true;
@@ -44,8 +63,21 @@ service cloud.firestore {
     match /comments/{document} {
       allow create: if isAuthenticated();
       allow read: if true;
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.userref;
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userref;
+      allow update: if isAuthenticated() && (
+        isCommentOwner(resource.data) || 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingDeletion', 'deleted', 'deletedAt', 'deletedBy', 'deletedAs', 'likes'])
+      );
+      allow delete: if isAuthenticated() && (
+        isCommentOwner(resource.data) || 
+        isCommentPostOwner(resource.data)
+      );
+    }
+
+    match /deleted_comments/{document} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update: if false;
+      allow delete: if false;
     }
 
     match /usernames/{document} {

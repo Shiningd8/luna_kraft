@@ -16,6 +16,7 @@ import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:simple_gradient_text/simple_gradient_text.dart';
 import 'add_post1_model.dart';
+import '/utils/serialization_helpers.dart';
 export 'add_post1_model.dart';
 
 class AddPost1Widget extends StatefulWidget {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/utils/serialization_helpers.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import 'package:provider/provider.dart';
@@ -473,7 +474,12 @@ class _SettingsPageState extends State<SettingsPage>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () {
+                // Properly dispose controllers before closing dialog
+                deleteController.dispose();
+                passwordController.dispose();
+                Navigator.pop(dialogContext);
+              },
               child: Text('Cancel'),
             ),
             TextButton(
@@ -491,8 +497,15 @@ class _SettingsPageState extends State<SettingsPage>
 
                         if (user == null || userRef == null || userId == null) {
                           print('Error: User not found or missing information');
+                          // Dispose controllers before returning
+                          deleteController.dispose();
+                          passwordController.dispose();
                           return;
                         }
+
+                        // Dispose controllers before closing the dialog
+                        deleteController.dispose();
+                        passwordController.dispose();
 
                         // Close the initial dialog
                         navigator.pop();
@@ -726,11 +739,14 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   void _showBugReportDialog(BuildContext context) {
+    final TextEditingController bugReportController = TextEditingController();
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text('Report a Bug'),
         content: TextField(
+          controller: bugReportController,
           maxLines: 5,
           decoration: InputDecoration(
             hintText: 'Describe the issue...',
@@ -739,16 +755,28 @@ class _SettingsPageState extends State<SettingsPage>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              // Dispose controller before closing dialog
+              bugReportController.dispose();
+              Navigator.pop(dialogContext);
+            },
             child: Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
               // Implement bug report submission
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Bug report submitted successfully')),
-              );
+              final bugReport = bugReportController.text.trim();
+
+              // Dispose controller before any async operations
+              bugReportController.dispose();
+
+              Navigator.pop(dialogContext);
+
+              if (bugReport.isNotEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Bug report submitted successfully')),
+                );
+              }
             },
             child: Text('Submit'),
           ),

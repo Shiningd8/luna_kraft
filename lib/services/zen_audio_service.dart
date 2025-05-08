@@ -641,13 +641,29 @@ class ZenAudioService extends ChangeNotifier {
           notifyListeners();
         } catch (e) {
           _debugLog('Error in timer completion callback: $e');
-          // Attempt emergency sound stop
-          _isPlaying = false;
-          _timerDurationMinutes = 0;
-          for (final sound in _availableSounds) {
-            sound.isActive = false;
+          // Attempt emergency sound stop with multiple fallbacks
+          try {
+            _isPlaying = false;
+            notifyListeners();
+
+            // First attempt - try to stop each sound individually
+            for (final sound in _availableSounds) {
+              try {
+                sound.isActive = false;
+                if (sound.player != null) {
+                  sound.player!.stop();
+                }
+              } catch (soundError) {
+                _debugLog('Error stopping individual sound: $soundError');
+              }
+            }
+
+            // Second attempt - reset all state variables
+            _timerDurationMinutes = 0;
+            notifyListeners();
+          } catch (emergencyError) {
+            _debugLog('Emergency error handling failed: $emergencyError');
           }
-          notifyListeners();
         }
       });
 

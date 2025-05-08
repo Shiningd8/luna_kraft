@@ -27,7 +27,9 @@ import '/splash_screen.dart';
 import '/services/native_ad_factory.dart';
 import '/services/purchase_service.dart';
 import '/services/subscription_manager.dart';
+import '/onboarding/onboarding_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +44,14 @@ void main() async {
 
   // Configure Firebase App Check safely
   await _configureFirebaseAppCheck();
+
+  // Preload onboarding status
+  try {
+    await OnboardingManager.hasCompletedOnboarding();
+    print('Onboarding status preloaded');
+  } catch (e) {
+    print('Error preloading onboarding status: $e');
+  }
 
   // Initialize AdMob
   try {
@@ -64,6 +74,11 @@ void main() async {
 
       // Set a flag in userDefaults/SharedPreferences to disable validator
       try {
+        // Disable validator completely for both platforms
+        print('Setting ad validator disabled flag');
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('admob_validator_disabled', true);
+
         // This approach helps disable validator on iOS
         if (Platform.isIOS) {
           print('Setting iOS ad validator disabled flag');
@@ -160,9 +175,22 @@ class _MyAppState extends State<MyApp> {
     _appStateNotifier = AppStateNotifier.instance;
     _router = createRouter(_appStateNotifier, widget.entryPage);
     userStream = lunaKraftFirebaseUserStream()
-      ..listen((user) => _appStateNotifier.update(user));
+      ..listen((user) {
+        // Add debug logging for auth state changes
+        print('AUTH STATE CHANGED: User logged in: ${user.loggedIn}');
+        if (user.loggedIn) {
+          print('Authenticated user: ${user.email}');
+        } else {
+          print('User logged out or not authenticated');
+        }
+        _appStateNotifier.update(user);
+      });
 
-    jwtTokenStream.listen((_) {});
+    // Add debug logging for JWT token changes
+    jwtTokenStream.listen((jwt) {
+      print(
+          'JWT token refreshed: ${jwt != null ? 'Token present' : 'No token'}');
+    });
 
     // We're using our own splash screen
     _appStateNotifier.stopShowingSplashImage();
@@ -198,23 +226,19 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     if (_showSplashScreen) {
       return MaterialApp(
-        debugShowCheckedModeBanner: false,
         title: 'LunaKraft',
         theme: ThemeData(
-          brightness: Brightness.light,
-          useMaterial3: false,
-        ),
-        darkTheme: ThemeData(
           brightness: Brightness.dark,
           useMaterial3: false,
         ),
-        themeMode: _themeMode,
-        home: SplashScreen(onAnimationComplete: hideSplashScreen),
+        debugShowCheckedModeBanner: false,
+        home: SplashScreen(
+          onAnimationComplete: hideSplashScreen,
+        ),
       );
     }
 
     return MaterialApp.router(
-      debugShowCheckedModeBanner: false,
       title: 'LunaKraft',
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
@@ -224,36 +248,17 @@ class _MyAppState extends State<MyApp> {
       supportedLocales: const [Locale('en', '')],
       theme: ThemeData(
         brightness: Brightness.light,
-        scrollbarTheme: ScrollbarThemeData(
-          thumbColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.dragged)) {
-              return Color(4293257195);
-            }
-            if (states.contains(MaterialState.hovered)) {
-              return Color(4293257195);
-            }
-            return Color(4293257195);
-          }),
-        ),
         useMaterial3: false,
       ),
       darkTheme: ThemeData(
         brightness: Brightness.dark,
-        scrollbarTheme: ScrollbarThemeData(
-          thumbColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.dragged)) {
-              return Color(4281414722);
-            }
-            if (states.contains(MaterialState.hovered)) {
-              return Color(4281414722);
-            }
-            return Color(4281414722);
-          }),
-        ),
         useMaterial3: false,
       ),
       themeMode: _themeMode,
       routerConfig: _router,
+      builder: (context, child) {
+        return ConnectivityBanner(child: child!);
+      },
     );
   }
 }
@@ -312,5 +317,88 @@ Future<String?> _getDeviceInfo() async {
   } catch (e) {
     print('Error getting device info: $e');
     return null;
+  }
+}
+
+class ConnectivityBanner extends StatefulWidget {
+  final Widget child;
+  const ConnectivityBanner({Key? key, required this.child}) : super(key: key);
+
+  @override
+  State<ConnectivityBanner> createState() => _ConnectivityBannerState();
+}
+
+class _ConnectivityBannerState extends State<ConnectivityBanner> {
+  late StreamSubscription<ConnectivityResult> _subscription;
+  bool _isOffline = false;
+  Timer? _snackbarTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription = Connectivity().onConnectivityChanged.listen((result) {
+      final offline = result == ConnectivityResult.none;
+      if (offline != _isOffline) {
+        setState(() {
+          _isOffline = offline;
+        });
+        if (offline) {
+          _showNoInternetSnackbar();
+        }
+      } else if (!offline) {
+        // If connection is restored, hide snackbar
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    _snackbarTimer?.cancel();
+    super.dispose();
+  }
+
+  void _showNoInternetSnackbar() {
+    // Exclude Add Post pages
+    final modalRoute = ModalRoute.of(context);
+    final settingsName = modalRoute?.settings.name ?? '';
+    if (settingsName.contains('AddPost1') ||
+        settingsName.contains('AddPost2') ||
+        settingsName.contains('AddPost4')) {
+      return;
+    }
+    // Show a modern snackbar at the bottom
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.wifi_off, color: Colors.white),
+            SizedBox(width: 12),
+            Expanded(child: Text('No internet connection')),
+          ],
+        ),
+        backgroundColor: Colors.redAccent.shade200,
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          bottom: 24,
+          left: 16,
+          right: 16,
+        ),
+        duration: Duration(seconds: 3),
+      ),
+    );
+    // Re-show if still offline after duration
+    _snackbarTimer?.cancel();
+    _snackbarTimer = Timer(Duration(seconds: 3), () {
+      if (_isOffline && mounted) {
+        _showNoInternetSnackbar();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }

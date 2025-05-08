@@ -154,6 +154,25 @@ class _OnboardingPageState extends State<OnboardingPage>
         fit: BoxFit.contain,
         width: double.infinity,
         height: double.infinity,
+        options: LottieOptions(enableMergePaths: true),
+        frameRate: FrameRate.max,
+        // Add error builder to handle JSON parsing errors
+        errorBuilder: (context, exception, stackTrace) {
+          // Show a fallback widget when there's an error loading the animation
+          return Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.monetization_on,
+              size: 80,
+              color: Colors.white,
+            ),
+          );
+        },
       ),
     ).animate().fade(duration: 800.ms);
   }
@@ -162,6 +181,8 @@ class _OnboardingPageState extends State<OnboardingPage>
     switch (widget.pageIndex) {
       case 2: // Social Connections (index 2)
         return _buildSocialNetworkAnimation();
+      case 4: // LunaCoins (index 4)
+        return _buildLunaCoinsAnimation();
       case 5: // Zen Mode (index 5)
         return _buildSoundWaveAnimation();
       default:
@@ -329,6 +350,111 @@ class _OnboardingPageState extends State<OnboardingPage>
   Widget _buildImageSequence() {
     // Placeholder for image sequence animation
     return Container();
+  }
+
+  Widget _buildLunaCoinsAnimation() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final centerX = constraints.maxWidth / 2;
+
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            // Main centered coin with animations
+            Center(
+              child: TweenAnimationBuilder(
+                  duration: const Duration(milliseconds: 2000),
+                  tween: Tween<double>(begin: -5, end: 5),
+                  curve: Curves.easeInOut,
+                  builder: (context, value, child) {
+                    return Transform.translate(
+                      offset: Offset(0, value),
+                      child: Container(
+                        width: 200,
+                        height: 200,
+                        child: Image.asset(
+                          'assets/images/lunacoin.png',
+                          fit: BoxFit.contain,
+                        ),
+                      )
+                          .animate(
+                            onPlay: (controller) =>
+                                controller.repeat(reverse: true),
+                          )
+                          .scale(
+                            begin: const Offset(0.9, 0.9),
+                            end: const Offset(1.05, 1.05),
+                            duration: 1500.ms,
+                            curve: Curves.easeInOut,
+                          )
+                          .rotate(
+                            begin: -0.05,
+                            end: 0.05,
+                            duration: 2000.ms,
+                            curve: Curves.easeInOut,
+                          )
+                          .shimmer(
+                            duration: 2500.ms,
+                            color: Colors.yellow.withOpacity(0.3),
+                          ),
+                    );
+                  }),
+            ),
+
+            // Small coin 1
+            Positioned(
+              top: 80,
+              left: centerX - 80,
+              child: _buildSmallCoin(0),
+            ),
+
+            // Small coin 2
+            Positioned(
+              top: 100,
+              right: centerX - 70,
+              child: _buildSmallCoin(400),
+            ),
+
+            // Small coin 3
+            Positioned(
+              top: 60,
+              right: centerX - 130,
+              child: _buildSmallCoin(800),
+            ),
+          ],
+        );
+      }),
+    ).animate().fadeIn(duration: 800.ms);
+  }
+
+  Widget _buildSmallCoin(int delayMs) {
+    return TweenAnimationBuilder(
+        duration: const Duration(milliseconds: 1500),
+        tween: Tween<double>(begin: 0, end: -40),
+        curve: Curves.easeOut,
+        builder: (context, value, child) {
+          return Transform.translate(
+            offset: Offset(0, value),
+            child: TweenAnimationBuilder(
+                duration: const Duration(milliseconds: 1500),
+                tween: Tween<double>(begin: 1.0, end: 0.0),
+                curve: Curves.easeIn,
+                builder: (context, opacity, child) {
+                  return Opacity(
+                    opacity: opacity,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      child: Image.asset(
+                        'assets/images/lunacoin.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  );
+                }),
+          );
+        });
   }
 }
 

@@ -7,11 +7,58 @@ import '/services/zen_audio_service.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/utils/animation_helpers.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'dart:math' as math;
+
+// Add a fallback AnimationGuard class right after imports
+import 'dart:math' as math;
+
+// Fallback AnimationGuard in case the import fails
+class _FallbackAnimationGuard {
+  final AnimationController _controller;
+  final bool Function() _isMountedCallback;
+  bool _isDisposed = false;
+
+  _FallbackAnimationGuard(this._controller, this._isMountedCallback);
+
+  void forward() {
+    if (!_isDisposed && _isMountedCallback() && !_controller.isAnimating) {
+      try {
+        _controller.forward();
+      } catch (e) {
+        print('Error in animation: $e');
+      }
+    }
+  }
+
+  void reverse() {
+    if (!_isDisposed && _isMountedCallback() && _controller.isAnimating) {
+      try {
+        _controller.reverse();
+      } catch (e) {
+        print('Error in animation: $e');
+      }
+    }
+  }
+
+  void stop() {
+    if (!_isDisposed && _isMountedCallback() && _controller.isAnimating) {
+      try {
+        _controller.stop();
+      } catch (e) {
+        print('Error in animation: $e');
+      }
+    }
+  }
+
+  void markAsDisposed() {
+    _isDisposed = true;
+  }
+}
 
 class ZenModePage extends StatefulWidget {
   const ZenModePage({Key? key}) : super(key: key);
@@ -41,6 +88,8 @@ class _AnimatedSoundCardState extends State<AnimatedSoundCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+  late dynamic _animationGuard;
+  bool _isMounted = true;
 
   @override
   void initState() {
@@ -52,10 +101,21 @@ class _AnimatedSoundCardState extends State<AnimatedSoundCard>
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+
+    // Try to use AnimationGuard, fall back to our internal version if it fails
+    try {
+      _animationGuard = AnimationGuard(_animationController, () => _isMounted);
+    } catch (e) {
+      print('Using fallback animation guard: $e');
+      _animationGuard =
+          _FallbackAnimationGuard(_animationController, () => _isMounted);
+    }
   }
 
   @override
   void dispose() {
+    _isMounted = false;
+    _animationGuard.markAsDisposed();
     _animationController.dispose();
     super.dispose();
   }
@@ -64,9 +124,9 @@ class _AnimatedSoundCardState extends State<AnimatedSoundCard>
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
-      onTapDown: (_) => _animationController.forward(),
-      onTapUp: (_) => _animationController.reverse(),
-      onTapCancel: () => _animationController.reverse(),
+      onTapDown: (_) => _animationGuard.forward(),
+      onTapUp: (_) => _animationGuard.reverse(),
+      onTapCancel: () => _animationGuard.reverse(),
       child: AnimatedScale(
         scale: widget.isActive ? 1.05 : 1.0,
         duration: Duration(milliseconds: 300),
@@ -91,6 +151,8 @@ class RippleAnimation extends StatefulWidget {
 class _RippleAnimationState extends State<RippleAnimation>
     with SingleTickerProviderStateMixin {
   late AnimationController _rippleController;
+  late dynamic _animationGuard;
+  bool _isMounted = true;
 
   @override
   void initState() {
@@ -100,8 +162,17 @@ class _RippleAnimationState extends State<RippleAnimation>
       duration: Duration(milliseconds: 1500),
     );
 
+    // Try to use AnimationGuard, fall back to our internal version if it fails
+    try {
+      _animationGuard = AnimationGuard(_rippleController, () => _isMounted);
+    } catch (e) {
+      print('Using fallback animation guard: $e');
+      _animationGuard =
+          _FallbackAnimationGuard(_rippleController, () => _isMounted);
+    }
+
     if (widget.isActive) {
-      _rippleController.repeat();
+      _animationGuard.forward();
     }
   }
 
@@ -111,12 +182,14 @@ class _RippleAnimationState extends State<RippleAnimation>
     if (widget.isActive && !oldWidget.isActive) {
       _rippleController.repeat();
     } else if (!widget.isActive && oldWidget.isActive) {
-      _rippleController.stop();
+      _animationGuard.stop();
     }
   }
 
   @override
   void dispose() {
+    _isMounted = false;
+    _animationGuard.markAsDisposed();
     _rippleController.dispose();
     super.dispose();
   }
@@ -189,13 +262,23 @@ class DelayedAnimation extends StatefulWidget {
 class _DelayedAnimationState extends State<DelayedAnimation>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late dynamic _animationGuard;
   late Animation<double> _opacityAnimation;
   late Animation<Offset> _slideAnimation;
+  bool _isMounted = true;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: widget.duration);
+
+    // Try to use AnimationGuard, fall back to our internal version if it fails
+    try {
+      _animationGuard = AnimationGuard(_controller, () => _isMounted);
+    } catch (e) {
+      print('Using fallback animation guard: $e');
+      _animationGuard = _FallbackAnimationGuard(_controller, () => _isMounted);
+    }
 
     _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
@@ -215,11 +298,11 @@ class _DelayedAnimationState extends State<DelayedAnimation>
     );
 
     if (widget.delay == 0) {
-      _controller.forward();
+      _animationGuard.forward();
     } else {
       Future.delayed(Duration(milliseconds: widget.delay), () {
-        if (mounted) {
-          _controller.forward();
+        if (_isMounted) {
+          _animationGuard.forward();
         }
       });
     }
@@ -227,6 +310,8 @@ class _DelayedAnimationState extends State<DelayedAnimation>
 
   @override
   void dispose() {
+    _isMounted = false;
+    _animationGuard.markAsDisposed();
     _controller.dispose();
     super.dispose();
   }
@@ -305,6 +390,11 @@ class _ZenModePageState extends State<ZenModePage>
   late AnimationController _timerRippleController;
   bool _isDisposed = false;
 
+  // Debug helper method
+  void _debugLog(String message) {
+    print('🧘 ZenMode: $message');
+  }
+
   // Ensure UI is in sync with audio service
   void _syncUIWithAudioService() {
     if (mounted && !_isDisposed) {
@@ -323,94 +413,138 @@ class _ZenModePageState extends State<ZenModePage>
   @override
   void initState() {
     super.initState();
+    _debugLog('Initializing ZenModePage');
 
     // Initialize services
-    final appState = Provider.of<AppState>(context, listen: false);
-    zenAudioService = appState.zenAudioService;
-    zenAudioService.initialize();
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      zenAudioService = appState.zenAudioService;
+      _debugLog('Got ZenAudioService reference');
 
-    // Add listener to update UI when service state changes
-    zenAudioService.addListener(_onZenServiceChanged);
+      zenAudioService.initialize();
+      _debugLog('ZenAudioService initialized');
 
-    // Setup pulse animation for play button
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: Duration(seconds: 2),
-    )..repeat(reverse: true);
-
-    // Setup title fade animation
-    _titleFadeController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 800),
-    )..forward();
-
-    // Setup title shimmer animation
-    _titleShimmerController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 2200),
-    );
-
-    Future.delayed(Duration(milliseconds: 4000), () {
-      if (mounted) {
-        _titleShimmerController.repeat();
-      }
-    });
-
-    // Setup timer pulse animation
-    _timerPulseController = AnimationController(
-      vsync: this,
-      duration: Duration(seconds: 1),
-    )..repeat(reverse: true);
-
-    // Setup Lottie animation controller - don't automatically start repeating
-    _lottieController = AnimationController(
-      vsync: this,
-      duration: Duration(seconds: 10),
-    );
-
-    // Start animation only if widget is still mounted
-    if (mounted) {
-      _lottieController?.repeat();
+      // Add listener to update UI when service state changes
+      zenAudioService.addListener(_onZenServiceChanged);
+      _debugLog('Added service change listener');
+    } catch (e) {
+      print('❌ Error initializing zen audio service: $e');
     }
 
-    // Setup menu animation controller
-    _menuController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 300),
-    );
+    try {
+      _debugLog('Setting up animation controllers');
+      // Setup pulse animation for play button
+      _pulseController = AnimationController(
+        vsync: this,
+        duration: Duration(seconds: 2),
+      );
+      _pulseController.repeat(reverse: true);
+      _debugLog('Pulse controller initialized');
 
-    // Setup page transition controller
-    _pageTransitionController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 500),
-    )..forward();
+      // Setup title fade animation
+      _titleFadeController = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: 800),
+      );
+      _titleFadeController.forward();
+      _debugLog('Title fade controller initialized');
 
-    // Setup rotation controller for circular menu
-    _rotationController = AnimationController(
-      vsync: this,
-      duration: Duration(seconds: 30),
-    )..repeat();
+      // Setup title shimmer animation
+      _titleShimmerController = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: 2200),
+      );
+      _debugLog('Title shimmer controller initialized');
 
-    // Setup timer ripple animation
-    _timerRippleController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 1500),
-    )..repeat();
+      Future.delayed(Duration(milliseconds: 4000), () {
+        if (mounted && !_isDisposed) {
+          try {
+            _titleShimmerController.repeat();
+            _debugLog('Title shimmer animation started');
+          } catch (e) {
+            print('❌ Error starting title shimmer: $e');
+          }
+        }
+      });
 
-    _isInitialized = true;
+      // Setup timer pulse animation
+      _timerPulseController = AnimationController(
+        vsync: this,
+        duration: Duration(seconds: 1),
+      );
+      _timerPulseController.repeat(reverse: true);
+      _debugLog('Timer pulse controller initialized');
+
+      // Setup Lottie animation controller with robust error handling
+      try {
+        _lottieController = AnimationController(
+          vsync: this,
+          duration: Duration(seconds: 10),
+        );
+        _debugLog('Lottie controller initialized');
+
+        if (mounted && !_isDisposed) {
+          try {
+            _lottieController?.repeat();
+            _debugLog('Lottie animation started');
+          } catch (e) {
+            print('❌ Error starting Lottie animation: $e');
+          }
+        }
+      } catch (e) {
+        print('❌ Error creating Lottie controller: $e');
+        _lottieController = null;
+      }
+
+      // Setup menu animation controller
+      _menuController = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: 300),
+      );
+      _debugLog('Menu controller initialized');
+
+      // Setup page transition controller
+      _pageTransitionController = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: 500),
+      );
+      _pageTransitionController.forward();
+      _debugLog('Page transition controller initialized');
+
+      // Setup rotation controller for circular menu
+      _rotationController = AnimationController(
+        vsync: this,
+        duration: Duration(seconds: 30),
+      );
+      _rotationController.repeat();
+      _debugLog('Rotation controller initialized');
+
+      // Setup timer ripple animation
+      _timerRippleController = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: 1500),
+      );
+      _timerRippleController.repeat();
+      _debugLog('Timer ripple controller initialized');
+
+      _isInitialized = true;
+      _debugLog('All animation controllers initialized successfully');
+    } catch (e) {
+      print('❌ Error initializing animation controllers: $e');
+      _isInitialized = false;
+    }
 
     // Update UI when returning to the page
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (mounted && !_isDisposed) {
+        _debugLog('Post-frame callback executing');
         // Immediately sync UI with service state
         _syncUIWithAudioService();
 
         setState(() {
           _selectedTimerMinutes = zenAudioService.timerDurationMinutes;
           _updateBackgroundImage();
-          print(
-            'ZenMode initialized: isPlaying=$_isPlaying, service.isPlaying=${zenAudioService.isPlaying}',
-          );
+          _debugLog('UI state updated with service state');
         });
       }
     });
@@ -437,39 +571,93 @@ class _ZenModePageState extends State<ZenModePage>
     // Check if we're still able to access zenAudioService
     if (zenAudioService != null) {
       // Remove listener using stored reference
-      zenAudioService.removeListener(_onZenServiceChanged);
+      try {
+        zenAudioService.removeListener(_onZenServiceChanged);
+      } catch (e) {
+        print('Error removing audio service listener: $e');
+      }
     }
 
-    // Stop animations before disposing to prevent assertions
-    _pulseController.stop();
-    _titleFadeController.stop();
-    _titleShimmerController.stop();
-    _timerRippleController.stop();
-    _timerPulseController.stop();
-    if (_lottieController != null) {
-      _lottieController!.stop();
+    // Safely dispose animation controllers
+    try {
+      _presetNameController.dispose();
+    } catch (e) {
+      print('Error disposing presetNameController: $e');
     }
-    _menuController.stop();
-    _pageTransitionController.stop();
-    _rotationController.stop();
 
-    // Cancel the countdown timer if it exists
-    _timerCountdown?.cancel();
-
-    // Now dispose of controllers
-    _presetNameController.dispose();
-    _pulseController.dispose();
-    _titleFadeController.dispose();
-    _titleShimmerController.dispose();
-    _timerRippleController.dispose();
-    _timerPulseController.dispose();
-    if (_lottieController != null) {
-      _lottieController!.dispose();
-      _lottieController = null; // Set to null after disposal
+    try {
+      if (_pulseController != null) {
+        _pulseController.dispose();
+      }
+    } catch (e) {
+      print('Error disposing pulseController: $e');
     }
-    _menuController.dispose();
-    _pageTransitionController.dispose();
-    _rotationController.dispose();
+
+    try {
+      if (_titleFadeController != null) {
+        _titleFadeController.dispose();
+      }
+    } catch (e) {
+      print('Error disposing titleFadeController: $e');
+    }
+
+    try {
+      if (_titleShimmerController != null) {
+        _titleShimmerController.dispose();
+      }
+    } catch (e) {
+      print('Error disposing titleShimmerController: $e');
+    }
+
+    try {
+      if (_timerRippleController != null) {
+        _timerRippleController.dispose();
+      }
+    } catch (e) {
+      print('Error disposing timerRippleController: $e');
+    }
+
+    try {
+      if (_timerPulseController != null) {
+        _timerPulseController.dispose();
+      }
+    } catch (e) {
+      print('Error disposing timerPulseController: $e');
+    }
+
+    try {
+      if (_lottieController != null) {
+        _lottieController!.stop();
+        _lottieController!.dispose();
+        _lottieController = null;
+      }
+    } catch (e) {
+      print('Error disposing lottieController: $e');
+    }
+
+    try {
+      if (_menuController != null) {
+        _menuController.dispose();
+      }
+    } catch (e) {
+      print('Error disposing menuController: $e');
+    }
+
+    try {
+      if (_pageTransitionController != null) {
+        _pageTransitionController.dispose();
+      }
+    } catch (e) {
+      print('Error disposing pageTransitionController: $e');
+    }
+
+    try {
+      if (_rotationController != null) {
+        _rotationController.dispose();
+      }
+    } catch (e) {
+      print('Error disposing rotationController: $e');
+    }
 
     super.dispose();
   }
@@ -546,11 +734,13 @@ class _ZenModePageState extends State<ZenModePage>
     print('TOGGLING SOUND: $soundName');
 
     // Set loading state to give immediate feedback
-    setState(() {});
+    if (mounted && !_isDisposed) {
+      setState(() {});
+    }
 
     // Toggle this sound's state and update background
     zenAudioService.toggleSound(soundName).then((_) {
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         print(
           'TOGGLED SOUND: $soundName, isPlaying=${zenAudioService.isPlaying}',
         );
@@ -564,7 +754,7 @@ class _ZenModePageState extends State<ZenModePage>
     }).catchError((error) {
       print("Error toggling sound: $error");
       // Force refresh UI state to keep in sync with service
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         setState(() {
           _isPlaying = zenAudioService.isPlaying;
         });
@@ -1057,7 +1247,15 @@ class _ZenModePageState extends State<ZenModePage>
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, _) {
-        final sounds = zenAudioService.availableSounds;
+        // Get sounds safely
+        final List<ZenAudioSound> sounds = [];
+        try {
+          if (zenAudioService != null) {
+            sounds.addAll(zenAudioService.availableSounds);
+          }
+        } catch (e) {
+          print('Error getting sounds: $e');
+        }
 
         return Scaffold(
           key: scaffoldKey,
@@ -1167,7 +1365,7 @@ class _ZenModePageState extends State<ZenModePage>
           ),
           body: Stack(
             children: [
-              // Lottie animation background
+              // Lottie animation background with proper null handling
               Positioned.fill(
                 child: ColorFiltered(
                   colorFilter: ColorFilter.mode(
@@ -1177,8 +1375,25 @@ class _ZenModePageState extends State<ZenModePage>
                   child: _isInitialized && _lottieController != null
                       ? Lottie.asset(
                           'assets/jsons/boat.json',
-                          controller: _lottieController!,
+                          controller: _lottieController,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('⚠️ Lottie error: $error');
+                            print('⚠️ Lottie stacktrace: $stackTrace');
+                            return Container(
+                              color: Colors.black54,
+                              child: Center(
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.white30,
+                                  size: 64,
+                                ),
+                              ),
+                            );
+                          },
+                          onWarning: (warning) {
+                            print('⚠️ Lottie warning: $warning');
+                          },
                         )
                       : Container(color: Colors.black),
                 ),
