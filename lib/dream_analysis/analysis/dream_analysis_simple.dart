@@ -869,12 +869,28 @@ class _DreamAnalysisSimpleState extends State<DreamAnalysisSimple> {
     // Generate emotional insights based on actual emotions in dreams
     final Map<String, dynamic> emotionalInsights = {};
 
+    // Filter out emotions that are actually tags or irrelevant text
     final List<String> primaryEmotions = dreams
         .map((d) => d.emotion)
-        .where((e) => e != 'Unknown' && e.isNotEmpty)
-        .toSet()
+        .expand((e) => e.split(
+            ',')) // Split by comma in case multiple emotions are combined
+        .map((e) => e.trim()) // Trim whitespace
+        .where((e) =>
+                e != 'Unknown' &&
+                e.isNotEmpty &&
+                !e.startsWith('#') && // Filter out hashtags
+                !e.startsWith('@') && // Filter out mentions
+                !e.contains('Travel') && // Remove specific non-emotion tags
+                !e.contains('Other') &&
+                !e.contains('droppa') &&
+                !e.contains('new') &&
+                RegExp(r'^[A-Za-z ]+$')
+                    .hasMatch(e) // Only allow letters and spaces
+            )
+        .toSet() // Remove duplicates
         .toList();
 
+    // Add valid emotions to insights
     if (primaryEmotions.isNotEmpty) {
       emotionalInsights['Primary Emotions'] = primaryEmotions;
     }

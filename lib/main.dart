@@ -196,7 +196,7 @@ class _MyAppState extends State<MyApp> {
     _appStateNotifier.stopShowingSplashImage();
 
     // Auto-hide splash screen after a timeout (as a fallback)
-    Timer(Duration(seconds: 6), () {
+    Timer(Duration(seconds: 5), () {
       if (mounted) {
         setState(() {
           _showSplashScreen = false;

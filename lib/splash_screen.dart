@@ -25,33 +25,70 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _fadeInController;
   late AnimationController _scaleController;
   late AnimationController _glowController;
+  late AnimationController _fadeOutController;
+  late AnimationController _logoAnimController;
 
   // Animation values
   late Animation<double> _fadeIn;
   late Animation<double> _scale;
   late Animation<double> _glow;
+  late Animation<double> _fadeOut;
+  late Animation<double> _logoScale;
+  late Animation<double> _logoOpacity;
+
+  // Stars for background
+  final List<_Star> _stars = [];
+  late AnimationController _starsController;
 
   @override
   void initState() {
     super.initState();
 
+    // Generate stars for background
+    final random = math.Random(42);
+    for (int i = 0; i < 100; i++) {
+      _stars.add(_Star(
+        x: random.nextDouble(),
+        y: random.nextDouble(),
+        size: random.nextDouble() * 2.0 + 0.5,
+        opacity: random.nextDouble() * 0.6 + 0.3,
+        twinkleSpeed: random.nextDouble() * 0.5 + 0.5,
+      ));
+    }
+
     // Set system UI overlay style to immersive for splash screen
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+
+    // Initialize stars animation controller
+    _starsController = AnimationController(
+      vsync: this,
+      duration: const Duration(minutes: 2),
+    )..repeat();
 
     // Initialize controllers
     _fadeInController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 1800),
     );
 
     _scaleController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2500),
+      duration: const Duration(milliseconds: 2200),
     );
 
     _glowController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3000),
+      duration: const Duration(milliseconds: 2800),
+    );
+
+    _fadeOutController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _logoAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
     );
 
     // Create animations
@@ -74,13 +111,44 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
+    _fadeOut = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _fadeOutController,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    _logoScale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.8, end: 1.1),
+        weight: 40.0,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.1, end: 1.0),
+        weight: 60.0,
+      ),
+    ]).animate(
+      CurvedAnimation(
+        parent: _logoAnimController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _logoAnimController,
+        curve: Interval(0.0, 0.5, curve: Curves.easeIn),
+      ),
+    );
+
     // Run animation sequence
     _runAnimationSequence();
   }
 
   Future<void> _runAnimationSequence() async {
-    // Start with fade in
+    // Start with fade in and logo animation
     _fadeInController.forward();
+    _logoAnimController.forward();
     await Future.delayed(Duration(milliseconds: 800));
 
     // Start subtle scaling
@@ -91,9 +159,9 @@ class _SplashScreenState extends State<SplashScreen>
     _glowController.repeat(reverse: true);
     await Future.delayed(Duration(milliseconds: 2000));
 
-    // Fade out
-    _fadeInController.reverse();
-    await Future.delayed(Duration(milliseconds: 1000));
+    // Fade out everything
+    _fadeOutController.forward();
+    await _fadeOutController.forward().orCancel;
 
     // Return to normal UI mode and complete
     if (mounted) {
@@ -107,78 +175,155 @@ class _SplashScreenState extends State<SplashScreen>
     _fadeInController.dispose();
     _scaleController.dispose();
     _glowController.dispose();
+    _fadeOutController.dispose();
+    _logoAnimController.dispose();
+    _starsController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Subtle gradient background
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.black,
-                gradient: RadialGradient(
-                  center: Alignment(0.0, 0.2),
-                  radius: 0.8,
-                  colors: [
-                    Color(0xFF121212),
-                    Colors.black,
-                  ],
-                  stops: [0.0, 1.0],
-                ),
-              ),
-            ),
-
-            // Centered logo text with animations
-            Center(
-              child: AnimatedBuilder(
-                animation: Listenable.merge([_fadeIn, _scale, _glow]),
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _fadeIn.value,
-                    child: Transform.scale(
-                      scale: _scale.value,
-                      child: ShaderMask(
-                        blendMode: BlendMode.srcIn,
-                        shaderCallback: (bounds) => LinearGradient(
-                          colors: [
-                            Color(0xFFFFD700), // Gold
-                            Color(0xFFF5DEB3), // Wheat
-                            Color(0xFFDAA520), // GoldenRod
-                          ],
-                          stops: [0.0, 0.5, 1.0],
-                        ).createShader(bounds),
-                        child: Text(
-                          'LunaKraft',
-                          style: GoogleFonts.montserrat(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.5,
-                            shadows: [
-                              Shadow(
-                                color:
-                                    Color(0xFFFFD700).withOpacity(_glow.value),
-                                blurRadius: 15.0,
-                                offset: Offset(0, 0),
-                              ),
-                            ],
-                          ),
+    return AnimatedBuilder(
+      animation: _fadeOutController,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _fadeOut.value,
+          child: Material(
+            color: Colors.black,
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              body: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Starry background
+                  AnimatedBuilder(
+                    animation: _starsController,
+                    builder: (context, child) {
+                      return CustomPaint(
+                        painter: _StarryNightPainter(
+                          stars: _stars,
+                          animationValue: _starsController.value,
+                          starOpacity: _fadeIn.value,
                         ),
+                      );
+                    },
+                  ),
+
+                  // Subtle space gradient
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment(0.0, 0.2),
+                        radius: 1.2,
+                        colors: [
+                          Color(0xFF151530),
+                          Colors.black,
+                        ],
+                        stops: [0.0, 1.0],
                       ),
                     ),
-                  );
-                },
+                  ),
+
+                  // Centered content with animations
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Logo with animations
+                        AnimatedBuilder(
+                          animation:
+                              Listenable.merge([_logoOpacity, _logoScale]),
+                          builder: (context, child) {
+                            return Opacity(
+                              opacity: _logoOpacity.value,
+                              child: Transform.scale(
+                                scale: _logoScale.value,
+                                child: Image.asset(
+                                  'assets/images/translogo.png',
+                                  width: 150,
+                                  height: 150,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                        SizedBox(height: 24),
+
+                        // App name text with animations
+                        AnimatedBuilder(
+                          animation: Listenable.merge([_fadeIn, _scale, _glow]),
+                          builder: (context, child) {
+                            return Opacity(
+                              opacity: _fadeIn.value,
+                              child: Transform.scale(
+                                scale: _scale.value,
+                                child: ShaderMask(
+                                  blendMode: BlendMode.srcIn,
+                                  shaderCallback: (bounds) => LinearGradient(
+                                    colors: [
+                                      Color(0xFFFFD700), // Gold
+                                      Color(0xFFF5DEB3), // Wheat
+                                      Color(0xFFDAA520), // GoldenRod
+                                    ],
+                                    stops: [0.0, 0.5, 1.0],
+                                  ).createShader(bounds),
+                                  child: Text(
+                                    'LunaKraft',
+                                    style: GoogleFonts.montserrat(
+                                      fontSize: 48,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 1.5,
+                                      shadows: [
+                                        Shadow(
+                                          color: Color(0xFFFFD700)
+                                              .withOpacity(_glow.value),
+                                          blurRadius: 15.0,
+                                          offset: Offset(0, 0),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Subtle shooting stars
+                  AnimatedBuilder(
+                    animation: _starsController,
+                    builder: (context, child) {
+                      return CustomPaint(
+                        painter: _ShootingStarPainter(
+                          animationValue: _starsController.value,
+                          starOpacity: _fadeIn.value,
+                        ),
+                      );
+                    },
+                  ),
+
+                  // Shine effect
+                  AnimatedBuilder(
+                    animation: _starsController,
+                    builder: (context, child) {
+                      return CustomPaint(
+                        painter: _ShineEffectPainter(
+                          animationValue: _starsController.value,
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

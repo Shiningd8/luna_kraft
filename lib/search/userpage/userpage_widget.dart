@@ -62,6 +62,114 @@ class _UserpageWidgetState extends State<UserpageWidget> {
     return user.photoUrl ?? '';
   }
 
+  bool hasRealProfileImage(UserRecord user) {
+    final photoUrl = user.photoUrl ?? '';
+    // Only consider it NOT a real image if it's empty or explicitly contains ui-avatars.com
+    return photoUrl.isNotEmpty && !photoUrl.contains('ui-avatars.com');
+  }
+
+  Widget buildProfileImageView(BuildContext context, UserRecord user) {
+    final photoUrl = getProfileImageUrl(user);
+    final hasImage = hasRealProfileImage(user);
+
+    if (hasImage) {
+      return FlutterFlowExpandedImageView(
+        image: Image.network(
+          photoUrl,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildInitialAvatar(user);
+          },
+        ),
+        allowRotation: false,
+        tag: valueOrDefault<String>(
+          user.photoUrl,
+          'default_profile_image',
+        ),
+        useHeroAnimation: true,
+      );
+    } else {
+      return Material(
+        color: Colors.black,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Center(
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: FlutterFlowTheme.of(context).primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 4,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Hero(
+                      tag: valueOrDefault<String>(
+                        user.photoUrl,
+                        'default_profile_image',
+                      ),
+                      child: Text(
+                        (user.displayName ?? '').isNotEmpty
+                            ? (user.displayName ?? '')[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 96,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                left: 8,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildInitialAvatar(UserRecord user) {
+    return Container(
+      color: FlutterFlowTheme.of(context).primary,
+      child: Center(
+        child: Text(
+          (user.displayName ?? '').isNotEmpty
+              ? (user.displayName ?? '')[0].toUpperCase()
+              : '?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 96,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.profileparameter == null) {
@@ -184,9 +292,11 @@ class _UserpageWidgetState extends State<UserpageWidget> {
                   filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: FlutterFlowTheme.of(context)
-                          .primaryBackground
-                          .withOpacity(0.4),
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.transparent
+                          : FlutterFlowTheme.of(context)
+                              .primaryBackground
+                              .withOpacity(0.4),
                       border: Border(
                         bottom: BorderSide(
                           color: FlutterFlowTheme.of(context)
@@ -328,46 +438,8 @@ class _UserpageWidgetState extends State<UserpageWidget> {
                                         context,
                                         PageTransition(
                                           type: PageTransitionType.fade,
-                                          child: FlutterFlowExpandedImageView(
-                                            image: Image.network(
-                                              getProfileImageUrl(
-                                                  userpageUserRecord),
-                                              fit: BoxFit.contain,
-                                              errorBuilder:
-                                                  (context, error, stackTrace) {
-                                                return Container(
-                                                  color: FlutterFlowTheme.of(
-                                                          context)
-                                                      .primary,
-                                                  child: Center(
-                                                    child: Text(
-                                                      (userpageUserRecord
-                                                                      .displayName ??
-                                                                  '')
-                                                              .isNotEmpty
-                                                          ? (userpageUserRecord
-                                                                      .displayName ??
-                                                                  '')[0]
-                                                              .toUpperCase()
-                                                          : '?',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 48,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                            allowRotation: false,
-                                            tag: valueOrDefault<String>(
-                                              userpageUserRecord.photoUrl,
-                                              'default_profile_image',
-                                            ),
-                                            useHeroAnimation: true,
-                                          ),
+                                          child: buildProfileImageView(
+                                              context, userpageUserRecord),
                                         ),
                                       );
                                     },

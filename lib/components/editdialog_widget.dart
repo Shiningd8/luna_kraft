@@ -10,6 +10,8 @@ export 'editdialog_model.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:luna_kraft/flutter_flow/flutter_flow_animations.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class EditdialogWidget extends StatefulWidget {
   const EditdialogWidget({
@@ -217,10 +219,58 @@ class _EditdialogWidgetState extends State<EditdialogWidget> {
     }
 
     try {
-      // Delete the document
+      // Debug log
       print('Attempting to delete post with ID: ${widget.editpostref.id}');
+
+      // First try with Cloud Function
+      try {
+        print('Trying to delete post using Cloud Function');
+        final callable = FirebaseFunctions.instance.httpsCallable('deletePost');
+        final result = await callable.call({
+          'postId': widget.editpostref.id,
+        });
+
+        print('Cloud Function result: ${result.data}');
+
+        // Close the bottom sheet
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Dream deleted successfully'),
+              backgroundColor: FlutterFlowTheme.of(context).primary,
+            ),
+          );
+        }
+        return;
+      } catch (cloudFunctionError) {
+        print('Cloud Function error: $cloudFunctionError');
+        print('Falling back to direct deletion...');
+      }
+
+      // Fallback to direct deletion
+      // Get the post document
+      final postDoc = await widget.editpostref.get();
+      final postData = postDoc.data() as Map<String, dynamic>?;
+
+      if (postData == null) {
+        throw Exception('Post data not found');
+      }
+
+      // Check if current user is the owner
+      final posterId = postData['poster'] is DocumentReference
+          ? (postData['poster'] as DocumentReference).id
+          : '';
+      final userrefId = postData['userref'] is DocumentReference
+          ? (postData['userref'] as DocumentReference).id
+          : '';
+
+      print('Current user: $currentUserUid, Post owner: $posterId/$userrefId');
+
+      // Try to delete the post directly
+      print('Attempting direct post deletion');
       await widget.editpostref.delete();
-      print('Post deleted successfully');
+      print('Post deleted successfully with direct deletion');
 
       // Close the bottom sheet
       if (mounted) {
@@ -235,11 +285,48 @@ class _EditdialogWidgetState extends State<EditdialogWidget> {
         );
       }
     } catch (e) {
+      print('Delete error: $e');
+
+      if (e.toString().contains('PERMISSION_DENIED') ||
+          e.toString().contains('insufficient permissions')) {
+        print('Permission denied error - checking current user auth state...');
+        final user = FirebaseAuth.instance.currentUser;
+        print('Current user: ${user?.uid}');
+        print('Is user signed in: ${user != null}');
+
+        if (user != null) {
+          try {
+            // Try getting a fresh ID token
+            print('Refreshing Firebase ID token...');
+            await user.getIdToken(true);
+            print('Token refreshed, attempting delete again...');
+
+            // Try deletion after token refresh
+            await widget.editpostref.delete();
+            print('Post deleted successfully after token refresh');
+
+            if (mounted) {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Dream deleted successfully'),
+                  backgroundColor: FlutterFlowTheme.of(context).primary,
+                ),
+              );
+              return;
+            }
+          } catch (tokenError) {
+            print(
+                'Error refreshing token or second delete attempt: $tokenError');
+          }
+        }
+      }
+
+      // Show error message
       if (mounted) {
-        print('Delete error: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error deleting dream: $e'),
+            content: Text('Unable to delete dream. Please try again later.'),
             backgroundColor: Colors.red,
           ),
         );

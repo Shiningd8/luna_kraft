@@ -468,10 +468,12 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                                                 Icons.person,
                                                                 size: 24,
                                                                 color: !_isSearchingTags
-                                                                    ? Colors
-                                                                        .white
-                                                                    : Colors
-                                                                        .white54,
+                                                                    ? FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .primaryText
+                                                                    : FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryText,
                                                               ),
                                                               SizedBox(
                                                                   width: 8),
@@ -482,10 +484,12 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                                                 style:
                                                                     TextStyle(
                                                                   color: !_isSearchingTags
-                                                                      ? Colors
-                                                                          .white
-                                                                      : Colors
-                                                                          .white54,
+                                                                      ? FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primaryText
+                                                                      : FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .secondaryText,
                                                                   fontWeight: !_isSearchingTags
                                                                       ? FontWeight
                                                                           .w600
@@ -544,10 +548,12 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                                                 Icons.tag,
                                                                 size: 24,
                                                                 color: _isSearchingTags
-                                                                    ? Colors
-                                                                        .white
-                                                                    : Colors
-                                                                        .white54,
+                                                                    ? FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .primaryText
+                                                                    : FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryText,
                                                               ),
                                                               SizedBox(
                                                                   width: 8),
@@ -558,10 +564,12 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                                                 style:
                                                                     TextStyle(
                                                                   color: _isSearchingTags
-                                                                      ? Colors
-                                                                          .white
-                                                                      : Colors
-                                                                          .white54,
+                                                                      ? FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primaryText
+                                                                      : FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .secondaryText,
                                                                   fontWeight: _isSearchingTags
                                                                       ? FontWeight
                                                                           .w600
@@ -1506,12 +1514,14 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                       children: [
                         Text(
                           user.displayName ?? '',
-                          style:
-                              FlutterFlowTheme.of(context).titleMedium.override(
-                                    fontFamily: 'Outfit',
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
+                          style: FlutterFlowTheme.of(context)
+                              .titleMedium
+                              .override(
+                                fontFamily: 'Outfit',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: FlutterFlowTheme.of(context).primaryText,
+                              ),
                         ),
                         SizedBox(height: 2),
                         Row(
@@ -1523,7 +1533,7 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                   .override(
                                     fontFamily: 'Figtree',
                                     color: FlutterFlowTheme.of(context).primary,
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.w600,
                                   ),
                             ),
                           ],
@@ -1533,7 +1543,12 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                           children: [
                             Icon(
                               Icons.people,
-                              color: FlutterFlowTheme.of(context).secondaryText,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.light
+                                  ? FlutterFlowTheme.of(context)
+                                      .primaryText
+                                      .withOpacity(0.7)
+                                  : FlutterFlowTheme.of(context).secondaryText,
                               size: 14,
                             ),
                             SizedBox(width: 4),
@@ -1543,8 +1558,14 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                   .bodySmall
                                   .override(
                                     fontFamily: 'Figtree',
-                                    color: FlutterFlowTheme.of(context)
-                                        .secondaryText,
+                                    color: Theme.of(context).brightness ==
+                                            Brightness.light
+                                        ? FlutterFlowTheme.of(context)
+                                            .primaryText
+                                            .withOpacity(0.7)
+                                        : FlutterFlowTheme.of(context)
+                                            .secondaryText,
+                                    fontWeight: FontWeight.w500,
                                   ),
                             ),
                           ],
@@ -1806,24 +1827,24 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                       children: [
                         Text(
                           user.displayName ?? '',
-                          style:
-                              FlutterFlowTheme.of(context).titleSmall.override(
-                                    fontFamily: 'Outfit',
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                          style: FlutterFlowTheme.of(context)
+                              .bodyMedium
+                              .override(
+                                fontFamily: 'Figtree',
+                                fontWeight: FontWeight.w600,
+                                color: FlutterFlowTheme.of(context).primaryText,
+                              ),
                         ),
                         SizedBox(height: 2),
                         Row(
                           children: [
                             Text(
-                              '@${user.userName ?? ''}',
+                              '@${user.userName}',
                               style: FlutterFlowTheme.of(context)
-                                  .bodyMedium
+                                  .bodySmall
                                   .override(
                                     fontFamily: 'Figtree',
                                     color: FlutterFlowTheme.of(context).primary,
-                                    fontWeight: FontWeight.w500,
                                   ),
                             ),
                           ],

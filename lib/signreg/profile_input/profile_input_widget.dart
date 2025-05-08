@@ -1154,7 +1154,8 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
                         minimumDate: DateTime(1920),
                         initialDateTime:
                             _model.datePicked ?? DateTime(2000, 1, 1),
-                        maximumDate: DateTime.now(),
+                        maximumDate:
+                            DateTime.now().subtract(Duration(days: 365 * 13)),
                         backgroundColor:
                             FlutterFlowTheme.of(context).secondaryBackground,
                         use24hFormat: false,

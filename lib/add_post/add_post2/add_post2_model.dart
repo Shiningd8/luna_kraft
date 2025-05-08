@@ -3,11 +3,16 @@ import '/index.dart';
 import 'add_post2_widget.dart' show AddPost2Widget;
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'dart:math';
 
 class AddPost2Model extends FlutterFlowModel<AddPost2Widget> {
   ///  Local state fields for this page.
 
   String generatedText = 'genText';
+  // New fields for 3D background selector
+  double rotationValue = 0.0;
+  int selectedBackgroundIndex = 0;
+  String selectedBackgroundUrl = 'https://picsum.photos/seed/368/600';
 
   ///  State fields for stateful widgets in this page.
 

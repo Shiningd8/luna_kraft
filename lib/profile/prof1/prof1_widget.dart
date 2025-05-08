@@ -150,7 +150,9 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.white.withOpacity(0.05),
+                        Theme.of(context).brightness == Brightness.light
+                            ? Colors.transparent
+                            : Colors.white.withOpacity(0.05),
                         Colors.transparent,
                       ],
                       begin: Alignment.topCenter,
@@ -505,45 +507,8 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                 context,
                                 PageTransition(
                                   type: PageTransitionType.fade,
-                                  child: FlutterFlowExpandedImageView(
-                                    image: Image.network(
-                                      currentUserDocument?.photoUrl?.isEmpty ==
-                                              true
-                                          ? 'https://ui-avatars.com/api/?name=${currentUserDisplayName.isNotEmpty ? currentUserDisplayName[0] : "U"}&background=random'
-                                          : currentUserDocument?.photoUrl?.contains(
-                                                      'firebasestorage.googleapis.com') ==
-                                                  true
-                                              ? 'https://ui-avatars.com/api/?name=${currentUserDisplayName.isNotEmpty ? currentUserDisplayName[0] : "U"}&background=random'
-                                              : currentUserDocument?.photoUrl ??
-                                                  '',
-                                      fit: BoxFit.contain,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        print(
-                                            'Error loading profile image: $error');
-                                        return Container(
-                                          color: FlutterFlowTheme.of(context)
-                                              .primary,
-                                          child: Center(
-                                            child: Text(
-                                              currentUserDisplayName.isNotEmpty
-                                                  ? currentUserDisplayName[0]
-                                                      .toUpperCase()
-                                                  : '?',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 48,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    allowRotation: false,
-                                    tag: currentUserDocument?.photoUrl ?? '',
-                                    useHeroAnimation: true,
-                                  ),
+                                  child:
+                                      _buildProfileImageExpandedView(context),
                                 ),
                               );
                             },
@@ -574,7 +539,8 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                   .toUpperCase()
                                               : '?',
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: FlutterFlowTheme.of(context)
+                                                .info,
                                             fontSize: 48,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -1253,7 +1219,9 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                       .toUpperCase()
                                                   : '?',
                                               style: TextStyle(
-                                                color: Colors.white,
+                                                color:
+                                                    FlutterFlowTheme.of(context)
+                                                        .info,
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -2510,5 +2478,114 @@ class _Prof1WidgetState extends State<Prof1Widget> {
         );
       }
     }
+  }
+
+  // Check if the user has a real profile image (not a generated avatar)
+  bool _hasRealProfileImage() {
+    final photoUrl = currentUserDocument?.photoUrl;
+    // Only consider it NOT a real image if it's empty or explicitly contains ui-avatars.com
+    return photoUrl != null &&
+        photoUrl.isNotEmpty &&
+        !photoUrl.contains('ui-avatars.com');
+  }
+
+  // Build the expanded profile image view
+  Widget _buildProfileImageExpandedView(BuildContext context) {
+    final hasRealImage = _hasRealProfileImage();
+    final photoUrl = currentUserDocument?.photoUrl;
+
+    if (hasRealImage) {
+      // Real image - show photo view
+      return FlutterFlowExpandedImageView(
+        image: Image.network(
+          photoUrl ?? '',
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildInitialAvatar();
+          },
+        ),
+        allowRotation: false,
+        tag: photoUrl ?? '',
+        useHeroAnimation: true,
+      );
+    } else {
+      // Fallback - create a styled avatar view
+      return Material(
+        color: Colors.black,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Center(
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: FlutterFlowTheme.of(context).primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 4,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Hero(
+                      tag: photoUrl ?? '',
+                      child: Text(
+                        currentUserDisplayName.isNotEmpty
+                            ? currentUserDisplayName[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 96,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                left: 8,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  // Helper method for creating the initial avatar
+  Widget _buildInitialAvatar() {
+    return Container(
+      color: FlutterFlowTheme.of(context).primary,
+      child: Center(
+        child: Text(
+          currentUserDisplayName.isNotEmpty
+              ? currentUserDisplayName[0].toUpperCase()
+              : '?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 96,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
   }
 }

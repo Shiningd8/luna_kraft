@@ -576,243 +576,287 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
           ),
           child: Container(
             decoration: BoxDecoration(
-              color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: FlutterFlowTheme.of(context).primary,
-                width: 1,
-              ),
+              boxShadow: [
+                BoxShadow(
+                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.15),
+                  blurRadius: 15,
+                  spreadRadius: 1,
+                  offset: Offset(0, 4),
+                ),
+              ],
             ),
-            child: Padding(
-              padding: EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Your Latest Post',
-                        style:
-                            FlutterFlowTheme.of(context).titleMedium.override(
-                                  fontFamily: 'Figtree',
-                                  color: FlutterFlowTheme.of(context).primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                      Spacer(),
-                      Text(
-                        util.dateTimeFormat('relative', latestPost.date!),
-                        style: FlutterFlowTheme.of(context).bodySmall.override(
-                              fontFamily: 'Figtree',
-                              color: FlutterFlowTheme.of(context).secondaryText,
-                            ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    latestPost.title,
-                    style: FlutterFlowTheme.of(context).titleMedium.override(
-                          fontFamily: 'Figtree',
-                          fontWeight: FontWeight.w600,
-                          fontSize: 17,
-                        ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    latestPost.dream,
-                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                          fontFamily: 'Figtree',
-                          fontSize: 15,
-                        ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (latestPost.tags != null && latestPost.tags.isNotEmpty)
-                    Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: TagFormatter.buildTagsWidget(
-                        context,
-                        latestPost.tags,
-                        style: FlutterFlowTheme.of(context).bodySmall.override(
-                              fontFamily: 'Figtree',
-                              fontWeight: FontWeight.w500,
-                              color: FlutterFlowTheme.of(context).primary,
-                            ),
-                      ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                        Colors.white.withOpacity(0.15),
+                      ],
                     ),
-                  SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          AnimatedLikeButton(
-                            isLiked: isLiked,
-                            likeCount: likeCount,
-                            iconSize: 28,
-                            activeColor: FlutterFlowTheme.of(context).primary,
-                            inactiveColor: Colors.white.withOpacity(0.8),
-                            onTap: () async {
-                              final userRef = currentUserReference;
-                              if (userRef == null) return;
-
-                              // Update local state immediately
-                              final newIsLiked = !isLiked;
-                              setState(() {
-                                isLiked = newIsLiked;
-                                likeCount =
-                                    newIsLiked ? likeCount + 1 : likeCount - 1;
-                              });
-
-                              // Update in parent state to reflect when scrolling
-                              _updatePostLikeState(latestPost, newIsLiked);
-
-                              // Update database
-                              try {
-                                await latestPost.reference.update({
-                                  'likes': newIsLiked
-                                      ? FieldValue.arrayUnion([userRef])
-                                      : FieldValue.arrayRemove([userRef]),
-                                });
-
-                                // Create notification if liking
-                                if (newIsLiked &&
-                                    latestPost.poster != null &&
-                                    latestPost.poster != currentUserReference) {
-                                  try {
-                                    await NotificationsRecord
-                                        .createNotification(
-                                      isALike: true,
-                                      isRead: false,
-                                      postRef: latestPost.reference,
-                                      madeBy: currentUserReference,
-                                      madeTo: latestPost.poster?.id,
-                                      date: DateTime.now(),
-                                      madeByUsername:
-                                          currentUserDocument?.userName ?? '',
-                                      isFollowRequest: false,
-                                      status: '',
-                                    );
-                                  } catch (e) {
-                                    print(
-                                        'Error creating like notification: $e');
-                                  }
-                                }
-                              } catch (e) {
-                                // If there's an error, revert local state
-                                print('Error updating like state: $e');
-                                setState(() {
-                                  isLiked = !newIsLiked;
-                                  likeCount = !newIsLiked
-                                      ? likeCount + 1
-                                      : likeCount - 1;
-                                });
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          StreamBuilder<int>(
-                            stream:
-                                _getCommentCountStream(latestPost.reference),
-                            builder: (context, snapshot) {
-                              final commentCount = snapshot.data ?? 0;
-                              return _buildInteractionButton(
-                                context: context,
-                                icon: Icons.mode_comment_outlined,
-                                count: commentCount,
-                                onTap: () {
-                                  AppNavigationHelper.navigateToDetailedPost(
-                                    context,
-                                    docref: serializeParam(
-                                      latestPost.reference,
-                                      ParamType.DocumentReference,
-                                    ),
-                                    userref: serializeParam(
-                                      latestPost.poster,
-                                      ParamType.DocumentReference,
-                                    ),
-                                    showComments: true,
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          _buildInteractionButton(
-                            context: context,
-                            icon: isSaved
-                                ? Icons.bookmark
-                                : Icons.bookmark_outline,
-                            count: saveCount,
-                            onTap: () async {
-                              // Update local state immediately
-                              final newIsSaved = !isSaved;
-                              setState(() {
-                                isSaved = newIsSaved;
-                                saveCount =
-                                    newIsSaved ? saveCount + 1 : saveCount - 1;
-                              });
-
-                              // Update in parent state to reflect when scrolling
-                              _updatePostSaveState(latestPost, newIsSaved);
-
-                              // Update database
-                              try {
-                                await latestPost.reference.update({
-                                  'Post_saved_by': newIsSaved
-                                      ? FieldValue.arrayUnion(
-                                          [currentUserReference])
-                                      : FieldValue.arrayRemove(
-                                          [currentUserReference]),
-                                });
-
-                                // Show the save popup
-                                SavePostPopup.showSavedPopup(context,
-                                    isSaved: newIsSaved);
-                              } catch (e) {
-                                // If there's an error, revert local state
-                                print('Error updating save state: $e');
-                                setState(() {
-                                  isSaved = !newIsSaved;
-                                  saveCount = !newIsSaved
-                                      ? saveCount + 1
-                                      : saveCount - 1;
-                                });
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.ios_share,
-                          color: Colors.white.withOpacity(0.8),
-                          size: 28,
-                        ),
-                        onPressed: () async {
-                          // Get the user record for the poster
-                          final UserRecord? posterUser =
-                              await UserRecord.getDocumentOnce(
-                                  latestPost.poster!);
-                          if (posterUser != null) {
-                            ShareOptionsDialog.show(
-                                context, latestPost, posterUser);
-                          }
-                        },
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        constraints: BoxConstraints(),
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color:
+                          FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                      width: 1.5,
+                    ),
                   ),
-                ],
+                  child: Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Your Latest Post',
+                              style: FlutterFlowTheme.of(context)
+                                  .titleMedium
+                                  .override(
+                                    fontFamily: 'Outfit',
+                                    color: FlutterFlowTheme.of(context).primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            Spacer(),
+                            Text(
+                              util.dateTimeFormat('relative', latestPost.date!),
+                              style: FlutterFlowTheme.of(context)
+                                  .bodySmall
+                                  .override(
+                                    fontFamily: 'Figtree',
+                                    color: FlutterFlowTheme.of(context)
+                                        .secondaryText,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          latestPost.title,
+                          style:
+                              FlutterFlowTheme.of(context).titleSmall.override(
+                                    fontFamily: 'Outfit',
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          latestPost.dream,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              FlutterFlowTheme.of(context).bodyMedium.override(
+                                    fontFamily: 'Figtree',
+                                    color: Colors.white,
+                                  ),
+                        ),
+                        if (latestPost.tags != null &&
+                            latestPost.tags.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: TagFormatter.buildTagsWidget(
+                              context,
+                              latestPost.tags,
+                              style: FlutterFlowTheme.of(context)
+                                  .bodySmall
+                                  .override(
+                                    fontFamily: 'Figtree',
+                                    fontWeight: FontWeight.w500,
+                                    color: FlutterFlowTheme.of(context).primary,
+                                  ),
+                            ),
+                          ),
+                        SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                AnimatedLikeButton(
+                                  isLiked: isLiked,
+                                  likeCount: likeCount,
+                                  iconSize: 28,
+                                  activeColor:
+                                      FlutterFlowTheme.of(context).primary,
+                                  inactiveColor: Colors.white.withOpacity(0.8),
+                                  onTap: () async {
+                                    final userRef = currentUserReference;
+                                    if (userRef == null) return;
+
+                                    // Update local state immediately
+                                    final newIsLiked = !isLiked;
+                                    setState(() {
+                                      isLiked = newIsLiked;
+                                      likeCount = newIsLiked
+                                          ? likeCount + 1
+                                          : likeCount - 1;
+                                    });
+
+                                    // Update in parent state to reflect when scrolling
+                                    _updatePostLikeState(
+                                        latestPost, newIsLiked);
+
+                                    // Update database
+                                    try {
+                                      await latestPost.reference.update({
+                                        'likes': newIsLiked
+                                            ? FieldValue.arrayUnion([userRef])
+                                            : FieldValue.arrayRemove([userRef]),
+                                      });
+
+                                      // Create notification if liking
+                                      if (newIsLiked &&
+                                          latestPost.poster != null &&
+                                          latestPost.poster !=
+                                              currentUserReference) {
+                                        try {
+                                          await NotificationsRecord
+                                              .createNotification(
+                                            isALike: true,
+                                            isRead: false,
+                                            postRef: latestPost.reference,
+                                            madeBy: currentUserReference,
+                                            madeTo: latestPost.poster?.id,
+                                            date: DateTime.now(),
+                                            madeByUsername:
+                                                currentUserDocument?.userName ??
+                                                    '',
+                                            isFollowRequest: false,
+                                            status: '',
+                                          );
+                                        } catch (e) {
+                                          print(
+                                              'Error creating like notification: $e');
+                                        }
+                                      }
+                                    } catch (e) {
+                                      // If there's an error, revert local state
+                                      print('Error updating like state: $e');
+                                      setState(() {
+                                        isLiked = !newIsLiked;
+                                        likeCount = !newIsLiked
+                                            ? likeCount + 1
+                                            : likeCount - 1;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                StreamBuilder<int>(
+                                  stream: _getCommentCountStream(
+                                      latestPost.reference),
+                                  builder: (context, snapshot) {
+                                    final commentCount = snapshot.data ?? 0;
+                                    return _buildInteractionButton(
+                                      context: context,
+                                      icon: Icons.mode_comment_outlined,
+                                      count: commentCount,
+                                      onTap: () {
+                                        AppNavigationHelper
+                                            .navigateToDetailedPost(
+                                          context,
+                                          docref: serializeParam(
+                                            latestPost.reference,
+                                            ParamType.DocumentReference,
+                                          ),
+                                          userref: serializeParam(
+                                            latestPost.poster,
+                                            ParamType.DocumentReference,
+                                          ),
+                                          showComments: true,
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                _buildInteractionButton(
+                                  context: context,
+                                  icon: isSaved
+                                      ? Icons.bookmark
+                                      : Icons.bookmark_outline,
+                                  count: saveCount,
+                                  onTap: () async {
+                                    // Update local state immediately
+                                    final newIsSaved = !isSaved;
+                                    setState(() {
+                                      isSaved = newIsSaved;
+                                      saveCount = newIsSaved
+                                          ? saveCount + 1
+                                          : saveCount - 1;
+                                    });
+
+                                    // Update in parent state to reflect when scrolling
+                                    _updatePostSaveState(
+                                        latestPost, newIsSaved);
+
+                                    // Update database
+                                    try {
+                                      await latestPost.reference.update({
+                                        'Post_saved_by': newIsSaved
+                                            ? FieldValue.arrayUnion(
+                                                [currentUserReference])
+                                            : FieldValue.arrayRemove(
+                                                [currentUserReference]),
+                                      });
+
+                                      // Show the save popup
+                                      SavePostPopup.showSavedPopup(context,
+                                          isSaved: newIsSaved);
+                                    } catch (e) {
+                                      // If there's an error, revert local state
+                                      print('Error updating save state: $e');
+                                      setState(() {
+                                        isSaved = !newIsSaved;
+                                        saveCount = !newIsSaved
+                                            ? saveCount + 1
+                                            : saveCount - 1;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.ios_share,
+                                color: Colors.white.withOpacity(0.8),
+                                size: 28,
+                              ),
+                              onPressed: () async {
+                                // Get the user record for the poster
+                                final UserRecord? posterUser =
+                                    await UserRecord.getDocumentOnce(
+                                        latestPost.poster!);
+                                if (posterUser != null) {
+                                  ShareOptionsDialog.show(
+                                      context, latestPost, posterUser);
+                                }
+                              },
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 2),
+                              constraints: BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -1458,18 +1502,57 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                               width: 2,
                                             ),
                                           ),
-                                          child: Center(
-                                            child: Text(
-                                              currentUserDisplayName.isNotEmpty
-                                                  ? currentUserDisplayName[0]
-                                                      .toUpperCase()
-                                                  : '?',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 24,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
+                                          child: ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(30),
+                                            child: currentUserDocument
+                                                        ?.photoUrl?.isEmpty !=
+                                                    false
+                                                ? Center(
+                                                    child: Text(
+                                                      currentUserDisplayName
+                                                              .isNotEmpty
+                                                          ? currentUserDisplayName[
+                                                                  0]
+                                                              .toUpperCase()
+                                                          : '?',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 24,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  )
+                                                : Image.network(
+                                                    currentUserDocument
+                                                            ?.photoUrl ??
+                                                        '',
+                                                    width: 60,
+                                                    height: 60,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context,
+                                                        error, stackTrace) {
+                                                      print(
+                                                          'Error loading profile image: $error');
+                                                      return Center(
+                                                        child: Text(
+                                                          currentUserDisplayName
+                                                                  .isNotEmpty
+                                                              ? currentUserDisplayName[
+                                                                      0]
+                                                                  .toUpperCase()
+                                                              : '?',
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 24,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
                                           ),
                                         ),
                                         SizedBox(height: 16),
@@ -1555,6 +1638,28 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                         ),
                                       ],
                                     ),
+                                  ),
+                                  Divider(
+                                    color: Colors.white.withOpacity(0.15),
+                                    height: 1,
+                                    thickness: 1,
+                                  ),
+                                  _buildDrawerItem(
+                                    icon: Icons.logout,
+                                    title: 'Sign Out',
+                                    onTap: () async {
+                                      try {
+                                        if (_isDisposed) return;
+                                        await AuthUtil.safeSignOut(
+                                          context: context,
+                                          shouldNavigate: true,
+                                          navigateTo: '/',
+                                        );
+                                      } catch (e) {
+                                        print('Error signing out: $e');
+                                        // Don't try to display errors via scaffold messenger to avoid deactivation issues
+                                      }
+                                    },
                                   ),
                                 ],
                               ),
@@ -2261,10 +2366,10 @@ class PostItemWidget extends StatelessWidget {
               // Post content
               Text(
                 post.title,
-                style: FlutterFlowTheme.of(context).titleMedium.override(
-                      fontFamily: 'Figtree',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 17,
+                style: FlutterFlowTheme.of(context).titleSmall.override(
+                      fontFamily: 'Outfit',
+                      color: FlutterFlowTheme.of(context).primaryText,
+                      fontWeight: FontWeight.bold,
                     ),
               ),
               SizedBox(height: 4),
@@ -2272,7 +2377,7 @@ class PostItemWidget extends StatelessWidget {
                 post.dream,
                 style: FlutterFlowTheme.of(context).bodyMedium.override(
                       fontFamily: 'Figtree',
-                      fontSize: 15,
+                      color: FlutterFlowTheme.of(context).primaryText,
                     ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

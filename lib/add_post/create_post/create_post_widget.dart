@@ -15,6 +15,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import 'dart:ui';
+import 'dart:math';
+import 'package:flutter/services.dart';
 
 // Add import for DreamPostedMessage component
 import '/components/dream_posted_message.dart';
@@ -1042,7 +1044,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
 
                       SizedBox(height: 24),
 
-                      // Background selection
+                      // Background selection - Clean Minimalist Design
                       Container(
                         width: double.infinity,
                         padding: EdgeInsets.all(20),
@@ -1057,93 +1059,93 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Select Background',
-                              style: FlutterFlowTheme.of(context)
-                                  .titleMedium
-                                  .override(
-                                    fontFamily: 'Figtree',
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            SizedBox(height: 16),
-                            Container(
-                              height: 120,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: backgrounds.length,
-                                itemBuilder: (context, index) {
-                                  final background = backgrounds[index];
-                                  final isSelected =
-                                      _selectedBackground == background['path'];
-                                  return GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _selectedBackground =
-                                            background['path'];
-                                      });
-                                    },
-                                    child: Container(
-                                      width: 160,
-                                      margin: EdgeInsets.only(right: 12),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: isSelected
-                                              ? FlutterFlowTheme.of(context)
-                                                  .primary
-                                              : Colors.transparent,
-                                          width: 2,
-                                        ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Select Background',
+                                  style: FlutterFlowTheme.of(context)
+                                      .titleMedium
+                                      .override(
+                                        fontFamily: 'Figtree',
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Stack(
-                                          fit: StackFit.expand,
-                                          children: [
-                                            Image.asset(
-                                              background['path'],
-                                              fit: BoxFit.cover,
-                                            ),
-                                            Container(
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  begin: Alignment.topCenter,
-                                                  end: Alignment.bottomCenter,
-                                                  colors: [
-                                                    Colors.transparent,
-                                                    Colors.black
-                                                        .withOpacity(0.7),
-                                                  ],
-                                                ),
-                                              ),
-                                              child: Center(
-                                                child: Text(
-                                                  background['name'],
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                ),
+                                // Current selection indicator
+                                if (_selectedBackground.isNotEmpty)
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          FlutterFlowTheme.of(context)
+                                              .primary
+                                              .withOpacity(0.8),
+                                          FlutterFlowTheme.of(context)
+                                              .secondary
+                                              .withOpacity(0.8),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
                                       ),
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
-                                  );
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle_outline_rounded,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          backgrounds.firstWhere(
+                                            (bg) =>
+                                                bg['path'] ==
+                                                _selectedBackground,
+                                            orElse: () => backgrounds[0],
+                                          )['name'],
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodySmall
+                                              .copyWith(
+                                                fontFamily: 'Figtree',
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: 20),
+                            Container(
+                              height: 260,
+                              child: MinimalistBackgroundSelector(
+                                backgrounds: backgrounds,
+                                selectedBackground: _selectedBackground,
+                                onSelect: (path) {
+                                  setState(() {
+                                    _selectedBackground = path;
+                                  });
+                                  HapticFeedback.selectionClick();
                                 },
+                                primaryColor:
+                                    FlutterFlowTheme.of(context).primary,
+                                secondaryColor:
+                                    FlutterFlowTheme.of(context).secondary,
                               ),
                             ),
                           ],
                         ),
                       ).animate().fadeIn(
-                          delay: Duration(milliseconds: 600),
-                          duration: Duration(milliseconds: 600),
-                          curve: Curves.easeOut),
+                            delay: Duration(milliseconds: 500),
+                            duration: Duration(milliseconds: 800),
+                          ),
 
                       SizedBox(height: 24),
 
@@ -1277,6 +1279,902 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// Starfield background effect painter
+class StarfieldPainter extends CustomPainter {
+  final int starCount = 150;
+  final List<Star> stars = [];
+
+  StarfieldPainter() {
+    // Generate random stars
+    final random = Random();
+    for (int i = 0; i < starCount; i++) {
+      stars.add(Star(
+        x: random.nextDouble(),
+        y: random.nextDouble(),
+        size: random.nextDouble() * 2 + 0.5,
+        opacity: random.nextDouble() * 0.7 + 0.3,
+      ));
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Draw stars
+    for (var star in stars) {
+      final paint = Paint()
+        ..color = Colors.white.withOpacity(star.opacity)
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(
+        Offset(star.x * size.width, star.y * size.height),
+        star.size,
+        paint,
+      );
+
+      // Draw glow around larger stars
+      if (star.size > 1.5) {
+        final glowPaint = Paint()
+          ..color = Colors.white.withOpacity(star.opacity * 0.3)
+          ..style = PaintingStyle.fill;
+
+        canvas.drawCircle(
+          Offset(star.x * size.width, star.y * size.height),
+          star.size * 2,
+          glowPaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// Star class for the starfield
+class Star {
+  final double x;
+  final double y;
+  final double size;
+  final double opacity;
+
+  Star({
+    required this.x,
+    required this.y,
+    required this.size,
+    required this.opacity,
+  });
+}
+
+// Utility function to map values from one range to another
+double mapRange(
+    double value, double min1, double max1, double min2, double max2) {
+  return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
+}
+
+// Unique hexagonal background grid with floating animation effect
+class HexagonalBackgroundGrid extends StatefulWidget {
+  final List<Map<String, dynamic>> backgrounds;
+  final String selectedBackground;
+  final Function(String) onBackgroundSelected;
+
+  const HexagonalBackgroundGrid({
+    Key? key,
+    required this.backgrounds,
+    required this.selectedBackground,
+    required this.onBackgroundSelected,
+  }) : super(key: key);
+
+  @override
+  State<HexagonalBackgroundGrid> createState() =>
+      _HexagonalBackgroundGridState();
+}
+
+class _HexagonalBackgroundGridState extends State<HexagonalBackgroundGrid>
+    with TickerProviderStateMixin {
+  late List<AnimationController> _floatingControllers;
+  late List<Animation<double>> _floatingAnimations;
+  final _random = Random();
+
+  // Animation values for each background item
+  late List<double> _scales;
+  late List<double> _rotations;
+  late List<Offset> _offsets;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize animation controllers for floating effect
+    _floatingControllers = List.generate(
+      widget.backgrounds.length,
+      (index) => AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: 2000 + _random.nextInt(2000)),
+      ),
+    );
+
+    // Create animations with different curves for variety
+    _floatingAnimations = List.generate(
+      widget.backgrounds.length,
+      (index) => CurvedAnimation(
+        parent: _floatingControllers[index],
+        curve: index % 2 == 0 ? Curves.easeInOut : Curves.easeOutQuad,
+      ),
+    );
+
+    // Initialize random scales, rotations and offsets for initial positions
+    _scales = List.generate(widget.backgrounds.length,
+        (index) => 0.85 + _random.nextDouble() * 0.3);
+
+    _rotations = List.generate(widget.backgrounds.length,
+        (index) => (_random.nextDouble() - 0.5) * 0.2);
+
+    _offsets = List.generate(
+      widget.backgrounds.length,
+      (index) => Offset(
+        (_random.nextDouble() - 0.5) * 30,
+        (_random.nextDouble() - 0.5) * 30,
+      ),
+    );
+
+    // Start the floating animations with different delays
+    for (int i = 0; i < _floatingControllers.length; i++) {
+      Future.delayed(Duration(milliseconds: i * 100), () {
+        if (mounted) {
+          _floatingControllers[i].repeat(reverse: true);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _floatingControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Calculate hexagon size based on the container size
+    final containerWidth = MediaQuery.of(context).size.width - 80;
+    final hexSize = containerWidth / 3.0;
+
+    return Stack(
+      children: [
+        // Background glow effects
+        Positioned.fill(
+          child: CustomPaint(
+            painter: GlowingBackgroundPainter(
+              color: FlutterFlowTheme.of(context).primary,
+            ),
+          ),
+        ),
+
+        // Hexagonal grid layout with perspective effect
+        Center(
+          child: Stack(
+            alignment: Alignment.center,
+            children: List.generate(widget.backgrounds.length, (index) {
+              // Calculate hexagon position in the grid
+              final row = index ~/ 3;
+              final col = index % 3;
+
+              // Offset every second row for hexagonal pattern
+              double xPos = col * (hexSize * 0.75);
+              double yPos = row * (hexSize * 0.85);
+
+              if (row % 2 == 1) {
+                xPos += hexSize * 0.375; // Offset odd rows
+              }
+
+              // Centered adjustment
+              xPos -= hexSize * 0.7;
+              yPos -= hexSize * 1.5;
+
+              final isSelected = widget.selectedBackground ==
+                  widget.backgrounds[index]['path'];
+
+              return AnimatedBuilder(
+                animation: _floatingAnimations[index],
+                builder: (context, child) {
+                  // Create a floating/bobbing effect with animations
+                  final floatValue = _floatingAnimations[index].value;
+
+                  // Compute animated transform values
+                  final scale =
+                      _scales[index] + sin(floatValue * pi * 2) * 0.05;
+                  final rotation =
+                      _rotations[index] + sin(floatValue * pi) * 0.02;
+                  final offset = Offset(
+                    _offsets[index].dx + sin(floatValue * pi * 2) * 5,
+                    _offsets[index].dy + cos(floatValue * pi * 2) * 5,
+                  );
+
+                  return Positioned(
+                    left: xPos + offset.dx,
+                    top: yPos + offset.dy,
+                    child: Transform(
+                      transform: Matrix4.identity()
+                        ..setEntry(3, 2, 0.001) // Add perspective
+                        ..rotateZ(rotation)
+                        ..scale(scale),
+                      alignment: Alignment.center,
+                      child: GestureDetector(
+                        onTap: () => widget.onBackgroundSelected(
+                            widget.backgrounds[index]['path']),
+                        child: HexagonalBackgroundTile(
+                          background: widget.backgrounds[index],
+                          isSelected: isSelected,
+                          size: hexSize,
+                          primaryColor: FlutterFlowTheme.of(context).primary,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            }),
+          ),
+        ),
+
+        // Selection hint text
+        Positioned(
+          bottom: 20,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Text(
+              'Tap a background to select',
+              style: FlutterFlowTheme.of(context).bodyMedium.copyWith(
+                    fontFamily: 'Figtree',
+                    color: Colors.white.withOpacity(0.7),
+                    fontStyle: FontStyle.italic,
+                  ),
+            ),
+          ),
+        ),
+
+        // Current selection name display
+        if (widget.selectedBackground.isNotEmpty)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    FlutterFlowTheme.of(context).primary.withOpacity(0.6),
+                    FlutterFlowTheme.of(context).secondary.withOpacity(0.6),
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Selected: ${widget.backgrounds.firstWhere((bg) => bg['path'] == widget.selectedBackground, orElse: () => {
+                      'name': 'None'
+                    })['name']}',
+                textAlign: TextAlign.center,
+                style: FlutterFlowTheme.of(context).bodyMedium.copyWith(
+                      fontFamily: 'Figtree',
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// Hexagonal background tile widget
+class HexagonalBackgroundTile extends StatefulWidget {
+  final Map<String, dynamic> background;
+  final bool isSelected;
+  final double size;
+  final Color primaryColor;
+
+  const HexagonalBackgroundTile({
+    Key? key,
+    required this.background,
+    required this.isSelected,
+    required this.size,
+    required this.primaryColor,
+  }) : super(key: key);
+
+  @override
+  State<HexagonalBackgroundTile> createState() =>
+      _HexagonalBackgroundTileState();
+}
+
+class _HexagonalBackgroundTileState extends State<HexagonalBackgroundTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 1500),
+    );
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    if (widget.isSelected) {
+      _pulseController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(HexagonalBackgroundTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isSelected != oldWidget.isSelected) {
+      if (widget.isSelected) {
+        _pulseController.repeat(reverse: true);
+      } else {
+        _pulseController.stop();
+        _pulseController.reset();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        final scale = widget.isSelected ? _pulseAnimation.value : 1.0;
+
+        return Transform.scale(
+          scale: scale,
+          child: ClipPath(
+            clipper: HexagonClipper(),
+            child: Container(
+              width: widget.size,
+              height: widget.size * 1.15, // Adjust for hexagon aspect ratio
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(widget.background['path']),
+                  fit: BoxFit.cover,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  // Dark overlay for non-selected items
+                  if (!widget.isSelected)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withOpacity(0.4),
+                      ),
+                    ),
+
+                  // Glowing border for selected item
+                  if (widget.isSelected)
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: HexagonBorderPainter(
+                          color: widget.primaryColor,
+                          strokeWidth: 3.0,
+                          glowWidth: 8.0,
+                        ),
+                      ),
+                    ),
+
+                  // Bottom gradient for text
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: widget.size * 0.4,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Background name
+                  Positioned(
+                    bottom: 10,
+                    left: 0,
+                    right: 0,
+                    child: Text(
+                      widget.background['name'],
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: widget.isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        fontSize: widget.isSelected ? 14 : 12,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black,
+                            blurRadius: 5,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Selected indicator
+                  if (widget.isSelected)
+                    Positioned(
+                      top: 10,
+                      right: widget.size / 2 - 10,
+                      child: Container(
+                        padding: EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: widget.primaryColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: widget.primaryColor.withOpacity(0.6),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 12,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Custom clipper for hexagon shape
+class HexagonClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    final height = size.height;
+    final width = size.width;
+    final heightFactor = size.height / 6;
+
+    path.moveTo(width / 2, 0);
+    path.lineTo(width, heightFactor * 1.5);
+    path.lineTo(width, height - heightFactor * 1.5);
+    path.lineTo(width / 2, height);
+    path.lineTo(0, height - heightFactor * 1.5);
+    path.lineTo(0, heightFactor * 1.5);
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+// Custom painter for hexagon border with glow effect
+class HexagonBorderPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+  final double glowWidth;
+
+  HexagonBorderPainter({
+    required this.color,
+    required this.strokeWidth,
+    required this.glowWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path();
+    final height = size.height;
+    final width = size.width;
+    final heightFactor = size.height / 6;
+
+    path.moveTo(width / 2, 0);
+    path.lineTo(width, heightFactor * 1.5);
+    path.lineTo(width, height - heightFactor * 1.5);
+    path.lineTo(width / 2, height);
+    path.lineTo(0, height - heightFactor * 1.5);
+    path.lineTo(0, heightFactor * 1.5);
+    path.close();
+
+    // Draw glow effect
+    final glowPaint = Paint()
+      ..color = color.withOpacity(0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth + glowWidth
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, glowWidth);
+
+    canvas.drawPath(path, glowPaint);
+
+    // Draw border
+    final borderPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    canvas.drawPath(path, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldPainter) => false;
+}
+
+// Background painter for glowing effect
+class GlowingBackgroundPainter extends CustomPainter {
+  final Color color;
+
+  GlowingBackgroundPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Create a radial gradient
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          color.withOpacity(0.1),
+          Colors.transparent,
+        ],
+        stops: [0.0, 1.0],
+        radius: 0.7,
+      ).createShader(
+        Rect.fromCenter(
+          center: Offset(size.width / 2, size.height / 2),
+          width: size.width,
+          height: size.height,
+        ),
+      );
+
+    // Draw radial gradient
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldPainter) => false;
+}
+
+// Clean, minimalist background selector
+class MinimalistBackgroundSelector extends StatelessWidget {
+  final List<Map<String, dynamic>> backgrounds;
+  final String selectedBackground;
+  final Function(String) onSelect;
+  final Color primaryColor;
+  final Color secondaryColor;
+
+  const MinimalistBackgroundSelector({
+    Key? key,
+    required this.backgrounds,
+    required this.selectedBackground,
+    required this.onSelect,
+    required this.primaryColor,
+    required this.secondaryColor,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        color: Colors.black.withOpacity(0.2),
+        child: Stack(
+          children: [
+            // Background preview section
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 180,
+              child: BackgroundPreview(
+                backgrounds: backgrounds,
+                selectedBackground: selectedBackground,
+              ),
+            ),
+
+            // Selection bar
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 80,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: backgrounds.length,
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  itemBuilder: (context, index) {
+                    final background = backgrounds[index];
+                    final isSelected = selectedBackground == background['path'];
+
+                    return GestureDetector(
+                      onTap: () => onSelect(background['path']),
+                      child: AnimatedContainer(
+                        duration: Duration(milliseconds: 300),
+                        margin: EdgeInsets.symmetric(horizontal: 6),
+                        width: 60,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                isSelected ? primaryColor : Colors.transparent,
+                            width: 2,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: primaryColor.withOpacity(0.5),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Stack(
+                            children: [
+                              // Thumbnail image
+                              Positioned.fill(
+                                child: Image.asset(
+                                  background['path'],
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+
+                              // Darkening overlay for unselected items
+                              if (!isSelected)
+                                Positioned.fill(
+                                  child: Container(
+                                    color: Colors.black.withOpacity(0.4),
+                                  ),
+                                ),
+
+                              // Selection indicator
+                              if (isSelected)
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: Container(
+                                    padding: EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: primaryColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 10,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // "Selected" label
+            Positioned(
+              top: 10,
+              left: 10,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.auto_awesome,
+                      color: primaryColor,
+                      size: 14,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Background',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Interactive background preview with elegant transitions
+class BackgroundPreview extends StatefulWidget {
+  final List<Map<String, dynamic>> backgrounds;
+  final String selectedBackground;
+
+  const BackgroundPreview({
+    Key? key,
+    required this.backgrounds,
+    required this.selectedBackground,
+  }) : super(key: key);
+
+  @override
+  State<BackgroundPreview> createState() => _BackgroundPreviewState();
+}
+
+class _BackgroundPreviewState extends State<BackgroundPreview>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late String _currentBg;
+  String? _previousBg;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentBg = widget.selectedBackground.isEmpty
+        ? widget.backgrounds[0]['path']
+        : widget.selectedBackground;
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 500),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void didUpdateWidget(BackgroundPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedBackground != oldWidget.selectedBackground) {
+      setState(() {
+        _previousBg = _currentBg;
+        _currentBg = widget.selectedBackground;
+        _controller.reset();
+        _controller.forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Previous background (for smooth transition)
+        if (_previousBg != null)
+          Image.asset(
+            _previousBg!,
+            fit: BoxFit.cover,
+          ),
+
+        // Current background with fade-in animation
+        AnimatedBuilder(
+          animation: _fadeAnimation,
+          builder: (context, child) {
+            return Opacity(
+              opacity: _fadeAnimation.value,
+              child: child,
+            );
+          },
+          child: Image.asset(
+            _currentBg,
+            fit: BoxFit.cover,
+          ),
+        ),
+
+        // Subtle gradient overlay for better visibility
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.transparent,
+                Colors.black.withOpacity(0.6),
+              ],
+              stops: [0.7, 1.0],
+            ),
+          ),
+        ),
+
+        // Background name displayed in the preview
+        Positioned(
+          bottom: 16,
+          left: 16,
+          child: AnimatedBuilder(
+            animation: _fadeAnimation,
+            builder: (context, child) {
+              return Opacity(
+                opacity: _fadeAnimation.value,
+                child: child,
+              );
+            },
+            child: Text(
+              widget.backgrounds.firstWhere((bg) => bg['path'] == _currentBg,
+                  orElse: () => widget.backgrounds[0])['name'],
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                shadows: [
+                  Shadow(
+                    color: Colors.black,
+                    blurRadius: 12,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

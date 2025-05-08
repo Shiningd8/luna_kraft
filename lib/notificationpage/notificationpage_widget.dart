@@ -24,6 +24,8 @@ class _NotificationpageWidgetState extends State<NotificationpageWidget>
   late NotificationpageModel _model;
   late TabController _tabController;
   String _selectedTab = 'All';
+  bool _isLoading = true;
+  bool _isRefreshing = false;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -37,6 +39,9 @@ class _NotificationpageWidgetState extends State<NotificationpageWidget>
         _selectedTab = _getTabName(_tabController.index);
       });
     });
+
+    // Initialize loading state
+    _isLoading = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
@@ -64,20 +69,16 @@ class _NotificationpageWidgetState extends State<NotificationpageWidget>
   }
 
   Widget _buildNotificationItem(NotificationsRecord notification) {
+    // If we're refreshing, use skeleton loaders instead of individual StreamBuilders
+    if (_isRefreshing) {
+      return _buildNotificationSkeleton();
+    }
+
     return StreamBuilder<UserRecord>(
       stream: UserRecord.getDocument(notification.madeBy!),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: FlutterFlowTheme.of(context).secondaryBackground,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
+          return _buildNotificationSkeleton();
         }
 
         final userRecord = snapshot.data!;
@@ -298,6 +299,87 @@ class _NotificationpageWidgetState extends State<NotificationpageWidget>
     );
   }
 
+  // Add a new method for the loading widget
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: Container(
+        width: 60,
+        height: 60,
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: FlutterFlowTheme.of(context).secondaryBackground,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: CircularProgressIndicator(
+          color: FlutterFlowTheme.of(context).primary,
+          strokeWidth: 3,
+        ),
+      ),
+    );
+  }
+
+  // Add a skeleton loader for notification items
+  Widget _buildNotificationSkeleton() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      decoration: BoxDecoration(
+        color: FlutterFlowTheme.of(context).secondaryBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Skeleton avatar
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: FlutterFlowTheme.of(context).alternate.withOpacity(0.3),
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Skeleton name
+                Container(
+                  width: 200,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color:
+                        FlutterFlowTheme.of(context).alternate.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                SizedBox(height: 8),
+                // Skeleton date
+                Container(
+                  width: 100,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color:
+                        FlutterFlowTheme.of(context).alternate.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -353,14 +435,41 @@ class _NotificationpageWidgetState extends State<NotificationpageWidget>
             ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildNotificationList('all'),
-                _buildNotificationList('likes'),
-                _buildNotificationList('comments'),
-                _buildNotificationList('follows'),
-              ],
+            child: StreamBuilder<List<NotificationsRecord>>(
+              stream: queryNotificationsRecord(
+                queryBuilder: (notificationsRecord) =>
+                    notificationsRecord.orderBy('date', descending: true),
+              ),
+              builder: (context, snapshot) {
+                // Set refreshing state based on snapshot state
+                _isRefreshing =
+                    snapshot.connectionState == ConnectionState.waiting;
+
+                // When data is loading for the first time, show a single loading indicator
+                if (!snapshot.hasData &&
+                    snapshot.connectionState != ConnectionState.active) {
+                  return _buildLoadingIndicator();
+                }
+
+                // When we have data or are refreshing, show the appropriate tab view
+                final data = snapshot.data ?? [];
+
+                return Stack(
+                  children: [
+                    TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildFilteredNotificationList(data, 'all'),
+                        _buildFilteredNotificationList(data, 'likes'),
+                        _buildFilteredNotificationList(data, 'comments'),
+                        _buildFilteredNotificationList(data, 'follows'),
+                      ],
+                    ),
+                    // Show overlay loading indicator when refreshing
+                    if (_isRefreshing) _buildLoadingIndicator(),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -368,6 +477,87 @@ class _NotificationpageWidgetState extends State<NotificationpageWidget>
     );
   }
 
+  // New method to build filtered notification list from existing data
+  Widget _buildFilteredNotificationList(
+      List<NotificationsRecord> allNotifications, String type) {
+    print('Building filtered notification list for type: $type');
+
+    // If refreshing, show skeleton items
+    if (_isRefreshing) {
+      return ListView.builder(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        itemCount: 5, // Show a fixed number of skeleton items
+        itemBuilder: (context, index) {
+          return _buildNotificationSkeleton();
+        },
+      );
+    }
+
+    // Filter for current user, looking for exact or partial ID matches
+    final currentUserID = currentUser?.uid ?? '';
+    print('Filtering for current user ID: $currentUserID');
+
+    final userNotifications = allNotifications.where((notification) {
+      try {
+        // Handle both string and DocumentReference types for made_to field
+        String madeTo = '';
+        if (notification.madeTo is String) {
+          madeTo = notification.madeTo ?? '';
+        } else if (notification.snapshotData['made_to'] is DocumentReference) {
+          // If made_to is a DocumentReference, get its ID
+          final madeToRef =
+              notification.snapshotData['made_to'] as DocumentReference?;
+          madeTo = madeToRef?.id ?? '';
+        }
+
+        final isMatch = madeTo == currentUserID ||
+            (currentUserID.isNotEmpty && madeTo.contains(currentUserID)) ||
+            (madeTo.isNotEmpty && currentUserID.contains(madeTo));
+        return isMatch;
+      } catch (e) {
+        print('Error processing notification ${notification.reference.id}: $e');
+        return false;
+      }
+    }).toList();
+
+    // Filter notifications based on type
+    List<NotificationsRecord> notifications = [];
+
+    if (type == 'all') {
+      notifications = userNotifications;
+    } else if (type == 'likes') {
+      notifications = userNotifications
+          .where((notification) => notification.isALike)
+          .toList();
+    } else if (type == 'comments') {
+      notifications = userNotifications
+          .where((notification) =>
+              !notification.isALike && !notification.isFollowRequest)
+          .toList();
+    } else if (type == 'follows') {
+      notifications = userNotifications
+          .where((notification) =>
+              notification.isFollowRequest &&
+              (notification.status == 'pending' ||
+                  notification.status == 'followed'))
+          .toList();
+    }
+
+    if (notifications.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      itemCount: notifications.length,
+      itemBuilder: (context, index) {
+        return _buildNotificationItem(notifications[index]);
+      },
+    );
+  }
+
+  // Original method kept for reference (deprecated)
+  // ignore: unused_element
   Widget _buildNotificationList(String type) {
     print('Building notification list for type: $type');
     return StreamBuilder<List<NotificationsRecord>>(
@@ -390,7 +580,7 @@ class _NotificationpageWidgetState extends State<NotificationpageWidget>
         }
 
         if (!snapshot.hasData) {
-          return Center(child: CircularProgressIndicator());
+          return _buildLoadingIndicator();
         }
 
         // Get all notifications first

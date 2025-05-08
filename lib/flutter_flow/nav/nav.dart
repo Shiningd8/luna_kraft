@@ -1012,10 +1012,15 @@ class _NavBarPageState extends State<NavBarPage>
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-              blurRadius: 30,
-              spreadRadius: 1,
-              offset: Offset(0, 10),
+              color: Theme.of(context).brightness == Brightness.light
+                  ? FlutterFlowTheme.of(context).primary.withOpacity(0.1)
+                  : FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+              blurRadius:
+                  Theme.of(context).brightness == Brightness.light ? 15 : 30,
+              spreadRadius:
+                  Theme.of(context).brightness == Brightness.light ? 0 : 1,
+              offset: Offset(
+                  0, Theme.of(context).brightness == Brightness.light ? 5 : 10),
             ),
           ],
         ),
@@ -1028,14 +1033,19 @@ class _NavBarPageState extends State<NavBarPage>
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    FlutterFlowTheme.of(context)
-                        .secondaryBackground
-                        .withOpacity(0.7),
-                    FlutterFlowTheme.of(context)
-                        .secondaryBackground
-                        .withOpacity(0.3),
-                  ],
+                  colors: Theme.of(context).brightness == Brightness.light
+                      ? [
+                          Colors.white.withOpacity(0.95),
+                          Colors.white.withOpacity(0.85),
+                        ]
+                      : [
+                          FlutterFlowTheme.of(context)
+                              .secondaryBackground
+                              .withOpacity(0.7),
+                          FlutterFlowTheme.of(context)
+                              .secondaryBackground
+                              .withOpacity(0.3),
+                        ],
                 ),
                 border: Border.all(
                   width: 1.5,
@@ -1063,12 +1073,20 @@ class _NavBarPageState extends State<NavBarPage>
                         gradient: RadialGradient(
                           center: Alignment.center,
                           radius: 0.8,
-                          colors: [
-                            FlutterFlowTheme.of(context)
-                                .primary
-                                .withOpacity(0.2),
-                            Colors.transparent,
-                          ],
+                          colors:
+                              Theme.of(context).brightness == Brightness.light
+                                  ? [
+                                      FlutterFlowTheme.of(context)
+                                          .primary
+                                          .withOpacity(0.06),
+                                      Colors.transparent,
+                                    ]
+                                  : [
+                                      FlutterFlowTheme.of(context)
+                                          .primary
+                                          .withOpacity(0.2),
+                                      Colors.transparent,
+                                    ],
                         ),
                       ),
                     ),
@@ -1137,12 +1155,20 @@ class _NavBarPageState extends State<NavBarPage>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: FlutterFlowTheme.of(context).primary.withOpacity(
-                      0.1 + 0.1 * animation.value,
+                      Theme.of(context).brightness == Brightness.light
+                          ? (0.03 +
+                              0.03 *
+                                  animation
+                                      .value) // Much lighter for light mode
+                          : (0.1 + 0.1 * animation.value),
                     ),
                 boxShadow: [
                   BoxShadow(
-                    color:
-                        FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                    color: FlutterFlowTheme.of(context).primary.withOpacity(
+                          Theme.of(context).brightness == Brightness.light
+                              ? 0.1 // Reduced shadow for light mode
+                              : 0.3,
+                        ),
                     blurRadius: 3 + animation.value, // Smaller blur
                     spreadRadius: -1,
                   ),

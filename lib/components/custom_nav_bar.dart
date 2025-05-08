@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/utils/color_utils.dart';
 
 class CustomNavBar extends StatefulWidget {
   final int currentIndex;
@@ -40,27 +41,36 @@ class _CustomNavBarState extends State<CustomNavBar>
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       height: 80,
       margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
-        color: FlutterFlowTheme.of(context).secondaryBackground,
+        color: isDarkMode
+            ? FlutterFlowTheme.of(context).secondaryBackground.withOpacity(0.8)
+            : Colors.white.withOpacity(0.95),
         borderRadius: BorderRadius.circular(40),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: Offset(0, 5),
+            color: ColorUtils.getShadowColor(context,
+                opacity: isDarkMode ? 0.1 : 0.08),
+            blurRadius: isDarkMode ? 10 : 8,
+            offset: Offset(0, isDarkMode ? 5 : 3),
           ),
         ],
+        border: Border.all(
+          color: FlutterFlowTheme.of(context).primary.withOpacity(0.08),
+          width: 1.5,
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildNavItem(0, Icons.home_outlined, Icons.home),
-          _buildNavItem(1, Icons.bar_chart_outlined, Icons.bar_chart),
+          _buildNavItem(1, Icons.search_outlined, Icons.search),
           _buildNavItem(2, Icons.add_circle_outline, Icons.add_circle),
-          _buildNavItem(3, Icons.notifications_outlined, Icons.notifications),
+          _buildNavItem(3, Icons.diamond_outlined, Icons.diamond),
           _buildNavItem(4, Icons.person_outline, Icons.person),
         ],
       ),
@@ -70,6 +80,7 @@ class _CustomNavBarState extends State<CustomNavBar>
   Widget _buildNavItem(
       int index, IconData unselectedIcon, IconData selectedIcon) {
     final isSelected = widget.currentIndex == index;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () {
@@ -89,7 +100,9 @@ class _CustomNavBarState extends State<CustomNavBar>
                 height: 50,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                  color: isDarkMode
+                      ? FlutterFlowTheme.of(context).primary.withOpacity(0.1)
+                      : FlutterFlowTheme.of(context).primary.withOpacity(0.08),
                 ),
               ),
             ScaleTransition(

@@ -191,181 +191,219 @@ class _StandardizedPostItemState extends State<StandardizedPostItem> {
       onLongPress: widget.showDeleteOption && widget.onDelete != null
           ? () => _showDeleteOverlay(context)
           : null,
-      child: Stack(
-        children: [
-          // Background Image
-          Positioned.fill(
-            child: Hero(
-              tag: 'post_image_${widget.post.reference.id}',
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: _buildPostBackground(widget.post, context),
-              ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 12,
+              spreadRadius: 0.5,
+              offset: Offset(0, 5),
             ),
-          ),
-          // Add glassmorphic overlay
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 0.5, sigmaY: 0.5),
-                child: Container(
-                  color: Colors.black.withOpacity(0.05),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // Background Image
+            Positioned.fill(
+              child: Hero(
+                tag: 'post_image_${widget.post.reference.id}',
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: _buildPostBackground(widget.post, context),
                 ),
               ),
             ),
-          ),
-          // Content
-          Padding(
-            padding: EdgeInsets.all(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // User info row (conditionally shown)
-                if (widget.showUserInfo) ...[
-                  Row(
-                    children: [
-                      _buildUserAvatar(context, widget.user),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.user.displayName ?? '',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              util.dateTimeFormat(
-                                  'relative', widget.post.date!),
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
+            // Enhanced glassmorphic overlay with more blur
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withOpacity(0.12),
+                          Colors.white.withOpacity(0.05),
+                        ],
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.15),
+                        width: 1.0,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 10,
+                          spreadRadius: 0.5,
+                          offset: Offset(0, 4),
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Content
+            Padding(
+              padding: EdgeInsets.all(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // User info row (conditionally shown)
+                  if (widget.showUserInfo) ...[
+                    Row(
+                      children: [
+                        _buildUserAvatar(context, widget.user),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.user.displayName ?? '',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                util.dateTimeFormat(
+                                    'relative', widget.post.date!),
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                  ],
+                  // Post content
+                  Text(
+                    widget.post.title,
+                    style: FlutterFlowTheme.of(context).titleMedium.override(
+                          fontFamily: 'Figtree',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 17,
+                          color: Colors.white,
+                        ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    widget.post.dream,
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          fontFamily: 'Figtree',
+                          fontSize: 15,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // Tags (if present)
+                  if (widget.post.tags != null &&
+                      widget.post.tags.isNotEmpty) ...[
+                    SizedBox(height: 8),
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TagFormatter.buildTagsWidget(
+                        context,
+                        widget.post.tags,
+                        style: FlutterFlowTheme.of(context).bodySmall.override(
+                              fontFamily: 'Figtree',
+                              color: Colors.white.withOpacity(0.9),
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                    ),
+                  ],
+                  // Interaction buttons
+                  SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      AnimatedLikeButton(
+                        isLiked: _isLiked,
+                        likeCount: _likeCount,
+                        iconSize: 28,
+                        activeColor: FlutterFlowTheme.of(context).primary,
+                        inactiveColor: Colors.white.withOpacity(0.8),
+                        onTap: _handleLike,
+                      ),
+                      // Comments button with StreamBuilder for real-time updates
+                      StreamBuilder<int>(
+                        stream: _getCommentCountStream(),
+                        builder: (context, snapshot) {
+                          final commentCount = snapshot.data ?? 0;
+                          return _buildInteractionButton(
+                            context: context,
+                            icon: Icons.mode_comment_outlined,
+                            count: commentCount,
+                            onTap: () {
+                              context.pushNamed(
+                                'Detailedpost',
+                                queryParameters: {
+                                  'docref': serializeParam(
+                                    widget.post.reference,
+                                    ParamType.DocumentReference,
+                                  ),
+                                  'userref': serializeParam(
+                                    widget.post.poster,
+                                    ParamType.DocumentReference,
+                                  ),
+                                  'showComments': serializeParam(
+                                    true,
+                                    ParamType.bool,
+                                  ),
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+                      _buildInteractionButton(
+                        context: context,
+                        icon:
+                            _isSaved ? Icons.bookmark : Icons.bookmark_outline,
+                        count: _saveCount,
+                        onTap: _handleSave,
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.ios_share,
+                          color: Colors.white.withOpacity(0.8),
+                          size: 28,
+                        ),
+                        onPressed: () {
+                          ShareOptionsDialog.show(
+                              context, widget.post, widget.user);
+                        },
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        constraints: BoxConstraints(),
                       ),
                     ],
                   ),
-                  SizedBox(height: 12),
                 ],
-                // Post content
-                Text(
-                  widget.post.title,
-                  style: FlutterFlowTheme.of(context).titleMedium.override(
-                        fontFamily: 'Figtree',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 17,
-                        color: Colors.white,
-                      ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  widget.post.dream,
-                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                        fontFamily: 'Figtree',
-                        fontSize: 15,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                // Tags (if present)
-                if (widget.post.tags != null &&
-                    widget.post.tags.isNotEmpty) ...[
-                  SizedBox(height: 8),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: TagFormatter.buildTagsWidget(
-                      context,
-                      widget.post.tags,
-                      style: FlutterFlowTheme.of(context).bodySmall.override(
-                            fontFamily: 'Figtree',
-                            color: Colors.white.withOpacity(0.9),
-                            fontWeight: FontWeight.w500,
-                          ),
-                    ),
-                  ),
-                ],
-                // Interaction buttons
-                SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    AnimatedLikeButton(
-                      isLiked: _isLiked,
-                      likeCount: _likeCount,
-                      iconSize: 28,
-                      activeColor: FlutterFlowTheme.of(context).primary,
-                      inactiveColor: Colors.white.withOpacity(0.8),
-                      onTap: _handleLike,
-                    ),
-                    // Comments button with StreamBuilder for real-time updates
-                    StreamBuilder<int>(
-                      stream: _getCommentCountStream(),
-                      builder: (context, snapshot) {
-                        final commentCount = snapshot.data ?? 0;
-                        return _buildInteractionButton(
-                          context: context,
-                          icon: Icons.mode_comment_outlined,
-                          count: commentCount,
-                          onTap: () {
-                            context.pushNamed(
-                              'Detailedpost',
-                              queryParameters: {
-                                'docref': serializeParam(
-                                  widget.post.reference,
-                                  ParamType.DocumentReference,
-                                ),
-                                'userref': serializeParam(
-                                  widget.post.poster,
-                                  ParamType.DocumentReference,
-                                ),
-                                'showComments': serializeParam(
-                                  true,
-                                  ParamType.bool,
-                                ),
-                              },
-                            );
-                          },
-                        );
-                      },
-                    ),
-                    _buildInteractionButton(
-                      context: context,
-                      icon: _isSaved ? Icons.bookmark : Icons.bookmark_outline,
-                      count: _saveCount,
-                      onTap: _handleSave,
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.ios_share,
-                        color: Colors.white.withOpacity(0.8),
-                        size: 28,
-                      ),
-                      onPressed: () {
-                        ShareOptionsDialog.show(
-                            context, widget.post, widget.user);
-                      },
-                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      constraints: BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 

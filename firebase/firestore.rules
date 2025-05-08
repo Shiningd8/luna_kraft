@@ -1,56 +1,39 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is authenticated
+
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Helper function to check if user is the owner
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    // Helper function to get user ID from reference or string
     function getUserId(ref) {
-      return ref is string ? ref : ref.id;
+      return ref is string ? ref : (
+        ref is path ? ref.id : (
+          ref is map && "id" in ref ? ref.id : null
+        )
+      );
     }
 
-    // Helper function to check if user is post owner
     function isPostOwner() {
-      return isAuthenticated() && 
-        (getUserId(resource.data.poster) == request.auth.uid || 
-         getUserId(resource.data.userref) == request.auth.uid);
+      return isAuthenticated() && (
+        (resource.data.poster != null && getUserId(resource.data.poster) == request.auth.uid) || 
+        (resource.data.userref != null && getUserId(resource.data.userref) == request.auth.uid)
+      );
     }
 
-    // Helper function to check if a post exists
-    function postExists(postRef) {
-      return exists(postRef);
-    }
-
-    // Helper function to check if user is comment owner
-    function isCommentOwner(comment) {
-      return request.auth.uid == getUserId(comment.userref);
-    }
-
-    // Helper function to check if user is the owner of the post that a comment belongs to
-    function isCommentPostOwner(comment) {
-      let postRef = comment.postref;
-      return postRef != null && 
-             exists(postRef) && 
-             (getUserId(get(postRef).data.poster) == request.auth.uid || 
-              getUserId(get(postRef).data.userref) == request.auth.uid);
+    function postExists() {
+      return exists(/databases/$(database)/documents/posts/$(request.path[3]));
     }
 
     match /posts/{document} {
       allow create: if isAuthenticated();
       allow read: if true;
-      allow update: if isAuthenticated() && (
-        isPostOwner() || 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Post_saved_by'])
-      );
-      allow delete: if isOwner(resource.data.userId);
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
     }
 
     match /User/{document} {
@@ -63,16 +46,10 @@ service cloud.firestore {
     match /comments/{document} {
       allow create: if isAuthenticated();
       allow read: if true;
-      allow update: if isAuthenticated() && (
-        isCommentOwner(resource.data) || 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingDeletion', 'deleted', 'deletedAt', 'deletedBy', 'deletedAs', 'likes'])
-      );
-      allow delete: if isAuthenticated() && (
-        isCommentOwner(resource.data) || 
-        isCommentPostOwner(resource.data)
-      );
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
     }
-
+    
     match /deleted_comments/{document} {
       allow create: if isAuthenticated();
       allow read: if isAuthenticated();
@@ -142,6 +119,13 @@ service cloud.firestore {
       allow read: if true;
       allow update: if isAuthenticated();
       allow delete: if isOwner(resource.data.userId);
+    }
+
+    match /admin_requests/{document} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }

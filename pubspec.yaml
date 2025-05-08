@@ -157,7 +157,7 @@ dependency_overrides:
   win32: 5.5.1
 
 dev_dependencies:
-  flutter_launcher_icons: 0.13.1
+  flutter_launcher_icons: ^0.14.3
   flutter_lints: ^4.0.0
   image: 4.2.0
   integration_test: 
@@ -175,7 +175,7 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   web:
     generate: true
-  image_path: 'assets/images/app_launcher_icon.png'
+  image_path: 'assets/images/AppLogoAndroid.png'
 
 
 # For information on the generic Dart part of this file, see the

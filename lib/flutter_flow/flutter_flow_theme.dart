@@ -99,10 +99,20 @@ abstract class FlutterFlowTheme {
   TextStyle get headlineSmall => typography.headlineSmall;
   String get titleLargeFamily => typography.titleLargeFamily;
   TextStyle get titleLarge => typography.titleLarge;
-  String get titleMediumFamily => typography.titleMediumFamily;
-  TextStyle get titleMedium => typography.titleMedium;
-  String get titleSmallFamily => typography.titleSmallFamily;
-  TextStyle get titleSmall => typography.titleSmall;
+  String get titleMediumFamily => 'Figtree';
+  TextStyle get titleMedium => GoogleFonts.getFont(
+        'Figtree',
+        color: this.primaryText,
+        fontWeight: FontWeight.w500,
+        fontSize: 18.0,
+      );
+  String get titleSmallFamily => 'Figtree';
+  TextStyle get titleSmall => GoogleFonts.getFont(
+        'Figtree',
+        color: this.primaryText,
+        fontWeight: FontWeight.w500,
+        fontSize: 16.0,
+      );
   String get labelLargeFamily => typography.labelLargeFamily;
   TextStyle get labelLarge => typography.labelLarge;
   String get labelMediumFamily => typography.labelMediumFamily;
@@ -131,18 +141,18 @@ class LightModeTheme extends FlutterFlowTheme {
   late Color secondary = const Color(0xFF39D2C0);
   late Color tertiary = const Color(0xFFEE8B60);
   late Color alternate = const Color(0xFFE5E7EB);
-  late Color primaryText = const Color(0xFF15161E);
-  late Color secondaryText = const Color(0xFF606A85);
+  late Color primaryText = const Color(0xFF101213);
+  late Color secondaryText = const Color(0xFF57636C);
   late Color primaryBackground = const Color(0xFFF1F4F8);
   late Color secondaryBackground = const Color(0xFFFFFFFF);
   late Color accent1 = const Color(0x4D9489F5);
   late Color accent2 = const Color(0x4C39D2C0);
   late Color accent3 = const Color(0x4CEE8B60);
-  late Color accent4 = const Color(0x9AFFFFFF);
+  late Color accent4 = const Color(0xCCFFFFFF);
   late Color success = const Color(0xFF048178);
   late Color warning = const Color(0xFFFCDC0C);
   late Color error = const Color(0xFFFF5963);
-  late Color info = const Color(0xFFFFFFFF);
+  late Color info = const Color(0xFF101213);
 
   late Color dark800Persist = Color(0xFF15161E);
 }
@@ -237,14 +247,14 @@ class ThemeTypography extends Typography {
   String get titleMediumFamily => 'Figtree';
   TextStyle get titleMedium => GoogleFonts.getFont(
         'Figtree',
-        color: theme.info,
+        color: theme.primaryText,
         fontWeight: FontWeight.w500,
         fontSize: 18.0,
       );
   String get titleSmallFamily => 'Figtree';
   TextStyle get titleSmall => GoogleFonts.getFont(
         'Figtree',
-        color: theme.info,
+        color: theme.primaryText,
         fontWeight: FontWeight.w500,
         fontSize: 16.0,
       );

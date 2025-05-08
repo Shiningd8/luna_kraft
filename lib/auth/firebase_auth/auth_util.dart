@@ -296,67 +296,87 @@ class AuthUtil {
   static User? get currentUser => _auth.currentUser;
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  // A completely isolated sign-out method that can be called from anywhere
+  static Future<void> signOutSafely() async {
+    try {
+      debugPrint('Starting minimal sign-out process');
+
+      // Just sign out from Firebase - nothing else
+      await _auth.signOut();
+
+      // Let the auth state change listener handle navigation
+      debugPrint(
+          'Sign-out complete - Firebase auth state listener will handle navigation');
+    } catch (e) {
+      debugPrint('Error in signOutSafely: $e');
+    }
+  }
+
   // Safe sign out method that avoids scaffold messenger deactivation issues
   static Future<void> safeSignOut({
     required BuildContext context,
     bool shouldNavigate = true,
     String? navigateTo,
   }) async {
-    try {
-      // Cache any needed values before async operations
-      final navigator = Navigator.maybeOf(context);
-      GoRouter? router;
+    // Create a completer to ensure we only continue when logout is complete
+    final completer = Completer<void>();
 
-      // Only try to get router if context is still valid
-      if (context.mounted) {
+    try {
+      // First sign out from Firebase without any navigation
+      await signOutSafely();
+
+      // Wait a moment for auth state to update
+      await Future.delayed(Duration(milliseconds: 300));
+
+      // Get navigation references if needed and if context is still valid
+      GoRouter? router;
+      if (shouldNavigate && context.mounted) {
         try {
           router = GoRouter.of(context);
         } catch (e) {
-          debugPrint('GoRouter not available: $e');
+          debugPrint('Error getting GoRouter: $e');
         }
       }
 
-      // Only try to access AppState if context is still valid
-      AppState? appState;
+      // Cleanup app state if available and if context is still valid
       if (context.mounted) {
         try {
-          appState = Provider.of<AppState>(context, listen: false);
+          final appState = Provider.of<AppState>(context, listen: false);
+          await appState.cleanup();
         } catch (e) {
-          debugPrint('AppState not available: $e');
+          debugPrint('Error cleaning up AppState: $e');
         }
       }
 
-      // Do async cleanup after capturing all needed references
-      if (appState != null) {
-        await appState.cleanup();
-      }
-
-      // Sign out from Firebase
-      await _auth.signOut();
-
-      // Try to clear app state if available
+      // Clear FFAppState
       try {
         await FFAppState().initializePersistedState();
       } catch (e) {
-        debugPrint('FFAppState not available: $e');
+        debugPrint('Error initializing app state: $e');
       }
 
-      // Only navigate if requested and if context/navigator are still available
-      if (shouldNavigate &&
-          navigator != null &&
-          router != null &&
-          context.mounted) {
-        // First pop any remaining navigation stack
-        while (navigator.canPop()) {
-          navigator.pop();
-        }
-
-        // Then navigate to the specified route or default to sign in
-        router.go(navigateTo ?? '/');
+      // Navigation should be the last step, and only if requested and context is still valid
+      if (shouldNavigate && router != null && context.mounted) {
+        // Use a microtask to ensure navigation happens after all other processing
+        Future.microtask(() {
+          try {
+            // Use go() instead of context.pushNamed to avoid navigation conflicts
+            router?.go(navigateTo ?? '/');
+            completer.complete();
+          } catch (e) {
+            debugPrint('Error during navigation after sign out: $e');
+            completer.completeError(e);
+          }
+        });
+      } else {
+        completer.complete();
       }
+
+      return completer.future;
     } catch (e) {
       debugPrint('Error during safe sign out: $e');
-      // Don't show error messages since the widget might be disposed
+      completer.completeError(e);
+      return completer.future;
     }
   }
 
@@ -477,22 +497,6 @@ class AuthUtil {
     } catch (e) {
       debugPrint('Error checking App Check skipped status: $e');
       return false;
-    }
-  }
-
-  // A completely isolated sign-out method that can be called from anywhere
-  static Future<void> signOutSafely() async {
-    try {
-      debugPrint('Starting minimal sign-out process');
-
-      // Just sign out from Firebase - nothing else
-      await _auth.signOut();
-
-      // Let the auth state change listener handle navigation
-      debugPrint(
-          'Sign-out complete - Firebase auth state listener will handle navigation');
-    } catch (e) {
-      debugPrint('Error in signOutSafely: $e');
     }
   }
 }
