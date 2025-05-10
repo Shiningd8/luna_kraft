@@ -63,88 +63,141 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
 
   // Accept a follow request
   Future<void> _acceptFollowRequest(NotificationsRecord notification) async {
-    if (notification.madeBy == null || notification.madeTo == null) {
-      return;
-    }
+    try {
+      // Check if we have the required references
+      if (notification.madeBy == null) {
+        print('Cannot accept follow request: madeBy is null');
+        return;
+      }
 
-    // Create a batch to perform multiple operations
-    final batch = FirebaseFirestore.instance.batch();
+      // Check madeTo - it should be a String now based on our model changes
+      final String? madeTo = notification.madeTo;
+      if (madeTo == null || madeTo.isEmpty) {
+        print('Cannot accept follow request: madeTo is null or empty');
+        return;
+      }
 
-    // 1. Update the notification status
-    batch.update(notification.reference, {
-      'is_read': true,
-      'status': 'approved',
-    });
+      // Verify that the notification is for the current user
+      final currentUserId = currentUserReference?.id;
+      if (currentUserId == null || !madeTo.contains(currentUserId)) {
+        print('Cannot accept follow request: not for current user');
+        return;
+      }
 
-    // 2. Add the follower to the user's followers list
-    // First, get the current user
-    final currentUserDoc = await currentUserReference!.get();
-    final currentUserRecord = UserRecord.fromSnapshot(currentUserDoc);
+      // Create a batch to perform multiple operations
+      final batch = FirebaseFirestore.instance.batch();
 
-    // Then, add the follower to the followers list
-    batch.update(currentUserReference!, {
-      'users_following_me': FieldValue.arrayUnion([notification.madeBy]),
-      'followers': FieldValue.arrayUnion([notification.madeBy]),
-    });
-
-    // 3. Add the user to the follower's following list
-    // Get the follower user
-    final followerDoc = await notification.madeBy!.get();
-    if (followerDoc.exists) {
-      batch.update(notification.madeBy!, {
-        'following_users': FieldValue.arrayUnion([currentUserReference]),
-        'following': FieldValue.arrayUnion([currentUserReference]),
+      // 1. Update the notification status
+      batch.update(notification.reference, {
+        'is_read': true,
+        'status': 'approved',
       });
-    }
 
-    // 4. Remove the user from the pending requests list
-    batch.update(currentUserReference!, {
-      'pending_follow_requests': FieldValue.arrayRemove([notification.madeBy]),
-    });
+      // 2. Add the follower to the user's followers list
+      // First, get the current user
+      final currentUserDoc = await currentUserReference!.get();
+      final currentUserRecord = UserRecord.fromSnapshot(currentUserDoc);
 
-    // Commit all operations at once
-    await batch.commit();
+      // Then, add the follower to the followers list
+      batch.update(currentUserReference!, {
+        'users_following_me': FieldValue.arrayUnion([notification.madeBy]),
+        'followers': FieldValue.arrayUnion([notification.madeBy]),
+      });
 
-    // Show a success message
-    FollowStatusPopup.showFollowStatusPopup(
-      context,
-      isFollowed: true,
-      status: 'request_accepted',
-    );
-  }
+      // 3. Add the user to the follower's following list
+      // Get the follower user
+      final followerDoc = await notification.madeBy!.get();
+      if (followerDoc.exists) {
+        batch.update(notification.madeBy!, {
+          'following_users': FieldValue.arrayUnion([currentUserReference]),
+          'following': FieldValue.arrayUnion([currentUserReference]),
+        });
+      }
 
-  // Deny a follow request
-  Future<void> _denyFollowRequest(NotificationsRecord notification) async {
-    if (notification.madeBy == null || notification.madeTo == null) {
-      return;
-    }
-
-    // Create a batch to perform multiple operations
-    final batch = FirebaseFirestore.instance.batch();
-
-    // 1. Update the notification status
-    batch.update(notification.reference, {
-      'is_read': true,
-      'status': 'declined',
-    });
-
-    // 2. Remove the user from the pending requests list
-    if (currentUserReference != null) {
+      // 4. Remove the user from the pending requests list
       batch.update(currentUserReference!, {
         'pending_follow_requests':
             FieldValue.arrayRemove([notification.madeBy]),
       });
+
+      // Commit all operations at once
+      await batch.commit();
+
+      // Show a success message
+      FollowStatusPopup.showFollowStatusPopup(
+        context,
+        isFollowed: true,
+        status: 'request_accepted',
+      );
+    } catch (e) {
+      print('Error accepting follow request: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error accepting follow request'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
 
-    // Commit all operations at once
-    await batch.commit();
+  // Deny a follow request
+  Future<void> _denyFollowRequest(NotificationsRecord notification) async {
+    try {
+      // Check if we have the required references
+      if (notification.madeBy == null) {
+        print('Cannot deny follow request: madeBy is null');
+        return;
+      }
 
-    // Show a success message
-    FollowStatusPopup.showFollowStatusPopup(
-      context,
-      isFollowed: false,
-      status: 'request_cancelled',
-    );
+      // Check madeTo - it should be a String now based on our model changes
+      final String? madeTo = notification.madeTo;
+      if (madeTo == null || madeTo.isEmpty) {
+        print('Cannot deny follow request: madeTo is null or empty');
+        return;
+      }
+
+      // Verify that the notification is for the current user
+      final currentUserId = currentUserReference?.id;
+      if (currentUserId == null || !madeTo.contains(currentUserId)) {
+        print('Cannot deny follow request: not for current user');
+        return;
+      }
+
+      // Create a batch to perform multiple operations
+      final batch = FirebaseFirestore.instance.batch();
+
+      // 1. Update the notification status
+      batch.update(notification.reference, {
+        'is_read': true,
+        'status': 'declined',
+      });
+
+      // 2. Remove the user from the pending requests list
+      if (currentUserReference != null) {
+        batch.update(currentUserReference!, {
+          'pending_follow_requests':
+              FieldValue.arrayRemove([notification.madeBy]),
+        });
+      }
+
+      // Commit all operations at once
+      await batch.commit();
+
+      // Show a success message
+      FollowStatusPopup.showFollowStatusPopup(
+        context,
+        isFollowed: false,
+        status: 'request_cancelled',
+      );
+    } catch (e) {
+      print('Error denying follow request: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error denying follow request'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -271,40 +324,62 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
 
         // Filter notifications for current user
         final userNotifications = allNotifications.where((notification) {
-          // Get the current user ID
-          final currentUserID = currentUserReference?.id ?? '';
-          if (currentUserID.isEmpty) return false;
+          try {
+            // Get the current user ID
+            final currentUserID = currentUserReference?.id ?? '';
+            if (currentUserID.isEmpty) return false;
 
-          // Check if the notification is for the current user
-          // Case 1: made_to is stored as a String directly
-          if (notification.madeTo is String &&
-              notification.madeTo == currentUserID) {
-            return true;
-          }
+            // Debug the notification
+            print('Processing notification: ${notification.reference.id}');
+            print('Raw made_to value: ${notification.snapshotData['made_to']}');
+            print(
+                'Runtime type: ${notification.snapshotData['made_to']?.runtimeType}');
 
-          // Case 2: made_to is stored as a DocumentReference
-          if (notification.snapshotData.containsKey('made_to')) {
-            final madeTo = notification.snapshotData['made_to'];
+            // Handle mixed types in madeTo field safely
+            String? notificationMadeTo;
 
-            // If it's a DocumentReference
-            if (madeTo is DocumentReference) {
-              return madeTo.id == currentUserID;
+            // Get madeTo as String - check the schema's getter first
+            notificationMadeTo = notification.madeTo;
+            print('notification.madeTo getter result: $notificationMadeTo');
+
+            // If that's null, try to extract from the raw data
+            if (notificationMadeTo == null &&
+                notification.snapshotData.containsKey('made_to')) {
+              final rawMadeTo = notification.snapshotData['made_to'];
+              print('Raw madeTo value: $rawMadeTo (${rawMadeTo?.runtimeType})');
+
+              if (rawMadeTo is String) {
+                notificationMadeTo = rawMadeTo;
+              } else if (rawMadeTo is DocumentReference) {
+                notificationMadeTo = rawMadeTo.id;
+              } else if (rawMadeTo != null) {
+                // Last resort fallback
+                try {
+                  notificationMadeTo = rawMadeTo.toString();
+                } catch (e) {
+                  print('Error converting madeTo to string: $e');
+                }
+              }
             }
 
-            // If it's a String
-            if (madeTo is String) {
-              return madeTo == currentUserID;
+            // Now compare the IDs
+            if (notificationMadeTo != null) {
+              // Compare directly or check if one contains the other
+              final isMatch = notificationMadeTo == currentUserID ||
+                  notificationMadeTo.contains(currentUserID) ||
+                  currentUserID.contains(notificationMadeTo);
+              print('Notification match result: $isMatch');
+              return isMatch;
             }
-          }
 
-          // Check if madeTo path contains the current user ID
-          // This handles cases where the reference might be stored in different formats
-          if (notification.reference != null &&
-              notification.reference.path.contains('user/$currentUserID')) {
-            return true;
+            print('No madeTo value found, skipping notification');
+            return false;
+          } catch (e) {
+            print('Error filtering notification: $e');
+            print('Stack trace: ${StackTrace.current}');
+            // Skip this notification if it can't be processed
+            return false;
           }
-
-          return false;
         }).toList();
 
         // Filter notifications based on type
@@ -386,124 +461,93 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.notifications_none,
-            size: 64,
-            color: Colors.white.withOpacity(0.5),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'No notifications found for ${_selectedTab} tab',
-            style: FlutterFlowTheme.of(context).titleMedium.override(
-                  fontFamily: 'Figtree',
-                  color: Colors.white.withOpacity(0.7),
-                ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Current user ID: ${currentUserReference?.id ?? 'Not logged in'}',
-            style: FlutterFlowTheme.of(context).bodySmall.override(
-                  fontFamily: 'Figtree',
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 12,
-                ),
-          ),
-          SizedBox(height: 24),
-          // Add a test button to create a notification
-          ElevatedButton(
-            onPressed: () async {
-              // Create a test notification based on current tab
-              try {
-                bool isLike = _selectedTab == 'All' || _selectedTab == 'Likes';
-                bool isFollow =
-                    _selectedTab == 'All' || _selectedTab == 'Follows';
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.notifications_none,
+              size: 64,
+              color: Colors.white.withOpacity(0.5),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'No notifications found for ${_selectedTab} tab',
+              style: FlutterFlowTheme.of(context).titleMedium.override(
+                    fontFamily: 'Figtree',
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Current user ID: ${currentUserReference?.id ?? 'Not logged in'}',
+              style: FlutterFlowTheme.of(context).bodySmall.override(
+                    fontFamily: 'Figtree',
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 12,
+                  ),
+            ),
+            SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                // Show a diagnostic popup with debugging information
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text('Notification Diagnostics'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                            'Current User ID: ${currentUserReference?.id ?? 'None'}'),
+                        SizedBox(height: 8),
+                        Text('Current Tab: $_selectedTab'),
+                        SizedBox(height: 16),
+                        FutureBuilder<QuerySnapshot>(
+                          future: NotificationsRecord.collection.get(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return CircularProgressIndicator();
+                            }
 
-                if (!isLike && !isFollow) {
-                  // Create a comment notification if not like or follow
-                  final result = await NotificationsRecord.collection.add({
-                    'is_a_like': false,
-                    'is_follow_request': false,
-                    'is_read': false,
-                    'made_by': currentUserReference,
-                    'made_to': currentUserReference?.id,
-                    'date': DateTime.now(),
-                    'made_by_username': 'Test User (Comment)',
-                  });
-                  print(
-                      'Created test COMMENT notification with ID: ${result.id}');
-                } else if (isLike) {
-                  // Create a like notification
-                  final result = await NotificationsRecord.collection.add({
-                    'is_a_like': true,
-                    'is_follow_request': false,
-                    'is_read': false,
-                    'made_by': currentUserReference,
-                    'made_to': currentUserReference?.id,
-                    'date': DateTime.now(),
-                    'made_by_username': 'Test User (Like)',
-                  });
-                  print('Created test LIKE notification with ID: ${result.id}');
-                } else {
-                  // Create a follow notification
-                  final result = await NotificationsRecord.collection.add({
-                    'is_a_like': false,
-                    'is_follow_request': true,
-                    'is_read': false,
-                    'made_by': currentUserReference,
-                    'made_to': currentUserReference?.id,
-                    'date': DateTime.now(),
-                    'made_by_username': 'Test User (Follow)',
-                    'status': 'pending',
-                  });
-                  print(
-                      'Created test FOLLOW notification with ID: ${result.id}');
-                }
-
-                // Refresh the page
+                            final notifications = snapshot.data!.docs;
+                            return Text(
+                                'Total Notifications in DB: ${notifications.length}');
+                          },
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey.shade800,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Diagnostics'),
+            ),
+            SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () {
                 setState(() {});
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content:
-                        Text('Test notification created - pull to refresh'),
-                    backgroundColor: FlutterFlowTheme.of(context).primary,
-                  ),
-                );
-              } catch (e) {
-                print('Error creating test notification: $e');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error: $e'),
-                    backgroundColor: FlutterFlowTheme.of(context).error,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: FlutterFlowTheme.of(context).primary,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Retry'),
             ),
-            child: Text('Create Test ${_selectedTab} Notification'),
-          ),
-          SizedBox(height: 12),
-          TextButton(
-            onPressed: () {
-              setState(() {});
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.refresh, size: 16, color: Colors.white70),
-                SizedBox(width: 8),
-                Text('Refresh', style: TextStyle(color: Colors.white70)),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

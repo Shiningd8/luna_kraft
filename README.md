@@ -30,3 +30,24 @@ flutter drive \
 Find more information about running Flutter integration tests [here](https://docs.flutter.dev/cookbook/testing/integration/introduction#5-run-the-integration-test).
 
 Refer to this guide for instructions on running the tests on [Firebase Test Lab](https://github.com/flutter/flutter/tree/main/packages/integration_test#firebase-test-lab).
+
+## Customizing Notification Icons
+
+To replace the placeholder notification icons with your own:
+
+1. Create notification icons according to Android's specifications:
+   - Icons should be simple, white silhouettes on a transparent background
+   - Material design icon templates are preferred
+   - Recommended tool: [Android Asset Studio](https://romannurik.github.io/AndroidAssetStudio/icons-notification.html)
+
+2. Save your icons with the name `notification_icon.png` in the following directories:
+   - `android/app/src/main/res/drawable-mdpi/` (24x24 px)
+   - `android/app/src/main/res/drawable-hdpi/` (36x36 px)
+   - `android/app/src/main/res/drawable-xhdpi/` (48x48 px)
+   - `android/app/src/main/res/drawable-xxhdpi/` (72x72 px)
+   - `android/app/src/main/res/drawable-xxxhdpi/` (96x96 px)
+
+3. You can also customize the notification color by editing:
+   - `android/app/src/main/res/values/colors.xml` - update the `notification_color` value
+
+Note: The XML vector icon at `android/app/src/main/res/drawable/notification_icon.xml` serves as a fallback and should be kept.

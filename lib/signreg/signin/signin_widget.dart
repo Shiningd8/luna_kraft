@@ -711,12 +711,14 @@ class _SigninWidgetState extends State<SigninWidget>
             alignment: AlignmentDirectional(0.0, 0.0),
             child: Stack(
               children: [
-                Lottie.asset(
-                  'assets/jsons/Animation_-_1739171323302.json',
-                  width: 500.0,
-                  height: 1000.0,
-                  fit: BoxFit.none,
-                  animate: true,
+                AbsorbPointer(
+                  child: Lottie.asset(
+                    'assets/jsons/Animation_-_1739171323302.json',
+                    width: 500.0,
+                    height: 1000.0,
+                    fit: BoxFit.none,
+                    animate: true,
+                  ),
                 ),
                 Column(
                   mainAxisSize: MainAxisSize.max,

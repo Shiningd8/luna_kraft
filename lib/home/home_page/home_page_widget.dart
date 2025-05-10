@@ -10,6 +10,8 @@ import '/widgets/space_background.dart';
 import '/services/app_state.dart';
 import '/backend/schema/util/schema_util.dart';
 import '/backend/schema/util/firestore_util.dart';
+import '/widgets/notification_permission_dialog.dart';
+import '/widgets/notification_test_button.dart';
 import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -25,6 +27,7 @@ import 'dart:io' as io;
 import 'dart:async';
 import 'package:video_player/video_player.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '/components/save_post_popup.dart';
 import '/components/animated_like_button.dart';
 import '/flutter_flow/app_navigation_helper.dart';
@@ -930,6 +933,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
   bool _isDisposed = false;
   late ScrollController _scrollController;
   bool _isScrolled = false;
+  bool _showHeaderShadow = false;
+  bool _checkingNotificationPermission = false;
+  Timer? _notificationRequestTimer;
 
   @override
   void didChangeDependencies() {
@@ -956,204 +962,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
 
-    // Initialize user data and music service
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (mounted) {
-        try {
-          // Initialize music service
-          _appState?.initialize();
-
-          if (currentUserReference != null) {
-            int retryCount = 0;
-            const maxRetries = 3;
-            bool success = false;
-            Duration retryDelay = Duration(seconds: 1);
-
-            while (!success && retryCount < maxRetries) {
-              try {
-                // First check if we have a valid auth state
-                final user = FirebaseAuth.instance.currentUser;
-                if (user == null) {
-                  print('No authenticated user found');
-                  break;
-                }
-
-                // Try to get user data with timeout and offline persistence
-                final userData =
-                    await UserRecord.getDocument(currentUserReference!)
-                        .first
-                        .timeout(
-                  Duration(seconds: 10),
-                  onTimeout: () {
-                    throw TimeoutException('User data fetch timed out');
-                  },
-                );
-
-                if (mounted) {
-                  setState(() {
-                    _refreshTimestamp = DateTime.now().millisecondsSinceEpoch;
-                  });
-                  success = true;
-                }
-              } catch (error) {
-                retryCount++;
-                print('Error loading user data (attempt $retryCount): $error');
-
-                if (error is FirebaseAuthException) {
-                  if (error.code == 'firebase_auth/network-request-failed') {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            retryCount < maxRetries
-                                ? 'Network error. Retrying in ${retryDelay.inSeconds} seconds... (${retryCount}/$maxRetries)'
-                                : 'Unable to connect to Firebase. Please try the following:\n1. Check your network settings\n2. Try using a different network\n3. Restart the app\n4. Clear app cache and data\n5. Try using mobile data instead of WiFi',
-                          ),
-                          backgroundColor: FlutterFlowTheme.of(context).error,
-                          duration: Duration(seconds: 5),
-                          action: retryCount < maxRetries
-                              ? null
-                              : SnackBarAction(
-                                  label: 'Retry',
-                                  onPressed: () {
-                                    setState(() {
-                                      _refreshTimestamp =
-                                          DateTime.now().millisecondsSinceEpoch;
-                                    });
-                                  },
-                                ),
-                        ),
-                      );
-                    }
-
-                    if (retryCount < maxRetries) {
-                      // Exponential backoff for retry delay
-                      retryDelay *= 2;
-                      await Future.delayed(retryDelay);
-                    }
-                  } else {
-                    // Handle other Firebase Auth errors
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content:
-                              Text('Authentication error: ${error.message}'),
-                          backgroundColor: FlutterFlowTheme.of(context).error,
-                          duration: Duration(seconds: 5),
-                        ),
-                      );
-                    }
-                    break;
-                  }
-                } else if (error is TimeoutException) {
-                  // Handle timeout errors
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            'Request timed out. Please check your connection.'),
-                        backgroundColor: FlutterFlowTheme.of(context).error,
-                        duration: Duration(seconds: 5),
-                      ),
-                    );
-                  }
-                  break;
-                } else {
-                  // For other errors, show error message without retry
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error loading user data: $error'),
-                        backgroundColor: FlutterFlowTheme.of(context).error,
-                        duration: Duration(seconds: 5),
-                      ),
-                    );
-                  }
-                  break;
-                }
-              }
-            }
-          }
-        } catch (e) {
-          print('Error in initialization: $e');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Unable to connect to the server. Please try the following:\n1. Check your network settings\n2. Try using a different network\n3. Restart the app\n4. Clear app cache and data\n5. Try using mobile data instead of WiFi',
-                ),
-                backgroundColor: FlutterFlowTheme.of(context).error,
-                duration: Duration(seconds: 5),
-                action: SnackBarAction(
-                  label: 'Retry',
-                  onPressed: () {
-                    setState(() {
-                      _refreshTimestamp = DateTime.now().millisecondsSinceEpoch;
-                    });
-                  },
-                ),
-              ),
-            );
-          }
-        }
-      }
-    });
-  }
-
-  Future<void> _initializePostVideo(PostsRecord post) async {
-    print('Initializing video for post: ${post.reference.id}');
-    print('Video URL: ${post.videoBackgroundUrl}');
-
-    if (post.videoBackgroundUrl.isNotEmpty) {
-      try {
-        // Dispose existing controller
-        await _videoController?.dispose();
-
-        // Create new controller with the post's video
-        // Use the full asset path as registered in pubspec.yaml
-        final videoPath = post.videoBackgroundUrl;
-        print('Loading video from path: $videoPath');
-
-        // Initialize the video controller
-        _videoController = VideoPlayerController.asset(
-          videoPath,
-          package: null,
-        );
-
-        print('Video controller created, initializing...');
-        await _videoController!.initialize();
-        print('Video initialized successfully');
-
-        if (!_isDisposed && mounted) {
-          setState(() {
-            _isVideoInitialized = true;
-          });
-        }
-
-        // Set video properties
-        _videoController!.setLooping(true);
-        _videoController!.play();
-        _videoController!.setVolume(0.0);
-
-        print('Video properties set:');
-        print('- Size: ${_videoController!.value.size}');
-        print('- Is playing: ${_videoController!.value.isPlaying}');
-        print('- Aspect ratio: ${_videoController!.value.aspectRatio}');
-      } catch (e, stackTrace) {
-        print('Error initializing video: $e');
-        print('Stack trace: $stackTrace');
-        if (!_isDisposed && mounted) {
-          setState(() {
-            _isVideoInitialized = false;
-          });
-        }
-      }
-    } else {
-      print('No video URL provided for post');
-      _videoController?.dispose();
-      _videoController = null;
-      _isVideoInitialized = false;
-    }
+    // Schedule notification permission check
+    _scheduleNotificationPermissionCheck();
   }
 
   @override
@@ -1165,6 +975,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
     _appState?.cleanup();
     _videoController?.dispose();
     _scrollController.dispose();
+    _notificationRequestTimer?.cancel();
     super.dispose();
   }
 
@@ -2168,6 +1979,104 @@ class _HomePageWidgetState extends State<HomePageWidget>
       setState(() {
         _isScrolled = false;
       });
+    }
+  }
+
+  // Schedule notification permission check after a delay
+  void _scheduleNotificationPermissionCheck() {
+    // Check permissions shortly after the homepage loads
+    _notificationRequestTimer = Timer(Duration(seconds: 1), () {
+      _checkNotificationPermission();
+    });
+  }
+
+  // Check if notification permission should be requested
+  Future<void> _checkNotificationPermission() async {
+    if (_checkingNotificationPermission) return;
+    _checkingNotificationPermission = true;
+
+    try {
+      // Check if the user is logged in
+      if (currentUser?.uid == null) {
+        _checkingNotificationPermission = false;
+        return;
+      }
+
+      // Check if we've already asked for permission
+      final prefs = await SharedPreferences.getInstance();
+      final permissionAsked =
+          prefs.getBool('notification_permission_asked') ?? false;
+      final permissionGranted =
+          prefs.getBool('notification_permission_granted') ?? false;
+
+      // If permission already granted, no need to show dialog
+      if (permissionGranted) {
+        _checkingNotificationPermission = false;
+        return;
+      }
+
+      // If we haven't asked before or it's a new user, show immediately
+      if (!permissionAsked) {
+        // Show the permission dialog immediately for new users
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationPermissionDialog.show(context).then((granted) async {
+            // Store the time we asked
+            final currentTimeMillis = DateTime.now().millisecondsSinceEpoch;
+            await prefs.setInt(
+                'notification_permission_last_asked_time', currentTimeMillis);
+
+            if (granted) {
+              // If permission granted, make sure user is registered with FCM
+              await prefs.setBool('notification_permission_granted', true);
+              // The NotificationService.requestPermission already registers the token
+            }
+          });
+        });
+        _checkingNotificationPermission = false;
+        return;
+      }
+
+      // Don't ask if we've already asked in the last week
+      final lastAskedTimeMillis =
+          prefs.getInt('notification_permission_last_asked_time') ?? 0;
+      final currentTimeMillis = DateTime.now().millisecondsSinceEpoch;
+      final weekInMillis = 7 * 24 * 60 * 60 * 1000;
+
+      if (permissionAsked &&
+          (currentTimeMillis - lastAskedTimeMillis < weekInMillis)) {
+        _checkingNotificationPermission = false;
+        return;
+      }
+
+      // For returning users who previously denied permission,
+      // show the dialog after some activity
+      // Check if the user has been active for a sufficient amount of time
+      final firstOpenTime =
+          prefs.getInt('first_open_time') ?? currentTimeMillis;
+
+      if (firstOpenTime == currentTimeMillis) {
+        // First time opening the app, save the timestamp
+        await prefs.setInt('first_open_time', currentTimeMillis);
+      }
+
+      // For returning users who denied before, wait a bit before asking again
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        NotificationPermissionDialog.show(context).then((granted) async {
+          // Store the time we asked
+          await prefs.setInt(
+              'notification_permission_last_asked_time', currentTimeMillis);
+
+          if (granted) {
+            // If permission granted, make sure user is registered with FCM
+            await prefs.setBool('notification_permission_granted', true);
+            // The NotificationService.requestPermission already registers the token
+          }
+        });
+      });
+    } catch (e) {
+      print('Error checking notification permission: $e');
+    } finally {
+      _checkingNotificationPermission = false;
     }
   }
 }

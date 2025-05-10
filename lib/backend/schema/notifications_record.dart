@@ -82,13 +82,36 @@ class NotificationsRecord extends FirestoreRecord {
     _madeBy = snapshotData['made_by'] as DocumentReference?;
 
     // Handle the madeTo field which could be either a String or DocumentReference
-    if (snapshotData['made_to'] is String) {
-      _madeTo = snapshotData['made_to'] as String?;
-    } else if (snapshotData['made_to'] is DocumentReference) {
-      final madeToRef = snapshotData['made_to'] as DocumentReference?;
-      _madeTo = madeToRef?.id;
-    } else {
-      _madeTo = null;
+    try {
+      if (snapshotData['made_to'] is String) {
+        _madeTo = snapshotData['made_to'] as String?;
+      } else if (snapshotData['made_to'] is DocumentReference) {
+        final madeToRef = snapshotData['made_to'] as DocumentReference?;
+        _madeTo = madeToRef?.id;
+      } else {
+        _madeTo = null;
+      }
+    } catch (e) {
+      print('Error parsing madeTo field: $e');
+      // Attempt a more robust fallback extraction
+      try {
+        if (snapshotData.containsKey('made_to')) {
+          final madeToValue = snapshotData['made_to'];
+          if (madeToValue != null) {
+            if (madeToValue is String) {
+              _madeTo = madeToValue;
+            } else if (madeToValue is DocumentReference) {
+              _madeTo = madeToValue.id;
+            } else {
+              // Try to convert to string as last resort
+              _madeTo = madeToValue.toString();
+            }
+          }
+        }
+      } catch (fallbackError) {
+        print('Fallback madeTo extraction failed: $fallbackError');
+        _madeTo = null;
+      }
     }
 
     _date = snapshotData['date'] as DateTime?;
@@ -172,10 +195,22 @@ class NotificationsRecord extends FirestoreRecord {
   }) async {
     // Ensure madeTo is always stored as String
     String? madeToString;
-    if (madeTo is String) {
-      madeToString = madeTo;
-    } else if (madeTo is DocumentReference) {
-      madeToString = madeTo.id;
+    try {
+      if (madeTo == null) {
+        madeToString = null;
+      } else if (madeTo is String) {
+        madeToString = madeTo;
+      } else if (madeTo is DocumentReference) {
+        madeToString = madeTo.id;
+      } else {
+        // Last resort, try to convert to string
+        madeToString = madeTo.toString();
+        print(
+            'Warning: madeTo was converted from ${madeTo.runtimeType} to String');
+      }
+    } catch (e) {
+      print('Error processing madeTo in createNotification: $e');
+      // Don't set madeToString if there was an error
     }
 
     final notificationData = {

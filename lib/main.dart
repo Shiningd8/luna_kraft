@@ -28,6 +28,8 @@ import '/services/native_ad_factory.dart';
 import '/services/purchase_service.dart';
 import '/services/subscription_manager.dart';
 import '/onboarding/onboarding_manager.dart';
+import '/services/notification_service.dart';
+import '/widgets/notification_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
@@ -125,6 +127,14 @@ void main() async {
     print('Subscription manager initialized successfully');
   } catch (e) {
     print('Error initializing subscription manager: $e');
+  }
+
+  // Initialize notification service
+  try {
+    await NotificationService().initialize();
+    print('Notification service initialized successfully');
+  } catch (e) {
+    print('Error initializing notification service: $e');
   }
 
   await FlutterFlowTheme.initialize();
@@ -238,27 +248,29 @@ class _MyAppState extends State<MyApp> {
       );
     }
 
-    return MaterialApp.router(
-      title: 'LunaKraft',
-      localizationsDelegates: [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [Locale('en', '')],
-      theme: ThemeData(
-        brightness: Brightness.light,
-        useMaterial3: false,
+    return NotificationHandler(
+      child: MaterialApp.router(
+        title: 'LunaKraft',
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('en', '')],
+        theme: ThemeData(
+          brightness: Brightness.light,
+          useMaterial3: false,
+        ),
+        darkTheme: ThemeData(
+          brightness: Brightness.dark,
+          useMaterial3: false,
+        ),
+        themeMode: _themeMode,
+        routerConfig: _router,
+        builder: (context, child) {
+          return ConnectivityBanner(child: child!);
+        },
       ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        useMaterial3: false,
-      ),
-      themeMode: _themeMode,
-      routerConfig: _router,
-      builder: (context, child) {
-        return ConnectivityBanner(child: child!);
-      },
     );
   }
 }
