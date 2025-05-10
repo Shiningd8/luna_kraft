@@ -1590,13 +1590,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                           EdgeInsets.symmetric(vertical: 8),
                                       children: [
                                         _buildDrawerItem(
-                                          icon: Icons.home_outlined,
-                                          title: 'Home',
-                                          onTap: () {
-                                            Navigator.pop(context);
-                                          },
-                                        ),
-                                        _buildDrawerItem(
                                           icon: Icons.person_outline,
                                           title: 'Profile',
                                           onTap: () {
@@ -1787,13 +1780,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 child: ListView(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   children: [
-                    _buildDrawerItem(
-                      icon: Icons.home_outlined,
-                      title: 'Home',
-                      onTap: () {
-                        Navigator.pop(context);
-                      },
-                    ),
                     _buildDrawerItem(
                       icon: Icons.person_outline,
                       title: 'Profile',

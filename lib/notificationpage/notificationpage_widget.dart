@@ -272,7 +272,12 @@ class _NotificationpageWidgetState extends State<NotificationpageWidget>
         return 'requested to follow you';
       }
     } else {
-      return 'commented on your post';
+      // Use the isReply field to determine the correct notification text
+      if (notification.isReply) {
+        return 'replied to your comment';
+      } else {
+        return 'commented on your post';
+      }
     }
   }
 

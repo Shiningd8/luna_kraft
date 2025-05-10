@@ -13,6 +13,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'package:intl/intl.dart';
+import 'package:screen_brightness/screen_brightness.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Add a fallback AnimationGuard class right after imports
 import 'dart:math' as math;
@@ -337,6 +340,15 @@ class _ZenModePageState extends State<ZenModePage>
   Timer? _timerCountdown;
   String _timerDisplay = '';
 
+  // Night Garden mode state
+  bool _isNightGardenMode = false;
+  late AnimationController _nightGardenFadeController;
+
+  // Screen brightness variables
+  double _originalBrightness = 1.0;
+  final double _nightGardenBrightness = 0.15; // Very dim for battery saving
+  final ScreenBrightness _screenBrightness = ScreenBrightness();
+
   // Helper method to get icon based on sound name
   IconData _getSoundIcon(String soundName) {
     switch (soundName.toLowerCase()) {
@@ -410,10 +422,34 @@ class _ZenModePageState extends State<ZenModePage>
     }
   }
 
+  // Add variables for the intro experience
+  bool _showZenModeIntro = false;
+  late PageController _introPageController;
+  late AnimationController _introFadeController;
+  int _currentIntroPage = 0;
+  final int _totalIntroPages = 4;
+
+  // Add a variable to track the overlay entry
+  OverlayEntry? _nightGardenOverlay;
+
   @override
   void initState() {
     super.initState();
     _debugLog('Initializing ZenModePage');
+
+    // Initialize intro page controller
+    _introPageController = PageController();
+
+    // Initialize intro fade animation
+    _introFadeController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 600),
+    );
+
+    // Check if user needs to see intro
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkIfNeedsZenModeIntro();
+    });
 
     // Initialize services
     try {
@@ -527,6 +563,14 @@ class _ZenModePageState extends State<ZenModePage>
       _timerRippleController.repeat();
       _debugLog('Timer ripple controller initialized');
 
+      // Setup Night Garden fade animation
+      _nightGardenFadeController = AnimationController(
+        vsync: this,
+        duration: Duration(
+            milliseconds: 800), // Increase duration for smoother transition
+      );
+      _debugLog('Night Garden fade controller initialized');
+
       _isInitialized = true;
       _debugLog('All animation controllers initialized successfully');
     } catch (e) {
@@ -554,19 +598,37 @@ class _ZenModePageState extends State<ZenModePage>
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // This is a safe place to get references to any ancestor widgets
-    // that might be needed later in dispose()
-    if (!_isInitialized) {
-      // Only get references when not already initialized
-      // to avoid unnecessary lookups
-      final appState = Provider.of<AppState>(context, listen: false);
-      zenAudioService = appState.zenAudioService;
+    // Check if route has changed and we're leaving the page
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) {
+      // Stop all sounds when navigating away from this page
+      if (zenAudioService.isPlaying) {
+        zenAudioService.stopAllSounds();
+        print(
+            '🔊 Stopped all sounds due to navigation away from Zen Mode page');
+      }
     }
   }
 
   @override
   void dispose() {
     _isDisposed = true;
+    _debugLog('Disposing ZenModePage');
+
+    // Remove Night Garden overlay if active
+    if (_nightGardenOverlay != null) {
+      _nightGardenOverlay?.remove();
+      _nightGardenOverlay = null;
+    }
+
+    // Restore original screen brightness when disposing if in Night Garden mode
+    if (_isNightGardenMode) {
+      try {
+        _screenBrightness.setScreenBrightness(_originalBrightness);
+      } catch (e) {
+        print('Error restoring brightness on dispose: $e');
+      }
+    }
 
     // Check if we're still able to access zenAudioService
     if (zenAudioService != null) {
@@ -658,6 +720,28 @@ class _ZenModePageState extends State<ZenModePage>
     } catch (e) {
       print('Error disposing rotationController: $e');
     }
+
+    try {
+      if (_nightGardenFadeController != null) {
+        _nightGardenFadeController.dispose();
+      }
+    } catch (e) {
+      print('Error disposing nightGardenFadeController: $e');
+    }
+
+    // Cancel any active timers
+    try {
+      if (_timerCountdown != null) {
+        _timerCountdown!.cancel();
+        _timerCountdown = null;
+      }
+    } catch (e) {
+      print('Error cancelling timer: $e');
+    }
+
+    // Dispose intro controllers
+    _introPageController.dispose();
+    _introFadeController.dispose();
 
     super.dispose();
   }
@@ -1243,6 +1327,369 @@ class _ZenModePageState extends State<ZenModePage>
     );
   }
 
+  // Toggle Night Garden (battery saver) mode
+  void _toggleNightGardenMode() async {
+    if (!_isNightGardenMode) {
+      // Enter Night Garden mode
+      // Save current brightness before entering Night Garden mode
+      try {
+        _originalBrightness = await _screenBrightness.current;
+        await _screenBrightness.setScreenBrightness(_nightGardenBrightness);
+      } catch (e) {
+        print('Error managing screen brightness: $e');
+      }
+
+      // Hide the system UI before creating the overlay
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+      // Create and insert a full-screen overlay that truly covers everything
+      _nightGardenOverlay = OverlayEntry(
+        builder: (context) => Material(
+          color: Color(0xFF050716),
+          child: WillPopScope(
+            onWillPop: () async {
+              _toggleNightGardenMode();
+              return false;
+            },
+            child: AnimatedOpacity(
+              opacity: 1.0,
+              duration: Duration(milliseconds: 500),
+              child: Stack(
+                children: [
+                  // Static stars with different opacities (no animation)
+                  ...List.generate(20, (index) {
+                    final random = math.Random(index);
+                    final size = random.nextDouble() * 2.0 + 0.5;
+                    final position = Offset(
+                      random.nextDouble() * MediaQuery.of(context).size.width,
+                      random.nextDouble() * MediaQuery.of(context).size.height,
+                    );
+                    final opacity = 0.4 + random.nextDouble() * 0.6;
+
+                    return Positioned(
+                      left: position.dx,
+                      top: position.dy,
+                      child: Container(
+                        width: size,
+                        height: size,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(opacity),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    );
+                  }),
+
+                  // Main centered content
+                  Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 40),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Title
+                          Text(
+                            'Night Garden',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 36,
+                              fontWeight: FontWeight.w200,
+                              letterSpacing: 2.0,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+
+                          // Subtitle in simple container
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: FlutterFlowTheme.of(context)
+                                  .primary
+                                  .withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'Battery Saving Mode',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w300,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+
+                          SizedBox(height: 50),
+
+                          // Clock display (simplified)
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(
+                                color: FlutterFlowTheme.of(context)
+                                    .primary
+                                    .withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: StreamBuilder<int>(
+                              stream: Stream.periodic(
+                                  Duration(seconds: 1), (x) => x),
+                              builder: (context, snapshot) {
+                                final now = DateTime.now();
+                                return Text(
+                                  _timerDisplay.isNotEmpty
+                                      ? _timerDisplay
+                                      : DateFormat('HH:mm').format(now),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 56,
+                                    fontWeight: FontWeight.w200,
+                                    letterSpacing: 2,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+
+                          SizedBox(height: 60),
+
+                          // Relaxation message instead of sound list
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 30,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: FlutterFlowTheme.of(context)
+                                    .primary
+                                    .withOpacity(0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.spa_outlined,
+                                  color: Colors.white.withOpacity(0.7),
+                                  size: 40,
+                                ),
+                                SizedBox(height: 20),
+                                Text(
+                                  'Close your eyes, breathe deeply,\nand let the sounds guide you to peace.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w300,
+                                    letterSpacing: 0.5,
+                                    height: 1.6,
+                                  ),
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Your sounds are playing in the background',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w300,
+                                    fontStyle: FontStyle.italic,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Exit button (simplified)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 40,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: _toggleNightGardenMode,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 30,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            'Exit Night Garden',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w300,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Insert the overlay into the Overlay
+      Overlay.of(context).insert(_nightGardenOverlay!);
+
+      setState(() {
+        _isNightGardenMode = true;
+      });
+    } else {
+      // Exit Night Garden mode
+      // First remove the overlay with an animation
+      if (_nightGardenOverlay != null) {
+        Future.delayed(Duration(milliseconds: 500), () {
+          if (mounted) {
+            _nightGardenOverlay?.remove();
+            _nightGardenOverlay = null;
+          }
+        });
+      }
+
+      setState(() {
+        _isNightGardenMode = false;
+      });
+
+      // Restore original brightness
+      try {
+        _screenBrightness.setScreenBrightness(_originalBrightness);
+      } catch (e) {
+        print('Error restoring screen brightness: $e');
+      }
+
+      // Restore the system UI
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
+  // First, add a method to stop the timer
+  void _stopTimer() {
+    if (_timerCountdown != null) {
+      _timerCountdown!.cancel();
+      _timerCountdown = null;
+    }
+
+    setState(() {
+      _selectedTimerMinutes = null;
+      _timerDisplay = '';
+    });
+
+    zenAudioService.cancelTimer();
+
+    // Show feedback to user
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.timer_off, color: Colors.white),
+            SizedBox(width: 10),
+            Text('Timer stopped'),
+          ],
+        ),
+        backgroundColor: FlutterFlowTheme.of(context).primary,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Helper method to check if user needs to see the intro
+  Future<void> _checkIfNeedsZenModeIntro() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Check if the user has seen the Zen Mode intro before
+      final hasSeenIntro = prefs.getBool('has_seen_zen_mode_intro') ?? false;
+
+      if (!hasSeenIntro) {
+        if (mounted) {
+          setState(() {
+            _showZenModeIntro = true;
+          });
+
+          // Initialize the intro fade animation
+          _introFadeController.forward();
+        }
+      }
+    } catch (e) {
+      print('Error checking Zen Mode intro status: $e');
+    }
+  }
+
+  // Mark that the user has seen the intro
+  Future<void> _markZenModeIntroComplete() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_seen_zen_mode_intro', true);
+
+      if (mounted) {
+        // Animate out the intro
+        await _introFadeController.reverse();
+
+        setState(() {
+          _showZenModeIntro = false;
+        });
+      }
+    } catch (e) {
+      print('Error marking Zen Mode intro as complete: $e');
+      // Fallback for error case - just remove the intro
+      if (mounted) {
+        setState(() {
+          _showZenModeIntro = false;
+        });
+      }
+    }
+  }
+
+  // For testing - resets the intro seen flag to show it again
+  Future<void> _resetZenModeIntro() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_seen_zen_mode_intro', false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Zen Mode intro reset. Restart to see it again.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error resetting Zen Mode intro: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
@@ -1304,54 +1751,74 @@ class _ZenModePageState extends State<ZenModePage>
             centerTitle: true,
             actions: [
               if (_timerDisplay.isNotEmpty)
-                AnimatedBuilder(
-                  animation: _timerPulseController,
-                  builder: (context, child) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 12.0),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(
-                            0.3 + (_timerPulseController.value * 0.2),
+                GestureDetector(
+                  onTap: _stopTimer,
+                  child: AnimatedBuilder(
+                    animation: _timerPulseController,
+                    builder: (context, child) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
                           ),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(
-                              0.5 + (_timerPulseController.value * 0.3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(
+                              0.3 + (_timerPulseController.value * 0.2),
                             ),
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.timer,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
                               color: Colors.white.withOpacity(
-                                0.7 + (_timerPulseController.value * 0.3),
+                                0.5 + (_timerPulseController.value * 0.3),
                               ),
-                              size: 18,
+                              width: 1.0,
                             ),
-                            SizedBox(width: 5),
-                            Text(
-                              _timerDisplay,
-                              style: TextStyle(
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.timer,
                                 color: Colors.white.withOpacity(
-                                  0.8 + (_timerPulseController.value * 0.2),
+                                  0.7 + (_timerPulseController.value * 0.3),
                                 ),
-                                fontWeight: FontWeight.w500,
+                                size: 18,
                               ),
-                            ),
-                          ],
+                              SizedBox(width: 5),
+                              Text(
+                                _timerDisplay,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(
+                                    0.8 + (_timerPulseController.value * 0.2),
+                                  ),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(width: 5),
+                              Icon(
+                                Icons.close,
+                                color: Colors.white.withOpacity(0.7),
+                                size: 16,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
+              // Night Garden mode toggle
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(0, 0, 12, 0),
+                child: IconButton(
+                  icon: Icon(
+                      _isNightGardenMode ? Icons.brightness_3 : Icons.dark_mode,
+                      color: Colors.white),
+                  onPressed: _toggleNightGardenMode,
+                  tooltip: 'Night Garden Mode',
+                ),
+              ),
               // Timer button
               Padding(
                 padding: EdgeInsetsDirectional.fromSTEB(0, 0, 12, 0),
@@ -1429,14 +1896,13 @@ class _ZenModePageState extends State<ZenModePage>
                                 ),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: FlutterFlowTheme.of(
-                                      context,
-                                    ).primary.withOpacity(0.2),
+                                    color: FlutterFlowTheme.of(context)
+                                        .primary
+                                        .withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(24),
                                     border: Border.all(
-                                      color: FlutterFlowTheme.of(
-                                        context,
-                                      ).primary,
+                                      color:
+                                          FlutterFlowTheme.of(context).primary,
                                       width: 1,
                                     ),
                                   ),
@@ -1458,9 +1924,9 @@ class _ZenModePageState extends State<ZenModePage>
                                         SizedBox(width: 8),
                                         Text(
                                           sound.name,
-                                          style: FlutterFlowTheme.of(
-                                            context,
-                                          ).bodyMedium.override(
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
                                                 fontFamily: 'Readex Pro',
                                                 color: Colors.white,
                                               ),
@@ -1514,25 +1980,23 @@ class _ZenModePageState extends State<ZenModePage>
                                 duration: Duration(milliseconds: 300),
                                 decoration: BoxDecoration(
                                   color: isActive
-                                      ? FlutterFlowTheme.of(
-                                          context,
-                                        ).primary.withOpacity(0.3)
+                                      ? FlutterFlowTheme.of(context)
+                                          .primary
+                                          .withOpacity(0.3)
                                       : Colors.black.withOpacity(0.3),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: isActive
-                                        ? FlutterFlowTheme.of(
-                                            context,
-                                          ).primary
+                                        ? FlutterFlowTheme.of(context).primary
                                         : Colors.white.withOpacity(0.2),
                                     width: isActive ? 2 : 1,
                                   ),
                                   boxShadow: isActive
                                       ? [
                                           BoxShadow(
-                                            color: FlutterFlowTheme.of(
-                                              context,
-                                            ).primary.withOpacity(0.3),
+                                            color: FlutterFlowTheme.of(context)
+                                                .primary
+                                                .withOpacity(0.3),
                                             blurRadius: 10,
                                             spreadRadius: 1,
                                           ),
@@ -1551,9 +2015,9 @@ class _ZenModePageState extends State<ZenModePage>
                                     SizedBox(height: 12),
                                     Text(
                                       sound.name,
-                                      style: FlutterFlowTheme.of(
-                                        context,
-                                      ).bodyMedium.override(
+                                      style: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .override(
                                             fontFamily: 'Readex Pro',
                                             color: Colors.white,
                                           ),
@@ -1704,6 +2168,13 @@ class _ZenModePageState extends State<ZenModePage>
                   ],
                 ),
               ),
+
+              // Night Garden Mode overlay
+              if (_isNightGardenMode)
+                Container(), // Empty container since we're now using a true overlay
+
+              // Intro overlay for first-time users
+              if (_showZenModeIntro) _buildZenModeIntro(),
             ],
           ),
         );
@@ -1942,12 +2413,267 @@ class _ZenModePageState extends State<ZenModePage>
                       );
                     }).toList(),
                   ),
+
+                  // Add the stop timer button when a timer is active
+                  if (_selectedTimerMinutes != null) ...[
+                    SizedBox(height: 20),
+                    GestureDetector(
+                      onTap: () {
+                        _stopTimer();
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.red.withOpacity(0.5),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.timer_off,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Stop Current Timer',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             );
           },
         );
       },
+    );
+  }
+
+  // Build the intro overlay
+  Widget _buildZenModeIntro() {
+    return AnimatedBuilder(
+      animation: _introFadeController,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _introFadeController.value,
+          child: child,
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.black.withOpacity(0.9),
+        child: Stack(
+          children: [
+            // Page view with intro content
+            PageView(
+              controller: _introPageController,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIntroPage = index;
+                });
+              },
+              children: [
+                // Page 1 - Welcome to Zen Mode
+                _buildIntroPage(
+                  icon: Icons.self_improvement,
+                  title: 'Welcome to Zen Mode',
+                  description:
+                      'Your personal sound sanctuary for relaxation, focus, and mindfulness.',
+                  color: FlutterFlowTheme.of(context).primary,
+                ),
+
+                // Page 2 - Mix and Match Sounds
+                _buildIntroPage(
+                  icon: Icons.library_music,
+                  title: 'Mix Your Perfect Ambience',
+                  description:
+                      'Tap any sound card to activate it. Combine multiple sounds to create your perfect environment.',
+                  color: FlutterFlowTheme.of(context).tertiary,
+                ),
+
+                // Page 3 - Set a Timer
+                _buildIntroPage(
+                  icon: Icons.timer,
+                  title: 'Set a Timer',
+                  description:
+                      'Use the timer to automatically end your session. Tap the timer button in the top right.',
+                  color: FlutterFlowTheme.of(context).secondary,
+                ),
+
+                // Page 4 - Night Garden Mode
+                _buildIntroPage(
+                  icon: Icons.dark_mode,
+                  title: 'Night Garden Mode',
+                  description:
+                      'Activate battery-saving mode for nighttime use. Perfect for sleep sounds that run all night.',
+                  color: Color(0xFF1E3A8A),
+                ),
+              ],
+            ),
+
+            // Bottom controls for navigation
+            Positioned(
+              bottom: 50,
+              left: 0,
+              right: 0,
+              child: Column(
+                children: [
+                  // Page indicators
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      _totalIntroPages,
+                      (index) => AnimatedContainer(
+                        duration: Duration(milliseconds: 200),
+                        margin: EdgeInsets.symmetric(horizontal: 4),
+                        height: 8,
+                        width: _currentIntroPage == index ? 24 : 8,
+                        decoration: BoxDecoration(
+                          color: _currentIntroPage == index
+                              ? FlutterFlowTheme.of(context).primary
+                              : Colors.white.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 40),
+
+                  // Navigation buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Skip button
+                      TextButton(
+                        onPressed: _markZenModeIntroComplete,
+                        child: Text(
+                          'Skip',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+
+                      // Next/Done button
+                      ElevatedButton(
+                        onPressed: () {
+                          if (_currentIntroPage < _totalIntroPages - 1) {
+                            _introPageController.nextPage(
+                              duration: Duration(milliseconds: 400),
+                              curve: Curves.easeInOut,
+                            );
+                          } else {
+                            _markZenModeIntroComplete();
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: FlutterFlowTheme.of(context).primary,
+                          foregroundColor: Colors.white,
+                          minimumSize: Size(120, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: Text(
+                          _currentIntroPage < _totalIntroPages - 1
+                              ? 'Next'
+                              : 'Get Started',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper to build each intro page - fix to remove yellow underlines
+  Widget _buildIntroPage({
+    required IconData icon,
+    required String title,
+    required String description,
+    String? image,
+    required Color color,
+  }) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon or illustration
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(60),
+              ),
+              child: Icon(
+                icon,
+                size: 60,
+                color: color,
+              ),
+            ),
+
+            SizedBox(height: 40),
+
+            // Title
+            Text(
+              title,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Montserrat',
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            SizedBox(height: 20),
+
+            // Description
+            Text(
+              description,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 16,
+                height: 1.5,
+                fontFamily: 'Readex Pro',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -27,6 +27,8 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _glowController;
   late AnimationController _fadeOutController;
   late AnimationController _logoAnimController;
+  late AnimationController _particleController;
+  late AnimationController _textSlideController;
 
   // Animation values
   late Animation<double> _fadeIn;
@@ -35,9 +37,12 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeOut;
   late Animation<double> _logoScale;
   late Animation<double> _logoOpacity;
+  late Animation<double> _logoRotation;
+  late Animation<Offset> _textSlide;
 
   // Stars for background
   final List<_Star> _stars = [];
+  final List<_Particle> _particles = [];
   late AnimationController _starsController;
 
   @override
@@ -56,6 +61,23 @@ class _SplashScreenState extends State<SplashScreen>
       ));
     }
 
+    // Generate floating particles
+    for (int i = 0; i < 30; i++) {
+      _particles.add(_Particle(
+        x: random.nextDouble(),
+        y: random.nextDouble(),
+        size: random.nextDouble() * 1.2 + 0.3,
+        speed: random.nextDouble() * 0.2 + 0.1,
+        color: Color.fromRGBO(
+          200 + random.nextInt(55),
+          200 + random.nextInt(55),
+          240,
+          random.nextDouble() * 0.4 + 0.1,
+        ),
+        angle: random.nextDouble() * math.pi * 2,
+      ));
+    }
+
     // Set system UI overlay style to immersive for splash screen
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
 
@@ -63,6 +85,12 @@ class _SplashScreenState extends State<SplashScreen>
     _starsController = AnimationController(
       vsync: this,
       duration: const Duration(minutes: 2),
+    )..repeat();
+
+    // Initialize particle animation controller
+    _particleController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
     )..repeat();
 
     // Initialize controllers
@@ -89,6 +117,11 @@ class _SplashScreenState extends State<SplashScreen>
     _logoAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
+    );
+
+    _textSlideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
     );
 
     // Create animations
@@ -134,10 +167,27 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
+    _logoRotation = Tween<double>(begin: -0.02, end: 0.02).animate(
+      CurvedAnimation(
+        parent: _logoAnimController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
     _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _logoAnimController,
         curve: Interval(0.0, 0.5, curve: Curves.easeIn),
+      ),
+    );
+
+    _textSlide = Tween<Offset>(
+      begin: Offset(0, 0.5),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _textSlideController,
+        curve: Curves.easeOutCubic,
       ),
     );
 
@@ -149,7 +199,11 @@ class _SplashScreenState extends State<SplashScreen>
     // Start with fade in and logo animation
     _fadeInController.forward();
     _logoAnimController.forward();
-    await Future.delayed(Duration(milliseconds: 800));
+    await Future.delayed(Duration(milliseconds: 600));
+
+    // Start text slide animation
+    _textSlideController.forward();
+    await Future.delayed(Duration(milliseconds: 300));
 
     // Start subtle scaling
     _scaleController.forward();
@@ -178,6 +232,8 @@ class _SplashScreenState extends State<SplashScreen>
     _fadeOutController.dispose();
     _logoAnimController.dispose();
     _starsController.dispose();
+    _particleController.dispose();
+    _textSlideController.dispose();
     super.dispose();
   }
 
@@ -214,14 +270,28 @@ class _SplashScreenState extends State<SplashScreen>
                     decoration: BoxDecoration(
                       gradient: RadialGradient(
                         center: Alignment(0.0, 0.2),
-                        radius: 1.2,
+                        radius: 1.5,
                         colors: [
-                          Color(0xFF151530),
+                          Color(0xFF0A1128),
+                          Color(0xFF090B16),
                           Colors.black,
                         ],
-                        stops: [0.0, 1.0],
+                        stops: [0.0, 0.5, 1.0],
                       ),
                     ),
+                  ),
+
+                  // Floating particles
+                  AnimatedBuilder(
+                    animation: _particleController,
+                    builder: (context, child) {
+                      return CustomPaint(
+                        painter: _ParticlesPainter(
+                          particles: _particles,
+                          animationValue: _particleController.value,
+                        ),
+                      );
+                    },
                   ),
 
                   // Centered content with animations
@@ -231,18 +301,82 @@ class _SplashScreenState extends State<SplashScreen>
                       children: [
                         // Logo with animations
                         AnimatedBuilder(
-                          animation:
-                              Listenable.merge([_logoOpacity, _logoScale]),
+                          animation: Listenable.merge(
+                              [_logoOpacity, _logoScale, _logoRotation]),
                           builder: (context, child) {
                             return Opacity(
                               opacity: _logoOpacity.value,
-                              child: Transform.scale(
-                                scale: _logoScale.value,
-                                child: Image.asset(
-                                  'assets/images/translogo.png',
-                                  width: 150,
-                                  height: 150,
-                                  fit: BoxFit.contain,
+                              child: Transform.rotate(
+                                angle: _logoRotation.value,
+                                child: Transform.scale(
+                                  scale: _logoScale.value,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // Moon glow effect
+                                      Container(
+                                        width: 160,
+                                        height: 160,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.white
+                                                  .withOpacity(0.15),
+                                              blurRadius: 30,
+                                              spreadRadius: 5,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Moon image
+                                      Image.asset(
+                                        'assets/images/translogo.png',
+                                        width: 150,
+                                        height: 150,
+                                        fit: BoxFit.contain,
+                                      ),
+                                      // Crater glow effect
+                                      Positioned(
+                                        top: 60,
+                                        left: 45,
+                                        child: Container(
+                                          width: 15,
+                                          height: 15,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.white.withOpacity(
+                                                    0.4 * _glow.value),
+                                                blurRadius: 8,
+                                                spreadRadius: 1,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 40,
+                                        right: 55,
+                                        child: Container(
+                                          width: 10,
+                                          height: 10,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.white.withOpacity(
+                                                    0.3 * _glow.value),
+                                                blurRadius: 6,
+                                                spreadRadius: 1,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
@@ -253,36 +387,40 @@ class _SplashScreenState extends State<SplashScreen>
 
                         // App name text with animations
                         AnimatedBuilder(
-                          animation: Listenable.merge([_fadeIn, _scale, _glow]),
+                          animation: Listenable.merge(
+                              [_fadeIn, _scale, _glow, _textSlide]),
                           builder: (context, child) {
-                            return Opacity(
-                              opacity: _fadeIn.value,
-                              child: Transform.scale(
-                                scale: _scale.value,
-                                child: ShaderMask(
-                                  blendMode: BlendMode.srcIn,
-                                  shaderCallback: (bounds) => LinearGradient(
-                                    colors: [
-                                      Color(0xFFFFD700), // Gold
-                                      Color(0xFFF5DEB3), // Wheat
-                                      Color(0xFFDAA520), // GoldenRod
-                                    ],
-                                    stops: [0.0, 0.5, 1.0],
-                                  ).createShader(bounds),
-                                  child: Text(
-                                    'LunaKraft',
-                                    style: GoogleFonts.montserrat(
-                                      fontSize: 48,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 1.5,
-                                      shadows: [
-                                        Shadow(
-                                          color: Color(0xFFFFD700)
-                                              .withOpacity(_glow.value),
-                                          blurRadius: 15.0,
-                                          offset: Offset(0, 0),
-                                        ),
+                            return SlideTransition(
+                              position: _textSlide,
+                              child: Opacity(
+                                opacity: _fadeIn.value,
+                                child: Transform.scale(
+                                  scale: _scale.value,
+                                  child: ShaderMask(
+                                    blendMode: BlendMode.srcIn,
+                                    shaderCallback: (bounds) => LinearGradient(
+                                      colors: [
+                                        Color(0xFFC7D3E9), // Light silver/blue
+                                        Color(0xFFEEF2F9), // White/silver
+                                        Color(0xFFADBDD7), // Blue-grey/silver
                                       ],
+                                      stops: [0.0, 0.5, 1.0],
+                                    ).createShader(bounds),
+                                    child: Text(
+                                      'LunaKraft',
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 48,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 2.5,
+                                        shadows: [
+                                          Shadow(
+                                            color: Color(0xFFB6C2D6)
+                                                .withOpacity(_glow.value),
+                                            blurRadius: 15.0,
+                                            offset: Offset(0, 0),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -345,6 +483,25 @@ class _Star {
   });
 }
 
+// Particle class for floating dust particles
+class _Particle {
+  final double x; // Normalized x position (0-1)
+  final double y; // Normalized y position (0-1)
+  final double size; // Size of particle
+  final double speed; // Speed of movement
+  final Color color; // Particle color
+  final double angle; // Movement angle
+
+  _Particle({
+    required this.x,
+    required this.y,
+    required this.size,
+    required this.speed,
+    required this.color,
+    required this.angle,
+  });
+}
+
 // Custom painter for starry night effect
 class _StarryNightPainter extends CustomPainter {
   final List<_Star> stars;
@@ -385,6 +542,49 @@ class _StarryNightPainter extends CustomPainter {
   bool shouldRepaint(_StarryNightPainter oldPainter) =>
       animationValue != oldPainter.animationValue ||
       starOpacity != oldPainter.starOpacity;
+}
+
+// Custom painter for floating particles
+class _ParticlesPainter extends CustomPainter {
+  final List<_Particle> particles;
+  final double animationValue;
+
+  _ParticlesPainter({
+    required this.particles,
+    required this.animationValue,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final particle in particles) {
+      // Calculate current position with slow movement
+      final currentX = (particle.x +
+              math.cos(particle.angle) * particle.speed * animationValue) %
+          1.0;
+      final currentY = (particle.y +
+              math.sin(particle.angle) * particle.speed * animationValue) %
+          1.0;
+
+      // Pulse size effect
+      final pulsePhase = (animationValue * 0.5 + currentX * 0.3) % 1.0;
+      final pulseFactor = 0.2 * math.sin(pulsePhase * math.pi * 2) + 1.0;
+
+      final paint = Paint()
+        ..color = particle.color
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, particle.size);
+
+      // Draw particle
+      canvas.drawCircle(
+        Offset(currentX * size.width, currentY * size.height),
+        particle.size * pulseFactor,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ParticlesPainter oldPainter) =>
+      animationValue != oldPainter.animationValue;
 }
 
 // Custom painter for shooting stars effect
@@ -512,7 +712,7 @@ class _ShineEffectPainter extends CustomPainter {
         ),
         radius: 0.2,
         colors: [
-          Colors.white.withOpacity(0.7),
+          Colors.white.withOpacity(0.5),
           Colors.transparent,
         ],
         stops: [0.0, 1.0],

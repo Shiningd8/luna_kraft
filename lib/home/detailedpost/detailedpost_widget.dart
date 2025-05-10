@@ -1141,34 +1141,70 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
           .get();
       print('Added comment data: ${addedCommentDoc.data()}');
 
-      // Determine notification recipient (post author or parent comment author)
-      DocumentReference? notifyUserRef;
+      // Determine notification recipient
       if (_model.replyingToComment != null) {
         // If replying to a comment, notify the comment author
-        notifyUserRef = _model.replyingToComment!.userref;
+        final commentAuthorRef = _model.replyingToComment!.userref;
+
+        // Don't notify yourself
+        if (currentUserReference != commentAuthorRef) {
+          final username = currentUserDocument?.userName?.trim() ?? '';
+          print('Creating reply notification:');
+          print('Made by: ${currentUserReference?.id}');
+          print('Made to: ${commentAuthorRef?.id}');
+          print('Username: $username');
+
+          // Create notification for the comment author
+          await NotificationsRecord.createNotification(
+            isALike: false,
+            isRead: false,
+            postRef: widget.docref,
+            madeBy: currentUserReference,
+            madeTo: commentAuthorRef?.id,
+            date: util.getCurrentTimestamp,
+            madeByUsername: username,
+            isFollowRequest: false,
+            isReply: true, // This is a reply to a comment
+          );
+
+          // Also notify the post author if different from comment author and not the current user
+          if (widget.userref != commentAuthorRef &&
+              widget.userref != currentUserReference) {
+            await NotificationsRecord.createNotification(
+              isALike: false,
+              isRead: false,
+              postRef: widget.docref,
+              madeBy: currentUserReference,
+              madeTo: widget.userref?.id,
+              date: util.getCurrentTimestamp,
+              madeByUsername: username,
+              isFollowRequest: false,
+              isReply:
+                  false, // This is a comment on a post (from post author's perspective)
+            );
+          }
+        }
       } else {
         // If adding a top-level comment, notify the post author
-        notifyUserRef = widget.userref;
-      }
+        if (currentUserReference != widget.userref) {
+          final username = currentUserDocument?.userName?.trim() ?? '';
+          print('Creating comment notification:');
+          print('Made by: ${currentUserReference?.id}');
+          print('Made to: ${widget.userref?.id}');
+          print('Username: $username');
 
-      // Create notification if replying to someone else's content
-      if (currentUserReference != notifyUserRef) {
-        final username = currentUserDocument?.userName?.trim() ?? '';
-        print('Creating comment notification:');
-        print('Made by: ${currentUserReference?.id}');
-        print('Made to: ${notifyUserRef?.id}');
-        print('Username: $username');
-
-        await NotificationsRecord.createNotification(
-          isALike: false,
-          isRead: false,
-          postRef: widget.docref,
-          madeBy: currentUserReference,
-          madeTo: notifyUserRef?.id,
-          date: util.getCurrentTimestamp,
-          madeByUsername: username,
-          isFollowRequest: false,
-        );
+          await NotificationsRecord.createNotification(
+            isALike: false,
+            isRead: false,
+            postRef: widget.docref,
+            madeBy: currentUserReference,
+            madeTo: widget.userref?.id,
+            date: util.getCurrentTimestamp,
+            madeByUsername: username,
+            isFollowRequest: false,
+            isReply: false, // This is a top-level comment, not a reply
+          );
+        }
       }
 
       // Clear input and reset reply state

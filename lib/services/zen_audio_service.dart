@@ -138,53 +138,98 @@ class ZenAudioService extends ChangeNotifier {
     }
   }
 
+  // Helper method to safely dispose of an audio player
+  Future<void> _safeDisposePlayer(AudioPlayer? player, String soundName) async {
+    if (player != null) {
+      try {
+        await player.stop();
+        await player.dispose();
+        _debugLog('Successfully disposed player for $soundName');
+      } catch (e) {
+        _debugLog('Error disposing player for $soundName: $e');
+      }
+    }
+  }
+
+  // Helper method to safely create and initialize an audio player
+  Future<AudioPlayer?> _createAndInitializePlayer(
+      String assetPath, String soundName) async {
+    try {
+      _debugLog('🎵 Creating player for $soundName with path $assetPath');
+      final player = AudioPlayer();
+
+      // Set up error handling
+      player.playbackEventStream.listen(
+        (event) => _debugLog('Playback event for $soundName: $event'),
+        onError: (Object e, StackTrace st) {
+          _debugLog('Error in playback for $soundName: $e');
+        },
+      );
+
+      // Make sure path is correctly formatted for just_audio
+      String audioPath = assetPath;
+
+      _debugLog('🔍 Setting source for $soundName: $audioPath');
+      await player.setAsset(audioPath);
+      _debugLog('✅ Source set successfully for $soundName');
+
+      await player.setLoopMode(LoopMode.all);
+
+      _debugLog('🎧 Successfully initialized player for $soundName');
+      return player;
+    } catch (e) {
+      _debugLog('❌ Error creating player for $soundName: $e');
+      return null;
+    }
+  }
+
   // Initialize the zen audio service with available sounds
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     _debugLog('Initializing zen audio service');
 
-    // Define available sounds
+    // Define available sounds with correct asset paths
     _availableSounds = [
       ZenAudioSound(
         name: 'Rain',
-        assetPath: 'audio/zen/rain.mp3',
-        iconPath: 'icons/zen/rain.png',
+        assetPath: 'assets/audio/zen/rain.mp3',
+        iconPath: 'assets/icons/zen/rain.png',
       ),
       ZenAudioSound(
         name: 'Thunder',
-        assetPath: 'audio/zen/thunder.mp3',
-        iconPath: 'icons/zen/thunder.png',
+        assetPath: 'assets/audio/zen/thunder.mp3',
+        iconPath: 'assets/icons/zen/thunder.png',
       ),
       ZenAudioSound(
         name: 'Forest',
-        assetPath: 'audio/zen/forest.mp3',
-        iconPath: 'icons/zen/forest.png',
+        assetPath: 'assets/audio/zen/forest.mp3',
+        iconPath: 'assets/icons/zen/forest.png',
       ),
       ZenAudioSound(
         name: 'Ocean',
-        assetPath: 'audio/zen/ocean.mp3',
-        iconPath: 'icons/zen/ocean.png',
+        assetPath: 'assets/audio/zen/ocean.mp3',
+        iconPath: 'assets/icons/zen/ocean.png',
       ),
       ZenAudioSound(
         name: 'Fireplace',
-        assetPath: 'audio/zen/fireplace.mp3',
-        iconPath: 'icons/zen/fire.png',
+        assetPath: 'assets/audio/zen/fireplace.mp3',
+        iconPath: 'assets/icons/zen/fire.png',
       ),
       ZenAudioSound(
         name: 'Wind',
-        assetPath: 'audio/zen/wind.mp3',
-        iconPath: 'icons/zen/wind.png',
+        assetPath: 'assets/audio/zen/wind.mp3',
+        iconPath: 'assets/icons/zen/wind.png',
       ),
       ZenAudioSound(
         name: 'Birds',
-        assetPath: 'audio/zen/birds.mp3',
-        iconPath: 'icons/zen/birds.png',
+        assetPath: 'assets/audio/zen/birds.mp3',
+        iconPath: 'assets/icons/zen/birds.png',
       ),
       ZenAudioSound(
         name: 'Stream',
-        assetPath: 'audio/zen/stream.mp3',
-        iconPath: 'icons/zen/stream.png',
+        assetPath: 'assets/audio/zen/stream.mp3',
+        iconPath: 'assets/icons/zen/stream.png',
       ),
     ];
 
@@ -229,11 +274,32 @@ class ZenAudioService extends ChangeNotifier {
     }
   }
 
+  // Helper method to log the state of all active sounds for debugging
+  void _logActiveSoundsState() {
+    if (!_debug) return;
+
+    _debugLog('=== ACTIVE SOUNDS STATE ===');
+    int totalActive = 0;
+    int totalPlaying = 0;
+
+    for (final sound in _availableSounds) {
+      if (sound.isActive) {
+        totalActive++;
+        bool isPlaying = sound.player != null && sound.player!.playing;
+        if (isPlaying) totalPlaying++;
+        _debugLog(
+            '${sound.name}: active=${sound.isActive}, playing=$isPlaying, volume=${sound.volume}');
+      }
+    }
+
+    _debugLog('Total active: $totalActive, Total playing: $totalPlaying');
+    _debugLog('=========================');
+  }
+
   // Toggle a sound on or off
   Future<void> toggleSound(String soundName) async {
     _debugLog('🔄 Toggling sound: $soundName');
 
-    // Find the sound by name
     final soundIndex = _availableSounds.indexWhere((s) => s.name == soundName);
     if (soundIndex == -1) {
       _debugLog('Sound not found: $soundName');
@@ -244,74 +310,58 @@ class ZenAudioService extends ChangeNotifier {
 
     // Toggle the active state
     sound.isActive = !sound.isActive;
-    _debugLog(
-        'Sound $soundName is now ${sound.isActive ? "active" : "inactive"}');
 
     try {
       if (sound.isActive) {
-        // When toggling on, immediately play the sound
+        // When toggling ON, create and play the sound
         _debugLog('▶️ Starting playback for newly activated sound: $soundName');
 
-        // Stop and dispose existing player if any
+        // Always create a new player instance for each sound
+        // First dispose of any existing player to avoid memory leaks
         if (sound.player != null) {
-          await sound.player!.stop();
-          await sound.player!.dispose();
-        }
-
-        // Create a new player
-        sound.player = AudioPlayer();
-
-        // Attempt to load and play the audio
-        try {
-          // First try with just the path
-          await sound.player!.setAsset(sound.assetPath);
-        } catch (e) {
-          _debugLog('Error loading asset, trying with assets/ prefix: $e');
-          // If that fails, try with "assets/" prefix
-          await sound.player!.setAsset('assets/${sound.assetPath}');
-        }
-
-        // Configure looping
-        await sound.player!.setLoopMode(LoopMode.all);
-
-        // Set volume
-        await sound.player!.setVolume(sound.volume);
-
-        // Start playback immediately
-        await sound.player!.play();
-        _debugLog('Started playing $soundName with volume ${sound.volume}');
-
-        // Update playing state
-        _isPlaying = true;
-      } else {
-        // When toggling off, stop and clean up the player
-        _debugLog('⏹️ Stopping playback for deactivated sound: $soundName');
-
-        if (sound.player != null) {
-          await sound.player!.stop();
-          await sound.player!.dispose();
+          await _safeDisposePlayer(sound.player, soundName);
           sound.player = null;
         }
 
-        // Check if any sounds are still active and playing
-        bool anyStillPlaying = false;
-        for (final s in _availableSounds) {
-          if (s.isActive && s.player != null && s.player!.playing) {
-            anyStillPlaying = true;
-            break;
-          }
-        }
+        // Create a completely new player for this sound
+        sound.player =
+            await _createAndInitializePlayer(sound.assetPath, soundName);
 
-        // Update playing state
-        _isPlaying = anyStillPlaying;
+        if (sound.player != null) {
+          // Set volume before playing
+          await sound.player!.setVolume(sound.volume);
+
+          // Start playing
+          await sound.player!.play();
+          _debugLog('Started playing $soundName with volume ${sound.volume}');
+        } else {
+          _debugLog('❌ Failed to create player for $soundName');
+          sound.isActive = false;
+        }
+      } else {
+        // When toggling OFF, stop and cleanup
+        _debugLog('⏹️ Stopping playback for deactivated sound: $soundName');
+
+        if (sound.player != null) {
+          await _safeDisposePlayer(sound.player, soundName);
+          sound.player = null;
+          _debugLog('Stopped and disposed player for $soundName');
+        }
       }
+
+      // Check if any sounds are still active and playing
+      bool anyActive =
+          _availableSounds.any((s) => s.isActive && s.player != null);
+      _isPlaying = anyActive;
+
+      // Log the current state of all active sounds
+      _logActiveSoundsState();
     } catch (e) {
       _debugLog('❌ Error in toggleSound for $soundName: $e');
-      // Revert the active state on error
+      // Revert the active state in case of error
       sound.isActive = !sound.isActive;
     }
 
-    // Always notify listeners when done
     notifyListeners();
   }
 
@@ -325,8 +375,12 @@ class ZenAudioService extends ChangeNotifier {
 
     // Update the volume for active player
     if (sound.isActive && sound.player != null) {
-      await sound.player!.setVolume(volume);
-      _debugLog('Updated volume for $soundName to $volume');
+      try {
+        await sound.player!.setVolume(volume);
+        _debugLog('Updated volume for $soundName to $volume');
+      } catch (e) {
+        _debugLog('Error setting volume for $soundName: $e');
+      }
     }
 
     notifyListeners();
@@ -341,44 +395,42 @@ class ZenAudioService extends ChangeNotifier {
       for (final sound in _availableSounds.where(
         (s) => !s.isActive && s.player != null,
       )) {
-        await sound.player!.stop();
-        await sound.player!.dispose();
+        await _safeDisposePlayer(sound.player, sound.name);
         sound.player = null;
       }
 
       // Then play all active sounds
       for (final sound in _availableSounds.where((s) => s.isActive)) {
-        if (sound.player == null) {
-          // Create a new player for this sound
-          sound.player = AudioPlayer();
+        _debugLog('Creating new player for ${sound.name}');
 
-          try {
-            await sound.player!.setAsset(sound.assetPath);
-          } catch (e) {
-            _debugLog(
-              'Error loading asset directly, trying with assets/ prefix: $e',
-            );
-            await sound.player!.setAsset('assets/${sound.assetPath}');
-          }
+        // Always create a fresh player for each sound
+        if (sound.player != null) {
+          await _safeDisposePlayer(sound.player, sound.name);
+        }
 
-          await sound.player!.setLoopMode(LoopMode.all);
+        // Create a completely new player
+        sound.player =
+            await _createAndInitializePlayer(sound.assetPath, sound.name);
+
+        if (sound.player != null) {
+          // Set volume before playing
           await sound.player!.setVolume(sound.volume);
-          await sound.player!.play();
 
-          _debugLog('Created and started new player for ${sound.name}');
-        } else if (!sound.player!.playing) {
-          // Resume existing players that aren't playing
+          // Start playing
           await sound.player!.play();
-          _debugLog('Resumed ${sound.name}');
+          _debugLog('Started playing ${sound.name}');
+        } else {
+          _debugLog('❌ Failed to create player for ${sound.name}');
         }
       }
 
-      // Check the actual playing state
-      updatePlayingState();
+      // Update playing state based on whether any sounds are active
+      _isPlaying = _availableSounds.any((s) => s.isActive && s.player != null);
+
+      // Log the current state of all active sounds
+      _logActiveSoundsState();
     } catch (e) {
       _debugLog('Error in playAllActiveSounds: $e');
-      // Check actual state after error
-      updatePlayingState();
     }
 
     notifyListeners();
@@ -406,10 +458,14 @@ class ZenAudioService extends ChangeNotifier {
 
       _debugLog('Saved active sounds before pause: $_activeSoundsBeforePause');
 
-      // Pause all players
+      // Stop all players (don't dispose them yet)
       for (final sound in _availableSounds.where((s) => s.player != null)) {
-        await sound.player!.pause();
-        _debugLog('Paused ${sound.name}');
+        try {
+          await sound.player!.pause();
+          _debugLog('Paused ${sound.name}');
+        } catch (e) {
+          _debugLog('Error pausing ${sound.name}: $e');
+        }
       }
     } catch (e) {
       _debugLog('Error in pauseAllSounds: $e');
@@ -445,49 +501,40 @@ class ZenAudioService extends ChangeNotifier {
           // Make sure the sound is marked as active
           sound.isActive = true;
 
-          if (sound.player == null) {
-            // Create a new player
-            sound.player = AudioPlayer();
+          // Clean up existing player if any
+          if (sound.player != null) {
+            await _safeDisposePlayer(sound.player, sound.name);
+          }
 
-            try {
-              await sound.player!.setAsset(sound.assetPath);
-            } catch (e) {
-              _debugLog('Error loading asset, trying with assets/ prefix: $e');
-              await sound.player!.setAsset('assets/${sound.assetPath}');
-            }
+          // Create a completely new player
+          sound.player =
+              await _createAndInitializePlayer(sound.assetPath, sound.name);
 
-            await sound.player!.setLoopMode(LoopMode.all);
+          if (sound.player != null) {
+            // Set volume before playing
             await sound.player!.setVolume(sound.volume);
+
+            // Start playing
             await sound.player!.play();
-            _debugLog('Created new player for ${sound.name}');
+            _debugLog('Started playing ${sound.name}');
           } else {
-            // Resume existing player
-            await sound.player!.setVolume(sound.volume);
-            await sound.player!.play();
-            _debugLog('Resumed existing player for ${sound.name}');
+            _debugLog('❌ Failed to create player for ${sound.name}');
+            sound.isActive = false;
           }
         }
       }
 
       // Clear the stored list after resuming
       _activeSoundsBeforePause = [];
+
+      // Update playing state based on whether any sounds are active
+      _isPlaying = _availableSounds.any((s) => s.isActive && s.player != null);
+
+      // Log the current state of all active sounds
+      _logActiveSoundsState();
     } catch (e) {
       _debugLog('Error in resumeAllSounds: $e');
-
-      // Check if any sounds are actually playing
-      bool anyPlaying = false;
-      for (final sound in _availableSounds) {
-        if (sound.isActive && sound.player != null && sound.player!.playing) {
-          anyPlaying = true;
-          break;
-        }
-      }
-
-      // Update state based on actual playing status
-      if (_isPlaying != anyPlaying) {
-        _isPlaying = anyPlaying;
-        notifyListeners();
-      }
+      updatePlayingState();
     }
   }
 
@@ -496,63 +543,30 @@ class ZenAudioService extends ChangeNotifier {
     _debugLog('Stopping all sounds');
 
     try {
-      // First update the state to prevent UI issues
       _isPlaying = false;
       notifyListeners();
 
-      // Then stop each sound individually with error handling
       for (final sound in _availableSounds) {
         try {
-          if (sound.player != null) {
-            await sound.player!.stop().timeout(
-              Duration(milliseconds: 500),
-              onTimeout: () {
-                _debugLog('Timeout stopping player for ${sound.name}');
-                return;
-              },
-            );
-
-            await sound.player!.dispose().timeout(
-              Duration(milliseconds: 500),
-              onTimeout: () {
-                _debugLog('Timeout disposing player for ${sound.name}');
-                return;
-              },
-            );
-
-            sound.player = null;
-          }
+          await _safeDisposePlayer(sound.player, sound.name);
+          sound.player = null;
           sound.isActive = false;
         } catch (e) {
           _debugLog('Error stopping sound ${sound.name}: $e');
-          // Continue with other sounds even if one fails
           sound.isActive = false;
           sound.player = null;
         }
       }
 
-      // Clear the stored active sounds list since we're explicitly stopping all sounds
       _activeSoundsBeforePause = [];
-
       cancelTimer();
-
-      // Notify listeners again to ensure UI is updated
       notifyListeners();
     } catch (e) {
       _debugLog('Error in stopAllSounds: $e');
-
-      // Emergency fallback - set all sounds to inactive
       for (final sound in _availableSounds) {
         sound.isActive = false;
-        try {
-          if (sound.player != null) {
-            sound.player = null;
-          }
-        } catch (_) {
-          // Ignore errors in the emergency fallback
-        }
+        sound.player = null;
       }
-
       _isPlaying = false;
       notifyListeners();
     }
@@ -700,7 +714,6 @@ class ZenAudioService extends ChangeNotifier {
   // Clean up resources
   Future<void> dispose() async {
     _debugLog('Disposing zen audio service');
-
     await stopAllSounds();
     cancelTimer();
   }

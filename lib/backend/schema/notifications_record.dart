@@ -57,6 +57,11 @@ class NotificationsRecord extends FirestoreRecord {
   String get status => _status ?? '';
   bool hasStatus() => _status != null;
 
+  // "is_reply" field - indicates whether this is a notification for a reply to a comment
+  bool? _isReply;
+  bool get isReply => _isReply ?? false;
+  bool hasIsReply() => _isReply != null;
+
   void _initializeFields() {
     // For boolean fields, explicitly cast to bool to avoid type issues
     final rawIsALike = snapshotData['is_a_like'];
@@ -104,6 +109,19 @@ class NotificationsRecord extends FirestoreRecord {
     }
 
     _status = snapshotData['status'] as String?;
+
+    // Handle isReply the same way as isALike
+    final rawIsReply = snapshotData['is_reply'];
+    if (rawIsReply != null) {
+      if (rawIsReply is bool) {
+        _isReply = rawIsReply;
+      } else {
+        _isReply =
+            rawIsReply == true || rawIsReply == 'true' || rawIsReply == 1;
+      }
+    } else {
+      _isReply = false;
+    }
   }
 
   static CollectionReference get collection =>
@@ -150,6 +168,7 @@ class NotificationsRecord extends FirestoreRecord {
     String? madeByUsername,
     bool isFollowRequest = false,
     String status = '',
+    bool isReply = false, // Add isReply parameter
   }) async {
     // Ensure madeTo is always stored as String
     String? madeToString;
@@ -169,6 +188,7 @@ class NotificationsRecord extends FirestoreRecord {
       if (madeByUsername != null) 'made_by_username': madeByUsername,
       'is_follow_request': isFollowRequest,
       'status': status,
+      'is_reply': isReply, // Add isReply field
     };
 
     return await collection.add(notificationData);
