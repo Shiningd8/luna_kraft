@@ -138,6 +138,89 @@ class ShareUtil {
     }
   }
 
+  // Method to share app invitation link
+  static Future<void> shareAppInvitation(BuildContext context,
+      {String? userName}) async {
+    if (!context.mounted) return;
+
+    try {
+      final String appLink = 'https://lunakraft.com/';
+
+      // Create personalized message
+      final String message = userName != null && userName.isNotEmpty
+          ? '${userName} invites you to join the dreamy experience on LunaKraft! Create, visualize and share your dreams with our AI-powered dream crafting platform. Check it out: $appLink'
+          : 'Join me on the dreamy experience with LunaKraft! Create, visualize and share your dreams with our AI-powered dream crafting platform. Check it out: $appLink';
+
+      try {
+        // Share the invitation
+        await Share.share(
+          message,
+          subject: 'Join me on LunaKraft!',
+        );
+      } catch (e) {
+        // Show error
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error sharing invitation: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+
+        print('Error sharing invitation: $e');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error preparing invitation: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      print('Error preparing invitation: $e');
+    }
+  }
+
+  // Helper method to show a loading overlay
+  static OverlayEntry _showLoadingOverlay(BuildContext context) {
+    final overlayState = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Container(
+        color: Colors.black.withOpacity(0.5),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Preparing to share...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlayState.insert(overlayEntry);
+    return overlayEntry;
+  }
+
   // Show a preview dialog with a share button
   static Future<bool?> _showSharePreview(
       BuildContext context, SharePosterWidget posterWidget) async {
@@ -155,29 +238,53 @@ class ShareUtil {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
+              // Header with modern design
               Container(
                 decoration: BoxDecoration(
                   color: FlutterFlowTheme.of(dialogContext).secondaryBackground,
                   borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Preview',
-                      style: FlutterFlowTheme.of(dialogContext).titleMedium,
+                      style: FlutterFlowTheme.of(dialogContext)
+                          .titleMedium
+                          ?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 20,
+                          ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(dialogContext).pop(false),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                    Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => Navigator.of(dialogContext).pop(false),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 22,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -188,19 +295,19 @@ class ShareUtil {
                     curve: Curves.easeOut,
                   ),
 
-              // Poster Preview
+              // Poster Preview with improved styling
               ClipRRect(
                 borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
                 ),
                 child: Container(
                   color: Colors.black,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(
+                      0), // Removed padding for full-bleed design
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(dialogContext).size.height *
-                          0.7, // Allow more height
+                      maxHeight: MediaQuery.of(dialogContext).size.height * 0.7,
                     ),
                     child: posterWidget,
                   ),
@@ -212,55 +319,62 @@ class ShareUtil {
                     curve: Curves.easeOut,
                   ),
 
-              // Action Buttons
+              // Action Button with more modern styling
               Container(
                 decoration: BoxDecoration(
                   color: FlutterFlowTheme.of(dialogContext).secondaryBackground,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 5,
-                      offset: const Offset(0, -3),
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-                margin: const EdgeInsets.only(top: 16),
-                child: Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.center, // Center the single button
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => Navigator.of(dialogContext).pop(true),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.share,
-                                size: 24,
-                                color:
-                                    FlutterFlowTheme.of(dialogContext).primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Share',
-                                style: FlutterFlowTheme.of(dialogContext)
-                                    .titleMedium
-                                    ?.copyWith(
-                                      color: FlutterFlowTheme.of(dialogContext)
-                                          .primary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                            ],
+                margin: const EdgeInsets.only(top: 20),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => Navigator.of(dialogContext).pop(true),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: FlutterFlowTheme.of(dialogContext)
+                                  .primary
+                                  .withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.share_rounded,
+                              size: 22,
+                              color: FlutterFlowTheme.of(dialogContext).primary,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Share',
+                            style: FlutterFlowTheme.of(dialogContext)
+                                .titleMedium
+                                ?.copyWith(
+                                  color: FlutterFlowTheme.of(dialogContext)
+                                      .primary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 19,
+                                ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ).animate().fadeIn(duration: 400.ms).slideY(
                     begin: 0.1,
@@ -303,7 +417,11 @@ class ShareUtil {
                   SizedBox(height: 16),
                   Text(
                     'Creating image...',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),

@@ -1,6 +1,8 @@
 import UIKit
 import Flutter
 import GoogleMobileAds
+import UserNotifications
+import FirebaseMessaging
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
@@ -18,12 +20,25 @@ import GoogleMobileAds
     FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
         self, factoryId: "adFactoryExample", nativeAdFactory: nativeAdFactory)
     
+    // Set up push notifications
+    if #available(iOS 10.0, *) {
+      UNUserNotificationCenter.current().delegate = self
+    }
+    
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
   
   override func applicationWillTerminate(_ application: UIApplication) {
     // Unregister the native ad factory
     FLTGoogleMobileAdsPlugin.unregisterNativeAdFactory(self, factoryId: "adFactoryExample")
+  }
+  
+  // Handle receiving notification when app is in background
+  override func application(_ application: UIApplication,
+                          didReceiveRemoteNotification userInfo: [AnyHashable : Any],
+                          fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+    Messaging.messaging().appDidReceiveMessage(userInfo)
+    completionHandler(.newData)
   }
 }
 

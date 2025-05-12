@@ -26,6 +26,7 @@ import '/services/comments_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '/backend/cloud_functions/cloud_functions.dart';
+import 'dart:math';
 export 'detailedpost_model.dart';
 
 T createModel<T>(BuildContext context, T Function() model) => model();
@@ -33,13 +34,14 @@ T createModel<T>(BuildContext context, T Function() model) => model();
 class DetailedpostWidget extends StatefulWidget {
   const DetailedpostWidget({
     super.key,
-    required this.docref,
+    this.docref,
     this.userref,
     this.showComments,
   });
 
-  final DocumentReference? docref;
-  final DocumentReference? userref;
+  // Make these nullable and accept either document references or string IDs
+  final dynamic docref;
+  final dynamic userref;
   final bool? showComments;
 
   static String routeName = 'Detailedpost';
@@ -54,6 +56,14 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _commentsKey = GlobalKey();
+
+  // Add document reference properties to store the resolved references
+  DocumentReference? _postReference;
+  DocumentReference? _userReference;
+
+  // Direct string ID references for fallback
+  String? _postId;
+  String? _userId;
 
   // Add a comment count refresh notifier
   final ValueNotifier<int> _commentCountRefresh = ValueNotifier<int>(0);
@@ -70,38 +80,163 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
     _model.textController ??= TextEditingController();
     _model.textFieldFocusNode ??= FocusNode();
 
+    // Initialize document references
+    _resolveReferences();
+
     // More responsive scroll to comments when opened from a comment icon tap
     if (widget.showComments == true) {
-      print('DetailedpostWidget: Will scroll to comments');
-      // Wait for the widget to be fully built and laid out
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Give more time for content to load and layout to stabilize
-        if (!mounted) return; // Add mounted check before scheduling the delay
-        Future.delayed(Duration(milliseconds: 500), () {
+      print(
+          'DetailedpostWidget: Will scroll to comments - from widget parameter');
+      _scheduleCommentScroll();
+    }
+  }
+
+  void _scheduleCommentScroll() {
+    // Wait for the widget to be fully built and laid out
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Give more time for content to load and layout to stabilize
+      if (!mounted) return;
+      // First short delay to let the UI layout complete
+      Future.delayed(Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        print('DetailedpostWidget: First scroll attempt after layout');
+        _ensureCommentsVisible();
+
+        // Schedule a second attempt with a longer delay to catch cases where data loading takes longer
+        Future.delayed(Duration(milliseconds: 800), () {
           if (!mounted) return;
+          print('DetailedpostWidget: Second scroll attempt after data loading');
           _ensureCommentsVisible();
         });
       });
+    });
+  }
+
+  // Convert string parameters to document references
+  void _resolveReferences() {
+    try {
+      print('Resolving document references in DetailedpostWidget');
+
+      // Try to get string IDs directly first
+      if (widget.docref is String && (widget.docref as String).isNotEmpty) {
+        _postId = widget.docref as String;
+        print('Stored direct post ID: $_postId');
+      } else if (widget.docref is DocumentReference) {
+        _postId = (widget.docref as DocumentReference).id;
+        print('Extracted post ID from reference: $_postId');
+      }
+
+      if (widget.userref is String && (widget.userref as String).isNotEmpty) {
+        _userId = widget.userref as String;
+        print('Stored direct user ID: $_userId');
+      } else if (widget.userref is DocumentReference) {
+        _userId = (widget.userref as DocumentReference).id;
+        print('Extracted user ID from reference: $_userId');
+      }
+
+      // Resolve post reference
+      if (widget.docref is DocumentReference) {
+        _postReference = widget.docref as DocumentReference;
+        print(
+            'Post reference already a DocumentReference: ${_postReference?.path}');
+      } else if (widget.docref is String &&
+          (widget.docref as String).isNotEmpty) {
+        final postId = widget.docref as String;
+        print('Converting post ID to reference: $postId');
+
+        if (postId.contains('/')) {
+          // Handle full path format
+          _postReference = FirebaseFirestore.instance.doc(postId);
+          print('Using full path: ${_postReference?.path}');
+        } else {
+          // Use just the ID with collection name
+          _postReference =
+              FirebaseFirestore.instance.collection('posts').doc(postId);
+          print('Created posts reference with ID: ${_postReference?.path}');
+        }
+      } else {
+        print('Unable to resolve post reference from: ${widget.docref}');
+      }
+
+      // Resolve user reference
+      if (widget.userref is DocumentReference) {
+        _userReference = widget.userref as DocumentReference;
+        print(
+            'User reference already a DocumentReference: ${_userReference?.path}');
+      } else if (widget.userref is String &&
+          (widget.userref as String).isNotEmpty) {
+        final userId = widget.userref as String;
+        print('Converting user ID to reference: $userId');
+
+        if (userId.contains('/')) {
+          // Handle full path format
+          _userReference = FirebaseFirestore.instance.doc(userId);
+          print('Using full path: ${_userReference?.path}');
+        } else {
+          // Use just the ID with correct collection name
+          _userReference =
+              FirebaseFirestore.instance.collection('User').doc(userId);
+          print('Created User reference with ID: ${_userReference?.path}');
+        }
+      } else {
+        print('Unable to resolve user reference from: ${widget.userref}');
+      }
+
+      print(
+          'References after resolution - Post: ${_postReference?.path}, User: ${_userReference?.path}');
+      print('IDs after resolution - PostID: $_postId, UserID: $_userId');
+    } catch (e) {
+      print('Error resolving references: $e');
+      print(
+          'Debug info - widget.docref: ${widget.docref}, widget.userref: ${widget.userref}');
+    }
+  }
+
+  @override
+  void didUpdateWidget(DetailedpostWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-resolve references if the parameters changed
+    if (widget.docref != oldWidget.docref ||
+        widget.userref != oldWidget.userref) {
+      print('Parameters changed, re-resolving references');
+      _resolveReferences();
     }
   }
 
   void _ensureCommentsVisible() async {
     if (!mounted) return;
+    print('DetailedpostWidget: Attempting to scroll to comments section');
 
     // Try multiple times with increasing delays if needed
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
       if (!mounted) return;
+
       if (_scrollController.hasClients) {
+        print(
+            'DetailedpostWidget: ScrollController has clients, attempting animation (try ${i + 1})');
         await _animateToComments();
         break;
+      } else {
+        print(
+            'DetailedpostWidget: ScrollController has no clients yet, waiting (try ${i + 1})');
       }
-      await Future.delayed(Duration(milliseconds: 200 * (i + 1)));
+
+      // Use exponentially increasing delays
+      final delay = Duration(milliseconds: 200 * pow(2, i).toInt());
+      print(
+          'DetailedpostWidget: Waiting for ${delay.inMilliseconds}ms before next attempt');
+      await Future.delayed(delay);
+
       if (!mounted) return;
     }
   }
 
   Future<void> _animateToComments() async {
-    if (!mounted || !_scrollController.hasClients) return;
+    if (!mounted || !_scrollController.hasClients) {
+      print(
+          'DetailedpostWidget: Cannot animate to comments - not mounted or no clients');
+      return;
+    }
 
     print('DetailedpostWidget: Scrolling to comments with animation');
 
@@ -113,20 +248,24 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
       // Get the current scroll metrics
       final position = _scrollController.position;
       final maxScroll = position.maxScrollExtent;
+      print('DetailedpostWidget: Max scroll extent: $maxScroll');
 
       // First scroll all the way to the bottom to ensure comments are visible
+      print('DetailedpostWidget: Starting scroll animation to bottom');
       await _scrollController.animateTo(
         maxScroll,
-        duration: Duration(milliseconds: 600),
+        duration: Duration(milliseconds: 800),
         curve: Curves.easeOutCubic,
       );
+      print('DetailedpostWidget: Completed scroll to bottom');
       if (!mounted) return;
 
       // Optional: Slight bounce effect
       if (mounted && _scrollController.hasClients) {
+        print('DetailedpostWidget: Adding bounce effect');
         await _scrollController.animateTo(
-          maxScroll * 0.98, // Bounce back slightly
-          duration: Duration(milliseconds: 200),
+          maxScroll * 0.95, // Bounce back slightly more for visibility
+          duration: Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
         );
         if (!mounted) return;
@@ -135,9 +274,10 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
         if (mounted && _scrollController.hasClients) {
           await _scrollController.animateTo(
             maxScroll,
-            duration: Duration(milliseconds: 200),
+            duration: Duration(milliseconds: 300),
             curve: Curves.easeOutCubic,
           );
+          print('DetailedpostWidget: Completed bounce animation');
         }
       }
     } catch (e) {
@@ -363,8 +503,8 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
 
   Future<int> getCommentsCount() async {
     try {
-      print('Getting comments count for post: ${widget.docref?.id}');
-      return await CommentsService.getCommentCount(widget.docref!);
+      print('Getting comments count for post: ${_postReference?.id}');
+      return await CommentsService.getCommentCount(_postReference!);
     } catch (e) {
       print('Error getting comments count: $e');
       return 0;
@@ -391,26 +531,26 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                   onTap: () async {
                     if (hasLiked) {
                       // Unlike
-                      await widget.docref!.update({
+                      await _postReference!.update({
                         'likes': FieldValue.arrayRemove([currentUserReference]),
                       });
                     } else {
                       // Like
-                      await widget.docref!.update({
+                      await _postReference!.update({
                         'likes': FieldValue.arrayUnion([currentUserReference]),
                       });
 
                       // Create a like notification if necessary
-                      if (currentUserReference != widget.userref &&
-                          widget.userref != null) {
+                      if (currentUserReference != _userReference &&
+                          _userReference != null) {
                         try {
                           // Use direct Firebase method for consistency
                           final notificationData = {
                             'is_a_like': true,
                             'is_read': false,
-                            'post_ref': widget.docref,
+                            'post_ref': _postReference,
                             'made_by': currentUserReference,
-                            'made_to': widget.userref?.id,
+                            'made_to': _userReference?.id,
                             'date': DateTime.now(),
                             'made_by_username':
                                 currentUserDocument?.userName ?? '',
@@ -419,9 +559,9 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                           };
 
                           print('Creating like notification in detailed post:');
-                          print('  - Post ID: ${widget.docref?.id}');
+                          print('  - Post ID: ${_postReference?.id}');
                           print('  - Made by: ${currentUserReference?.id}');
-                          print('  - Made to: ${widget.userref?.id}');
+                          print('  - Made to: ${_userReference?.id}');
                           print('  - Full data: $notificationData');
 
                           final notifRef = await FirebaseFirestore.instance
@@ -483,14 +623,14 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                     final isCurrentlySaved =
                         currentSavedBy.contains(savedByElement);
 
-                    await post.reference.update({
+                    await _postReference!.update({
                       'Post_saved_by': isCurrentlySaved
                           ? FieldValue.arrayRemove([savedByElement])
                           : FieldValue.arrayUnion([savedByElement]),
                     });
                     print('Post saved status updated: ${!isCurrentlySaved}');
                     print(
-                        'Updated post data: ${(await post.reference.get()).data()}');
+                        'Updated post data: ${(await _postReference!.get()).data()}');
 
                     // Show the save popup
                     SavePostPopup.showSavedPopup(context,
@@ -511,10 +651,10 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
               onTap: () async {
                 // Get the user record for the poster
                 final UserRecord? posterUser =
-                    await UserRecord.getDocumentOnce(widget.userref!);
+                    await UserRecord.getDocumentOnce(_userReference!);
                 if (posterUser != null) {
                   // Get the post document
-                  final postDoc = await widget.docref!.get();
+                  final postDoc = await _postReference!.get();
                   final postRecord = PostsRecord.fromSnapshot(postDoc);
                   ShareOptionsDialog.show(context, postRecord, posterUser);
                 }
@@ -1029,7 +1169,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
         await NotificationsRecord.createNotification(
           isALike: true,
           isRead: false,
-          postRef: widget.docref,
+          postRef: _postReference,
           madeBy: currentUserReference,
           madeTo: comment.userref?.id,
           date: util.getCurrentTimestamp,
@@ -1053,15 +1193,15 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
     final commentText = comment?.trim() ?? '';
     if (commentText.isEmpty) return;
 
-    print('Adding comment to post: ${widget.docref?.id}');
-    print('Post reference path: ${widget.docref?.path}');
+    print('Adding comment to post: ${_postReference?.id}');
+    print('Post reference path: ${_postReference?.path}');
     print('Comment text: $commentText');
     print('User reference: ${currentUserReference?.id}');
     print('User reference path: ${currentUserReference?.path}');
 
     try {
       // Verify the post exists before adding comment
-      final postDoc = await widget.docref!.get();
+      final postDoc = await _postReference!.get();
       if (!postDoc.exists) {
         print('Post does not exist!');
         return;
@@ -1094,7 +1234,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
       final commentData = {
         'comment': commentText,
         'date': util.getCurrentTimestamp,
-        'postref': widget.docref,
+        'postref': _postReference,
         'userref': currentUserReference,
         'likes': [],
         'deleted': false,
@@ -1114,14 +1254,14 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
       String? commentId;
       if (_model.replyingToComment != null) {
         commentId = await CommentsService.createComment(
-          postId: widget.docref!.id,
+          postId: _postReference!.id,
           userId: currentUserReference!.id,
           comment: commentText,
           parentCommentId: _model.replyingToComment!.reference.id,
         );
       } else {
         commentId = await CommentsService.createComment(
-          postId: widget.docref!.id,
+          postId: _postReference!.id,
           userId: currentUserReference!.id,
           comment: commentText,
         );
@@ -1158,7 +1298,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
           await NotificationsRecord.createNotification(
             isALike: false,
             isRead: false,
-            postRef: widget.docref,
+            postRef: _postReference,
             madeBy: currentUserReference,
             madeTo: commentAuthorRef?.id,
             date: util.getCurrentTimestamp,
@@ -1168,14 +1308,14 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
           );
 
           // Also notify the post author if different from comment author and not the current user
-          if (widget.userref != commentAuthorRef &&
-              widget.userref != currentUserReference) {
+          if (_userReference != commentAuthorRef &&
+              _userReference != currentUserReference) {
             await NotificationsRecord.createNotification(
               isALike: false,
               isRead: false,
-              postRef: widget.docref,
+              postRef: _postReference,
               madeBy: currentUserReference,
-              madeTo: widget.userref?.id,
+              madeTo: _userReference?.id,
               date: util.getCurrentTimestamp,
               madeByUsername: username,
               isFollowRequest: false,
@@ -1186,19 +1326,19 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
         }
       } else {
         // If adding a top-level comment, notify the post author
-        if (currentUserReference != widget.userref) {
+        if (currentUserReference != _userReference) {
           final username = currentUserDocument?.userName?.trim() ?? '';
           print('Creating comment notification:');
           print('Made by: ${currentUserReference?.id}');
-          print('Made to: ${widget.userref?.id}');
+          print('Made to: ${_userReference?.id}');
           print('Username: $username');
 
           await NotificationsRecord.createNotification(
             isALike: false,
             isRead: false,
-            postRef: widget.docref,
+            postRef: _postReference,
             madeBy: currentUserReference,
-            madeTo: widget.userref?.id,
+            madeTo: _userReference?.id,
             date: util.getCurrentTimestamp,
             madeByUsername: username,
             isFollowRequest: false,
@@ -1230,7 +1370,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
   // Method to display options menu for a comment
   Widget _buildCommentOptionsMenu(CommentsRecord comment) {
     // Check permissions - only post owners can delete comments
-    final isPostOwner = currentUserReference == widget.userref;
+    final isPostOwner = currentUserReference == _userReference;
 
     return Theme(
       data: Theme.of(context).copyWith(
@@ -1530,12 +1670,12 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
   Future<void> _performSoftDeletion(CommentsRecord comment) async {
     print('Starting soft deletion for comment ID: ${comment.reference.id}');
     print('Current user: ${currentUserReference?.id}');
-    print('Post owner: ${widget.userref?.id}');
+    print('Post owner: ${_userReference?.id}');
     print('Comment owner: ${comment.userref?.id}');
 
     // Check if current user is either the comment author or post owner
     final isCommentAuthor = currentUserReference == comment.userref;
-    final isPostOwner = currentUserReference == widget.userref;
+    final isPostOwner = currentUserReference == _userReference;
 
     print('Is comment author: $isCommentAuthor');
     print('Is post owner: $isPostOwner');
@@ -2106,7 +2246,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
   Stream<List<CommentsRecord>> _queryComments() {
     return queryCommentsRecord(
       queryBuilder: (commentsRecord) => commentsRecord
-          .where('postref', isEqualTo: widget.docref)
+          .where('postref', isEqualTo: _postReference)
           .where('isReply', isEqualTo: false)
           .orderBy('date', descending: false),
     );
@@ -2500,8 +2640,133 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // Add extensive debugging to trace document reference issues
+    print('\n==== DETAILEDPOST WIDGET BUILD ====');
+    print('Original docref: ${widget.docref} (${widget.docref.runtimeType})');
+    print(
+        'Original userref: ${widget.userref} (${widget.userref.runtimeType})');
+    print(
+        'Original showComments: ${widget.showComments} (${widget.showComments?.runtimeType})');
+    print(
+        'Resolved _postReference: ${_postReference?.path} (${_postReference?.runtimeType})');
+    print(
+        'Resolved _userReference: ${_userReference?.path} (${_userReference?.runtimeType})');
+    print('Direct IDs - _postId: $_postId, _userId: $_userId');
+
+    // Try inspecting the parameters from context
+    try {
+      final routeState = GoRouterState.of(context);
+      final queryParams = routeState.uri.queryParameters;
+      print('Route query parameters: $queryParams');
+
+      // Extract parameters from route if our widget parameters are null
+      if (_postReference == null && queryParams.containsKey('docref')) {
+        final docId = queryParams['docref'];
+        print('Extracting docref from route: $docId');
+        _postId = docId;
+        _postReference =
+            FirebaseFirestore.instance.collection('posts').doc(docId);
+        print('Created post reference from route: ${_postReference?.path}');
+      }
+
+      if (_userReference == null && queryParams.containsKey('userref')) {
+        final userId = queryParams['userref'];
+        print('Extracting userref from route: $userId');
+        _userId = userId;
+        _userReference =
+            FirebaseFirestore.instance.collection('User').doc(userId);
+        print('Created user reference from route: ${_userReference?.path}');
+      }
+
+      // Check for showComments parameter in route
+      if (queryParams.containsKey('showComments')) {
+        final showComments =
+            queryParams['showComments']?.toLowerCase() == 'true';
+        print('Extracting showComments from route: $showComments');
+
+        if (showComments) {
+          print('Will scroll to comments based on route parameter');
+          // Schedule the scroll to comments
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _scheduleCommentScroll();
+          });
+        }
+      }
+    } catch (e) {
+      print('Error getting route parameters: $e');
+    }
+    print('==== END DETAILEDPOST WIDGET BUILD ====\n');
+
+    // Check if we have a valid post reference or ID
+    if (_postReference == null && _postId == null) {
+      // Handle null docref case with a fallback UI
+      return Scaffold(
+        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+        appBar: AppBar(
+          backgroundColor: FlutterFlowTheme.of(context).primary,
+          title: Text(
+            'Post Not Found',
+            style: FlutterFlowTheme.of(context).headlineMedium.override(
+                  fontFamily: 'Outfit',
+                  color: Colors.white,
+                  fontSize: 22,
+                ),
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.of(context).pop(),
+            color: Colors.white,
+          ),
+          centerTitle: true,
+          elevation: 2,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                color: FlutterFlowTheme.of(context).secondaryText,
+                size: 60,
+              ),
+              SizedBox(height: 20),
+              Text(
+                'The post you were looking for could not be found.',
+                style: FlutterFlowTheme.of(context).bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Go Back'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: FlutterFlowTheme.of(context).primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Build a stream from either the reference or the direct ID
+    Stream<PostsRecord> getPostStream() {
+      if (_postReference != null) {
+        print('Using document reference for stream: ${_postReference!.path}');
+        return PostsRecord.getDocument(_postReference!);
+      } else if (_postId != null) {
+        print('Creating reference from ID for stream: $_postId');
+        final ref = FirebaseFirestore.instance.collection('posts').doc(_postId);
+        return PostsRecord.getDocument(ref);
+      } else {
+        // This should never happen because we check above
+        throw Exception('No valid post reference or ID available');
+      }
+    }
+
     return StreamBuilder<PostsRecord>(
-      stream: PostsRecord.getDocument(widget.docref!),
+      stream: getPostStream(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return Center(
@@ -2525,16 +2790,17 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
         final postLikes = post.likes ?? [];
         final postSavedBy = post.postSavedBy ?? [];
 
-        // Check if userref is null, if it is, use post.poster as fallback
-        final userReference = widget.userref ?? post.poster;
+        // If user reference is still null, try to get it from the post
+        final userReference = _userReference ?? post.poster;
+        final userId = _userId ?? post.poster?.id;
 
         // Only proceed with StreamBuilder if userReference is not null
-        if (userReference == null) {
+        if (userReference == null && userId == null) {
           return Scaffold(
             key: scaffoldKey,
             backgroundColor: Colors.transparent,
             body: Hero(
-              tag: 'post_image_${widget.docref?.id ?? "default"}',
+              tag: 'post_image_${_postReference?.id ?? _postId ?? "default"}',
               child: SensorBackgroundImage(
                 imageUrl: postVideoUrl,
                 motionMultiplier: 0.0,
@@ -2608,8 +2874,25 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
           );
         }
 
+        // Build a stream from either the reference or the direct ID
+        Stream<UserRecord> getUserStream() {
+          if (userReference != null) {
+            print(
+                'Using user document reference for stream: ${userReference.path}');
+            return UserRecord.getDocument(userReference);
+          } else if (userId != null) {
+            print('Creating user reference from ID for stream: $userId');
+            final ref =
+                FirebaseFirestore.instance.collection('User').doc(userId);
+            return UserRecord.getDocument(ref);
+          } else {
+            // This should never happen because we check above
+            throw Exception('No valid user reference or ID available');
+          }
+        }
+
         return StreamBuilder<UserRecord>(
-          stream: UserRecord.getDocument(userReference),
+          stream: getUserStream(),
           builder: (context, userSnapshot) {
             if (!userSnapshot.hasData) {
               return Center(
@@ -2629,7 +2912,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
               key: scaffoldKey,
               backgroundColor: Colors.transparent,
               body: Hero(
-                tag: 'post_image_${widget.docref?.id ?? "default"}',
+                tag: 'post_image_${_postReference?.id ?? "default"}',
                 child: SensorBackgroundImage(
                   imageUrl: postVideoUrl,
                   motionMultiplier: 0.0,
@@ -2708,64 +2991,57 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
 
   // Anonymous user header when the user reference is missing
   Widget _buildAnonymousUserHeader() {
-    return _buildGlassmorphicContainer(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            InkWell(
-              onTap: () {
-                // Navigate to current user's profile when clicking an anonymous user avatar
-                context.pushNamed('prof1');
-              },
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 2,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    '?',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          // Anonymous user avatar
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Icon(
+                Icons.person,
+                color: Colors.white70,
+                size: 24,
               ),
             ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Unknown User',
-                    style: FlutterFlowTheme.of(context).titleMedium.override(
-                          fontFamily: 'Outfit',
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white.withOpacity(0.95),
-                        ),
-                  ),
-                  Text(
-                    'This user\'s data is not available',
-                    style: FlutterFlowTheme.of(context).bodySmall.override(
-                          fontFamily: 'Outfit',
-                          color: Colors.white.withOpacity(0.7),
-                        ),
-                  ),
-                ],
-              ),
+          ),
+          SizedBox(width: 12),
+          // Placeholder text
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'User',
+                  style: FlutterFlowTheme.of(context).titleMedium.override(
+                        fontFamily: 'Figtree',
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                Text(
+                  'Loading profile...',
+                  style: FlutterFlowTheme.of(context).bodySmall.override(
+                        fontFamily: 'Figtree',
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -22,12 +22,33 @@ class BaseLayout extends StatefulWidget {
 class _BaseLayoutState extends State<BaseLayout> {
   late int _currentIndex;
   late PageController _pageController;
+  bool _isInitialized = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: _currentIndex);
+    _initializeLayout();
+  }
+
+  Future<void> _initializeLayout() async {
+    try {
+      _currentIndex = widget.initialIndex;
+      _pageController = PageController(initialPage: _currentIndex);
+
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+    } catch (e) {
+      print('Error initializing BaseLayout: $e');
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to initialize app layout';
+        });
+      }
+    }
   }
 
   @override
@@ -52,6 +73,41 @@ class _BaseLayoutState extends State<BaseLayout> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red),
+              SizedBox(height: 16),
+              Text(_error!, style: TextStyle(color: Colors.red)),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _error = null;
+                    _isInitialized = false;
+                  });
+                  _initializeLayout();
+                },
+                child: Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_isInitialized) {
+      return Scaffold(
+        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
       body: Stack(

@@ -1,3 +1,9 @@
+// The membership page handles subscriptions and coin purchases.
+// IMPORTANT: All coin purchases now go through the proper purchase flow via PurchaseService,
+// ensuring coins are only added to a user's account AFTER payment confirmation from the store.
+// Direct Firestore updates are no longer used, fixing the security issue where coins could be
+// added without payment verification.
+
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -203,7 +209,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
   // Mock data for UI preview
   final List<Map<String, dynamic>> _coinPacks = [
     {
-      'id': 'coins_100',
+      'id': 'lunacoin_100',
       'title': '100 Coins',
       'amount': 100,
       'price': '0.99',
@@ -211,7 +217,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
       'color': Color(0xFFF9A825),
     },
     {
-      'id': 'coins_500',
+      'id': 'lunacoin_500',
       'title': '500 Coins',
       'amount': 500,
       'price': '4.99',
@@ -219,7 +225,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
       'color': Color(0xFFE65100),
     },
     {
-      'id': 'coins_1000',
+      'id': 'lunacoin_1000',
       'title': '1000 Coins',
       'amount': 1000,
       'price': '9.99',
@@ -404,8 +410,71 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
           );
         }
       } else {
-        // Handle coin purchase with direct Firestore access
-        await _directFirestoreCoinPurchase(pack);
+        // Get actual products from the service
+        final coinProducts = await PurchaseService.getCoinProducts();
+
+        if (coinProducts.isEmpty) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No products available. Please try again later.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        // Find the matching product
+        CoinProduct? foundProduct;
+        try {
+          foundProduct = coinProducts.firstWhere(
+            (product) => product.id == pack['id'],
+          );
+        } catch (e) {
+          // Product not found
+          foundProduct = null;
+        }
+
+        if (foundProduct == null) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Product not found. Please try again later.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        // Use the actual product instead of creating a new one
+        final result = await PurchaseService.purchaseProduct(foundProduct);
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('${foundProduct.amount} coins purchased successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message ?? 'Purchase failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       print('Error in _handlePurchase: $e');
@@ -422,114 +491,6 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
           backgroundColor: Colors.red,
         ),
       );
-    }
-  }
-
-  // Direct Firestore purchase method that bypasses UserRecord
-  Future<void> _directFirestoreCoinPurchase(Map<String, dynamic> pack) async {
-    try {
-      // Verify user is logged in
-      if (currentUserReference == null) {
-        throw Exception('You must be logged in to purchase coins');
-      }
-
-      print('Starting direct Firestore purchase for: ${pack['id']}');
-
-      // Get the user document directly from Firestore
-      final userDoc = await FirebaseFirestore.instance
-          .doc(currentUserReference!.path)
-          .get();
-
-      if (!userDoc.exists) {
-        throw Exception('User document not found');
-      }
-
-      // Get the current coin balance safely
-      final userData = userDoc.data();
-      if (userData == null) {
-        throw Exception('User data is null');
-      }
-
-      // FIXED: Using correct field name 'luna_coins' instead of 'lunaCoins'
-      final currentCoins =
-          userData['luna_coins'] is int ? userData['luna_coins'] as int : 0;
-      final purchasedCoins = pack['amount'] as int;
-      final newCoinBalance = currentCoins + purchasedCoins;
-
-      print(
-          'Updating coins: $currentCoins + $purchasedCoins = $newCoinBalance');
-
-      // Simple update instead of transaction
-      // FIXED: Only using serverTimestamp() with update()
-      await FirebaseFirestore.instance.doc(currentUserReference!.path).update({
-        'luna_coins': newCoinBalance,
-        'lastPurchaseTimestamp': FieldValue.serverTimestamp(),
-        'purchaseHistory': FieldValue.arrayUnion([
-          {
-            'type': 'coins',
-            'amount': purchasedCoins,
-            'price': pack['price'],
-            'timestamp': Timestamp
-                .now(), // Using Timestamp.now() instead of serverTimestamp
-            'productId': pack['id'],
-          }
-        ]),
-      });
-
-      // Record purchase analytics (optional)
-      try {
-        // Log analytics only if this isn't a release build or the user has permissions
-        await FirebaseFirestore.instance.collection('analytics').add({
-          'event': 'coin_purchase',
-          'userId': currentUserReference?.id,
-          'productId': pack['id'],
-          'amount': pack['amount'],
-          'price': pack['price'],
-          'timestamp': Timestamp.now(),
-        }).timeout(Duration(seconds: 3), onTimeout: () {
-          throw TimeoutException('Analytics write timed out');
-        });
-      } catch (e) {
-        // Silently catch analytics errors - they are non-critical
-        print('Analytics error (non-critical): $e');
-      }
-
-      if (mounted) {
-        // Update local state and show success message
-        setState(() {
-          _isLoading = false;
-        });
-
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$purchasedCoins Luna Coins added to your account!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-
-        // Force UI refresh to update coin display
-        setState(() {});
-      }
-    } catch (e) {
-      print('Error in _directFirestoreCoinPurchase: $e');
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to process purchase: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-
-      // Re-throw the error to be caught by the calling method
-      throw e;
     }
   }
 
@@ -1949,236 +1910,6 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
       return Color(0xFFE65100); // Orange for medium amounts
     } else {
       return Color(0xFFD32F2F); // Red for large amounts
-    }
-  }
-
-  // Add this method to handle coin purchases
-  Future<void> _purchaseCoins(CoinProduct product) async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Verify user is logged in
-      if (currentUserReference == null) {
-        throw Exception('User not found. Please log in first.');
-      }
-
-      debugPrint('MembershipPage: Starting coin purchase for ${product.id}');
-
-      // In debug mode, skip payment processing and directly add coins
-      if (kDebugMode) {
-        await _directDebugPurchase(product);
-        return;
-      }
-
-      // Check if product has proper product details before starting purchase
-      if (product.productDetails == null) {
-        throw Exception(
-            'Unable to start purchase. Product details not available.');
-      }
-
-      // Start the purchase process with the payment provider
-      final result = await PaywallManager.purchaseProduct(product);
-
-      // Make sure we're still mounted before showing UI
-      if (!mounted) return;
-
-      if (result.success) {
-        // Get the user document directly from Firestore
-        final userDoc = await FirebaseFirestore.instance
-            .doc(currentUserReference!.path)
-            .get();
-
-        if (!userDoc.exists) {
-          throw Exception('User document not found');
-        }
-
-        // Get current coin balance safely
-        final userData = userDoc.data();
-        if (userData == null) {
-          throw Exception('User data is null');
-        }
-
-        // FIXED: Using correct field name 'luna_coins' instead of 'lunaCoins'
-        final currentCoins =
-            userData['luna_coins'] is int ? userData['luna_coins'] as int : 0;
-        final newCoins = currentCoins + product.amount;
-
-        // Simple update without transaction
-        await FirebaseFirestore.instance
-            .doc(currentUserReference!.path)
-            .update({
-          'luna_coins': newCoins,
-          'lastPurchaseDate': FieldValue.serverTimestamp(),
-          'purchaseHistory': FieldValue.arrayUnion([
-            {
-              'productId': product.id,
-              'amount': product.amount,
-              'price': product.price,
-              'date': Timestamp
-                  .now(), // Using Timestamp.now() instead of serverTimestamp
-              'type': 'coin_purchase'
-            }
-          ])
-        });
-
-        // Log purchase analytics (optional)
-        try {
-          // Log analytics only if this isn't a release build or the user has permissions
-          await FirebaseFirestore.instance.collection('analytics').add({
-            'event': 'coin_purchase',
-            'userId': currentUserReference?.id,
-            'productId': product.id,
-            'amount': product.amount,
-            'price': product.price,
-            'timestamp': Timestamp.now(),
-          }).timeout(Duration(seconds: 3), onTimeout: () {
-            throw TimeoutException('Analytics write timed out');
-          });
-        } catch (e) {
-          // Silently catch analytics errors - they are non-critical
-          print('Analytics error (non-critical): $e');
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('${product.amount} Luna Coins added to your account!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-
-        // Force refresh UI to show new coin count
-        setState(() {});
-      } else {
-        // Purchase failed
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Purchase Failed'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(result.message ?? 'Purchase could not be completed.'),
-                SizedBox(height: 16),
-                if ((result.message ?? '').contains('not be found'))
-                  Text(
-                    'This product may not be set up correctly in the store. Please try again later.',
-                    style: TextStyle(color: Colors.orange.shade800),
-                  ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('OK'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      print('Error purchasing coins: $e');
-
-      if (!mounted) return;
-
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red.shade800,
-          duration: Duration(seconds: 3),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  // Direct purchase for debug mode
-  Future<void> _directDebugPurchase(CoinProduct product) async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Verify user is logged in
-      if (currentUserReference == null) {
-        throw Exception('User not found. Please log in again.');
-      }
-
-      print('Starting direct debug purchase for ${product.id}');
-
-      // Get the user document directly from Firestore
-      final userDoc = await FirebaseFirestore.instance
-          .doc(currentUserReference!.path)
-          .get();
-
-      if (!userDoc.exists) {
-        throw Exception('User document not found');
-      }
-
-      // Get current coin balance safely
-      final userData = userDoc.data();
-      if (userData == null) {
-        throw Exception('User data is null');
-      }
-
-      // FIXED: Using correct field name 'luna_coins' instead of 'lunaCoins'
-      final currentCoins =
-          userData['luna_coins'] is int ? userData['luna_coins'] as int : 0;
-      final newCoins = currentCoins + product.amount;
-
-      print('Updating coins: $currentCoins + ${product.amount} = $newCoins');
-
-      // Simple update without transaction
-      await FirebaseFirestore.instance.doc(currentUserReference!.path).update({
-        'luna_coins': newCoins,
-        'lastPurchaseDate': FieldValue.serverTimestamp(),
-        'purchaseHistory': FieldValue.arrayUnion([
-          {
-            'productId': product.id,
-            'amount': product.amount,
-            'price': product.price,
-            'date': Timestamp
-                .now(), // Using Timestamp.now() instead of serverTimestamp
-            'type': 'coin_purchase'
-          }
-        ])
-      });
-
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${product.amount} Luna Coins added to your account!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
-      );
-
-      // Force refresh of UI to show new coin balance
-      setState(() {});
-    } catch (e) {
-      // Show error message
-      print('Error in direct debug purchase: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red.shade800,
-        ),
-      );
-      throw e; // Re-throw to be caught by caller
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 

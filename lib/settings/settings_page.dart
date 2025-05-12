@@ -14,6 +14,10 @@ import '/flutter_flow/nav/nav.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'dart:convert';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -214,15 +218,27 @@ class _SettingsPageState extends State<SettingsPage>
                   ),
                   _buildSettingTile(
                     icon: Icons.help_outline,
-                    title: 'Help & FAQ',
-                    subtitle: 'Get help and answers to common questions',
+                    title: 'Help',
+                    subtitle: 'Get help with using the app',
                     onTap: () => _navigateToHelp(context),
                   ),
                   _buildSettingTile(
+                    icon: Icons.question_answer_outlined,
+                    title: 'FAQ',
+                    subtitle: 'Frequently Asked Questions',
+                    onTap: () => _navigateToFAQ(context),
+                  ),
+                  _buildSettingTile(
                     icon: Icons.description_outlined,
-                    title: 'Terms & Privacy Policy',
-                    subtitle: 'Read our terms and privacy policy',
-                    onTap: () => _navigateToTerms(context),
+                    title: 'Terms of Use',
+                    subtitle: 'Read our terms of use',
+                    onTap: () => _navigateToTermsOfUse(context),
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Privacy Policy',
+                    subtitle: 'Read our privacy policy',
+                    onTap: () => _navigateToPrivacyPolicy(context),
                   ),
                 ],
               ),
@@ -739,321 +755,208 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   void _showBugReportDialog(BuildContext context) {
-    final TextEditingController bugReportController = TextEditingController();
+    final bugReportController = TextEditingController();
+    bool _isSubmitting = false;
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Report a Bug'),
-        content: TextField(
-          controller: bugReportController,
-          maxLines: 5,
-          decoration: InputDecoration(
-            hintText: 'Describe the issue...',
-            border: OutlineInputBorder(),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Report a Bug'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_isSubmitting)
+                Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text('Submitting...'),
+                    ],
+                  ),
+                ),
+              TextField(
+                controller: bugReportController,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  hintText: 'Describe the issue...',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: !_isSubmitting,
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: _isSubmitting
+                  ? null
+                  : () {
+                      bugReportController.dispose();
+                      Navigator.pop(dialogContext);
+                    },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: _isSubmitting
+                  ? null
+                  : () async {
+                      final bugReport = bugReportController.text.trim();
+                      if (bugReport.isNotEmpty) {
+                        // Show submitting state
+                        setState(() => _isSubmitting = true);
+
+                        try {
+                          // Save to Firebase
+                          await FirebaseFirestore.instance
+                              .collection('bug_reports')
+                              .add({
+                            'content': bugReport,
+                            'user_id': currentUserUid,
+                            'user_email': currentUserEmail,
+                            'timestamp': FieldValue.serverTimestamp(),
+                            'status': 'new',
+                          });
+
+                          // Success - close dialog
+                          bugReportController.dispose();
+                          Navigator.pop(dialogContext);
+                        } catch (e) {
+                          print('Error submitting bug report: $e');
+                          // Show error state
+                          if (mounted) {
+                            setState(() => _isSubmitting = false);
+                          }
+                        }
+                      }
+                    },
+              child: Text('Submit'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              // Dispose controller before closing dialog
-              bugReportController.dispose();
-              Navigator.pop(dialogContext);
-            },
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              // Implement bug report submission
-              final bugReport = bugReportController.text.trim();
-
-              // Dispose controller before any async operations
-              bugReportController.dispose();
-
-              Navigator.pop(dialogContext);
-
-              if (bugReport.isNotEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Bug report submitted successfully')),
-                );
-              }
-            },
-            child: Text('Submit'),
-          ),
-        ],
       ),
     );
   }
 
   void _showFeatureRequestDialog(BuildContext context) {
+    final featureRequestController = TextEditingController();
+    bool _isSubmitting = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Request a Feature'),
-        content: TextField(
-          maxLines: 5,
-          decoration: InputDecoration(
-            hintText: 'Describe your feature request...',
-            border: OutlineInputBorder(),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Request a Feature'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_isSubmitting)
+                Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text('Submitting...'),
+                    ],
+                  ),
+                ),
+              TextField(
+                controller: featureRequestController,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  hintText: 'Describe your feature request...',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: !_isSubmitting,
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: _isSubmitting
+                  ? null
+                  : () {
+                      featureRequestController.dispose();
+                      Navigator.pop(dialogContext);
+                    },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: _isSubmitting
+                  ? null
+                  : () async {
+                      final featureRequest =
+                          featureRequestController.text.trim();
+                      if (featureRequest.isNotEmpty) {
+                        setState(() => _isSubmitting = true);
+                        try {
+                          await FirebaseFirestore.instance
+                              .collection('bug_reports')
+                              .add({
+                            'content': featureRequest,
+                            'user_id': currentUserUid,
+                            'user_email': currentUserEmail,
+                            'timestamp': FieldValue.serverTimestamp(),
+                            'status': 'new',
+                            'type': 'feature_request',
+                          });
+                          featureRequestController.dispose();
+                          Navigator.pop(dialogContext);
+                        } catch (e) {
+                          print('Error submitting feature request: $e');
+                          if (mounted) {
+                            setState(() => _isSubmitting = false);
+                          }
+                        }
+                      }
+                    },
+              child: Text('Submit'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              // Implement feature request submission
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text('Feature request submitted successfully')),
-              );
-            },
-            child: Text('Submit'),
-          ),
-        ],
       ),
     );
   }
 
   void _navigateToHelp(BuildContext context) {
-    context.pushNamed('Help');
+    _launchURL('https://lunakraft.com/Landing/Help-center.html');
   }
 
-  void _navigateToTerms(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          height: MediaQuery.of(context).size.height * 0.8,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              // Header with close button
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Colors.grey.shade200,
-                    ),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'LUNAKRAFT POLICIES',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: Colors.black),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              // Scrollable content
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildPolicySection(
-                        'Privacy Policy',
-                        'Last Updated: 28th March 2025',
-                        [
-                          _buildPolicyItem('1. Introduction', [
-                            'Welcome to LunaKraft. Your privacy is important to us. This Privacy Policy explains how we collect, use, disclose, and protect your personal data when you use our social media platform (the "Service"). By using the Service, you agree to the collection and use of information in accordance with this policy.',
-                          ]),
-                          _buildPolicyItem('2. Information We Collect', [
-                            'We may collect the following types of information:',
-                            '• Personal Information: Name, email address, phone number, profile picture, and other details you provide.',
-                            '• Usage Data: Information about how you use the Service, including interactions, posts, and preferences.',
-                            '• Device and Technical Data: IP address, browser type, device type, operating system, and app version.',
-                            '• Cookies and Tracking Technologies: We use cookies and similar technologies to enhance user experience and analyse usage patterns.',
-                          ]),
-                          _buildPolicyItem('3. How We Use Your Information', [
-                            'We use your information for the following purposes:',
-                            '• To provide, maintain, and improve the Service.',
-                            '• To personalize user experience and deliver relevant content.',
-                            '• To communicate with you about updates, features, and security alerts.',
-                            '• To prevent fraud, enforce our Terms and Conditions, and comply with legal obligations.',
-                          ]),
-                          _buildPolicyItem('4. Sharing of Information', [
-                            'We do not sell your personal information. However, we may share your data with:',
-                            '• Service Providers: Third-party vendors who help us operate and maintain the Service.',
-                            '• Legal Authorities: If required by law or to protect our rights and users\' safety.',
-                            '• Other Users: Depending on your privacy settings, some of your information may be visible to other users.',
-                          ]),
-                          _buildPolicyItem('5. Data Security', [
-                            'We take reasonable measures to protect your personal data. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.',
-                          ]),
-                          _buildPolicyItem('6. Your Rights and Choices', [
-                            'You have the right to:',
-                            '• Access, update, or delete your personal data.',
-                            '• Adjust privacy settings to control data visibility.',
-                            '• Opt-out of marketing communications.',
-                          ]),
-                          _buildPolicyItem('7. Children\'s Privacy', [
-                            'The Service is not intended for individuals under the age of 13. We do not knowingly collect data from children without parental consent.',
-                          ]),
-                          _buildPolicyItem(
-                              '8. Changes to This Privacy Policy', [
-                            'We may update this Privacy Policy periodically. Any changes will be posted on this page, and continued use of the Service after updates constitutes acceptance of the revised policy.',
-                          ]),
-                          _buildPolicyItem('9. Contact Us', [
-                            'If you have any questions about this Privacy Policy, please contact us at lunakraftco@gmail.com.',
-                          ]),
-                        ],
-                      ),
-                      Divider(height: 32),
-                      _buildPolicySection(
-                        'Terms of Use',
-                        'Last Updated: 28th March 2025',
-                        [
-                          _buildPolicyItem('1. Introduction', [
-                            'By accessing or using LunaKraft services, you agree to be bound by these Terms of Use. If you do not agree, you may not use the Service.',
-                          ]),
-                          _buildPolicyItem('2. User Responsibilities', [
-                            '• You must be at least 13 years old to use LunaKraft.',
-                            '• You are responsible for your account security and activity.',
-                            '• You may not post unlawful, offensive, or harmful content.',
-                          ]),
-                          _buildPolicyItem('3. Intellectual Property', [
-                            '• All content on LunaKraft belongs to us or its respective owners.',
-                            '• You grant us a license to use content you upload for promotional purposes.',
-                          ]),
-                          _buildPolicyItem('4. Termination', [
-                            'We reserve the right to suspend or terminate your account if you violate these Terms.',
-                          ]),
-                          _buildPolicyItem('5. Limitation of Liability', [
-                            'We are not liable for damages resulting from your use of LunaKraft.',
-                          ]),
-                          _buildPolicyItem('6. Changes to Terms', [
-                            'We may update these Terms at any time. Continued use of LunaKraft after changes means you accept them.',
-                          ]),
-                          _buildPolicyItem('7. Contact Us', [
-                            'For questions about these Terms, contact us at lunakraftco@gmail.com.',
-                          ]),
-                        ],
-                      ),
-                      Divider(height: 32),
-                      _buildPolicySection(
-                        'Other Legal',
-                        '',
-                        [
-                          Text(
-                            'LunaKraft complies with applicable data protection and consumer rights laws. Users should review our Privacy Policy and Terms of Use regularly.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Divider(height: 32),
-                      _buildPolicySection(
-                        'Safety Centre',
-                        '',
-                        [
-                          _buildPolicyItem('1. Community Guidelines', [
-                            'LunaKraft is committed to a safe and inclusive environment. Users must follow our community guidelines and report harmful content.',
-                          ]),
-                          _buildPolicyItem('2. Reporting and Blocking', [
-                            '• Users can report inappropriate behavior or content through our in-app tools.',
-                            '• You may block other users to manage your interactions.',
-                          ]),
-                          _buildPolicyItem('3. Cybersecurity Tips', [
-                            '• Do not share personal information with strangers.',
-                            '• Use strong passwords and enable two-factor authentication.',
-                          ]),
-                          _buildPolicyItem('4. Mental Health Resources', [
-                            'If you experience distress while using LunaKraft, we provide resources for mental health support.',
-                          ]),
-                          _buildPolicyItem('5. Contact for Safety Concerns', [
-                            'For urgent safety concerns, reach out to lunakraftco@gmail.com.',
-                          ]),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  void _navigateToFAQ(BuildContext context) {
+    _launchURL('https://lunakraft.com/Landing/faqs.html');
   }
 
-  Widget _buildPolicySection(String title, String date, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        if (date.isNotEmpty) ...[
-          SizedBox(height: 4),
-          Text(
-            date,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-        SizedBox(height: 16),
-        ...children,
-      ],
-    );
+  void _navigateToTermsOfUse(BuildContext context) {
+    _launchURL('https://lunakraft.com/Landing/terms-of-use.html');
   }
 
-  Widget _buildPolicyItem(String title, List<String> content) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        SizedBox(height: 8),
-        ...content.map((text) => Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.black87,
-                ),
-              ),
-            )),
-        SizedBox(height: 16),
-      ],
-    );
+  void _navigateToPrivacyPolicy(BuildContext context) {
+    _launchURL('https://lunakraft.com/Landing/privacy-policy.html');
+  }
+
+  Future<void> _launchURL(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(
+      url,
+      mode: LaunchMode.externalApplication,
+    )) {
+      throw Exception('Could not launch $urlString');
+    }
   }
 }

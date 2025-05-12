@@ -232,9 +232,7 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                             .headlineMedium
                                             .override(
                                               fontFamily: 'Outfit',
-                                              color:
-                                                  FlutterFlowTheme.of(context)
-                                                      .primaryText,
+                                              color: Colors.white,
                                               fontSize: 24,
                                               fontWeight: FontWeight.bold,
                                             ),

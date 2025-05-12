@@ -39,6 +39,8 @@ import 'package:luna_kraft/components/native_ad_post.dart';
 import '/utils/tag_formatter.dart';
 import '/utils/serialization_helpers.dart';
 import '/services/comments_service.dart';
+import '/utils/share_util.dart';
+import '/components/invite_friend_dialog.dart';
 
 // Separate class for home feed content
 class _HomeFeedContent extends StatefulWidget {
@@ -1433,6 +1435,25 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                           },
                                         ),
                                         _buildDrawerItem(
+                                          icon: Icons.share_outlined,
+                                          title: 'Invite a Friend',
+                                          onTap: () async {
+                                            Navigator.pop(context);
+                                            // Get user's display name for personalized invitation
+                                            final displayName =
+                                                currentUserDisplayName
+                                                        .isNotEmpty
+                                                    ? currentUserDisplayName
+                                                    : null;
+
+                                            // Show invite friend dialog
+                                            await InviteFriendDialog.show(
+                                              context,
+                                              userName: displayName,
+                                            );
+                                          },
+                                        ),
+                                        _buildDrawerItem(
                                           icon: Icons.settings_outlined,
                                           title: 'Settings',
                                           onTap: () {
@@ -1621,6 +1642,23 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       onTap: () {
                         Navigator.pop(context);
                         context.pushNamed('zen-mode');
+                      },
+                    ),
+                    _buildDrawerItem(
+                      icon: Icons.share_outlined,
+                      title: 'Invite a Friend',
+                      onTap: () async {
+                        Navigator.pop(context);
+                        // Get user's display name for personalized invitation
+                        final displayName = currentUserDisplayName.isNotEmpty
+                            ? currentUserDisplayName
+                            : null;
+
+                        // Show invite friend dialog
+                        await InviteFriendDialog.show(
+                          context,
+                          userName: displayName,
+                        );
                       },
                     ),
                     _buildDrawerItem(

@@ -123,15 +123,26 @@ dynamic deserializeParam<T>(
   List<String>? collectionNamePath,
 }) {
   try {
+    print('deserializeParam called:');
+    print('- param: $param');
+    print('- paramType: $paramType');
+    print('- isList: $isList');
+    print('- collectionNamePath: $collectionNamePath');
+
     if (param == null) {
+      print('- Param is null, returning null');
       return null;
     }
+
     if (isList) {
+      print('- Processing list parameter');
       final paramValues = jsonDecode(param) as Iterable;
       if (paramValues.isEmpty) {
+        print('- Empty list, returning []');
         return [];
       }
-      return paramValues
+
+      final result = paramValues
           .map((p) => deserializeParam<T>(
                 p,
                 paramType,
@@ -141,32 +152,62 @@ dynamic deserializeParam<T>(
           .where((p) => p != null)
           .map((p) => p as T)
           .toList();
+
+      print('- List result: $result');
+      return result;
     }
+
+    print('- Processing single parameter');
     switch (paramType) {
       case ParamType.int:
-        return int.tryParse(param);
+        final result = int.tryParse(param);
+        print('- Int result: $result');
+        return result;
       case ParamType.double:
-        return double.tryParse(param);
+        final result = double.tryParse(param);
+        print('- Double result: $result');
+        return result;
       case ParamType.String:
+        print('- String result: $param');
         return param;
       case ParamType.bool:
-        return param == 'true';
+        final result = param == 'true';
+        print('- Bool result: $result');
+        return result;
       case ParamType.DateTime:
         final milliseconds = int.tryParse(param);
-        return milliseconds != null
+        final result = milliseconds != null
             ? DateTime.fromMillisecondsSinceEpoch(milliseconds)
             : null;
+        print('- DateTime result: $result');
+        return result;
       case ParamType.DateTimeRange:
         final dateTimeRangeMap = jsonDecode(param) as Map<String, dynamic>;
-        return DateTimeRange(
+        final result = DateTimeRange(
           start: DateTime.fromMillisecondsSinceEpoch(
               dateTimeRangeMap['start'] as int),
           end: DateTime.fromMillisecondsSinceEpoch(
               dateTimeRangeMap['end'] as int),
         );
+        print('- DateTimeRange result: $result');
+        return result;
       case ParamType.DocumentReference:
-        return FirebaseFirestore.instance.doc(param);
+        print('- Creating DocumentReference with path: $param');
+        if (param.isEmpty) {
+          print('- Empty path, returning null');
+          return null;
+        }
+
+        try {
+          final result = FirebaseFirestore.instance.doc(param);
+          print('- DocumentReference result: ${result.path}');
+          return result;
+        } catch (e) {
+          print('- Error creating DocumentReference: $e');
+          return null;
+        }
       default:
+        print('- Unknown param type, returning null');
         return null;
     }
   } catch (e) {
@@ -428,24 +469,26 @@ GoRouter createRouter(AppStateNotifier appStateNotifier, [Widget? entryPage]) =>
         FFRoute(
           name: DetailedpostWidget.routeName,
           path: DetailedpostWidget.routePath,
-          builder: (context, params) => DetailedpostWidget(
-            docref: params.getParam(
-              'docref',
-              ParamType.DocumentReference,
-              isList: false,
-              collectionNamePath: ['posts'],
-            ),
-            userref: params.getParam(
-              'userref',
-              ParamType.DocumentReference,
-              isList: false,
-              collectionNamePath: ['User'],
-            ),
-            showComments: params.getParam(
-              'showComments',
-              ParamType.bool,
-            ),
-          ),
+          builder: (context, params) {
+            // Debug logs to understand parameter extraction
+            final docrefParam = params.getParam('docref', ParamType.String);
+            final userrefParam = params.getParam('userref', ParamType.String);
+            final showCommentsParam =
+                params.getParam('showComments', ParamType.bool);
+
+            print('NAV: Building DetailedpostWidget with parameters:');
+            print('NAV: docref = $docrefParam (${docrefParam.runtimeType})');
+            print('NAV: userref = $userrefParam (${userrefParam.runtimeType})');
+            print(
+                'NAV: showComments = $showCommentsParam (${showCommentsParam?.runtimeType})');
+
+            // Pass the parameters to the widget
+            return DetailedpostWidget(
+              docref: docrefParam,
+              userref: userrefParam,
+              showComments: showCommentsParam,
+            );
+          },
         ),
         FFRoute(
           name: ExploreWidget.routeName,
@@ -463,9 +506,8 @@ GoRouter createRouter(AppStateNotifier appStateNotifier, [Widget? entryPage]) =>
           builder: (context, params) => UserpageWidget(
             profileparameter: params.getParam(
               'profileparameter',
-              ParamType.DocumentReference,
+              ParamType.String,
               isList: false,
-              collectionNamePath: ['User'],
             ),
           ),
         ),
@@ -739,24 +781,42 @@ class FFParameters {
     bool isList = false,
     List<String>? collectionNamePath,
   }) {
+    print('FFParameters.getParam called:');
+    print('- paramName: $paramName');
+    print('- type: $type');
+    print('- isList: $isList');
+    print('- collectionNamePath: $collectionNamePath');
+
     if (futureParamValues.containsKey(paramName)) {
-      return futureParamValues[paramName];
+      final value = futureParamValues[paramName];
+      print('- Value from futureParamValues: $value (${value.runtimeType})');
+      return value;
     }
+
     if (!state.allParams.containsKey(paramName)) {
+      print('- Parameter not found in state.allParams');
       return null;
     }
+
     final param = state.allParams[paramName];
+    print('- Raw param value: $param (${param.runtimeType})');
+
     // Got parameter from `extras`, so just directly return it.
     if (param is! String) {
+      print('- Returning non-string param directly');
       return param;
     }
+
     // Return serialized value.
-    return deserializeParam<T>(
+    final result = deserializeParam<T>(
       param,
       type,
       isList,
       collectionNamePath: collectionNamePath,
     );
+
+    print('- Deserialized result: $result (${result?.runtimeType})');
+    return result;
   }
 }
 

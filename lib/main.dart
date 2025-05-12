@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:ui';
 import 'dart:async';
+import 'dart:convert';
 import 'package:go_router/go_router.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -14,6 +15,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'auth/firebase_auth/firebase_user_provider.dart';
 import 'auth/firebase_auth/auth_util.dart';
+import 'flutter_flow/nav/nav.dart';
 
 import 'backend/firebase/firebase_config.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -29,11 +31,106 @@ import '/services/purchase_service.dart';
 import '/services/subscription_manager.dart';
 import '/onboarding/onboarding_manager.dart';
 import '/services/notification_service.dart';
+import '/services/network_service.dart';
 import '/widgets/notification_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'firebase_options.dart';
 
-void main() async {
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    // Ensure Firebase is initialized since this can run when app is terminated
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('Handling a background message: ${message.messageId}');
+    print('Background message data: ${message.data}');
+
+    // Create notification plugin instance for background notifications
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+        FlutterLocalNotificationsPlugin();
+
+    // Initialize notification plugin for background notifications
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@drawable/notification_icon');
+
+    final DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+
+    final InitializationSettings initializationSettings =
+        InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+    );
+
+    // Create notification channel (Android only)
+    if (Platform.isAndroid) {
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'luna_kraft_channel',
+        'LunaKraft Notifications',
+        description: 'Social interaction notifications for LunaKraft',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        enableLights: true,
+        showBadge: true,
+      );
+
+      final androidPlugin =
+          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      if (androidPlugin != null) {
+        await androidPlugin.createNotificationChannel(channel);
+      }
+    }
+
+    // Show the notification
+    await flutterLocalNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      message.notification?.title ?? 'New Notification',
+      message.notification?.body ?? 'You have a new notification',
+      NotificationDetails(
+        android: const AndroidNotificationDetails(
+          'luna_kraft_channel',
+          'LunaKraft Notifications',
+          channelDescription: 'Social interaction notifications for LunaKraft',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: true,
+          icon: '@drawable/notification_icon',
+          enableLights: true,
+          enableVibration: true,
+          playSound: true,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: message.data.isNotEmpty ? json.encode(message.data) : null,
+    );
+
+    print('Background notification displayed successfully');
+  } catch (e) {
+    print('Error in background message handler: $e');
+  }
+}
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   GoRouter.optionURLReflectsImperativeAPIs = true;
   usePathUrlStrategy();
@@ -41,11 +138,80 @@ void main() async {
   // Initialize log filtering
   LoggingConfig.initialize();
 
-  // Initialize Firebase
-  await Firebase.initializeApp();
+  // Register background handler before Firebase initialization
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Initialize Firebase properly with options
+  try {
+    // This ensures Firebase is initialized properly for background notifications
+    await initFirebase();
+
+    // Make sure messaging is properly initialized
+    await FirebaseMessaging.instance.setAutoInitEnabled(true);
+
+    print('Firebase initialized successfully');
+  } catch (e) {
+    print('Error initializing Firebase: $e');
+  }
+
+  // Initialize notification service early
+  await NotificationService().initialize();
 
   // Configure Firebase App Check safely
   await _configureFirebaseAppCheck();
+
+  // Request permission for notifications early
+  try {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+
+    print(
+        'User notification permission status: ${settings.authorizationStatus}');
+
+    // Print FCM token for debugging
+    final token = await FirebaseMessaging.instance.getToken();
+    print(
+        'FCM Token: ${token != null ? token.substring(0, 10) + '...' : 'null'}');
+  } catch (e) {
+    print('Error requesting notification permissions: $e');
+  }
+
+  // Initialize NetworkService for better Firebase connectivity handling
+  try {
+    // Initialize NetworkService singleton
+    final networkService = NetworkService();
+
+    // Set up initial connectivity check
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult != ConnectivityResult.none) {
+      // Only try to verify Firestore if we have connectivity
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('User')
+              .doc(user.uid)
+              .get()
+              .timeout(Duration(seconds: 5));
+          print('Initial Firestore connection verified');
+        } catch (e) {
+          print('Initial Firestore verification failed: $e');
+        }
+      }
+    }
+
+    print('Network service initialized successfully');
+  } catch (e) {
+    print('Error initializing network service: $e');
+  }
 
   // Preload onboarding status
   try {
@@ -129,14 +295,6 @@ void main() async {
     print('Error initializing subscription manager: $e');
   }
 
-  // Initialize notification service
-  try {
-    await NotificationService().initialize();
-    print('Notification service initialized successfully');
-  } catch (e) {
-    print('Error initializing notification service: $e');
-  }
-
   await FlutterFlowTheme.initialize();
 
   final appState = FFAppState(); // Initialize FFAppState
@@ -176,48 +334,94 @@ class _MyAppState extends State<MyApp> {
   late Stream<BaseAuthUser> userStream;
   final authUserSub = authenticatedUserStream.listen((_) {});
   bool _showSplashScreen = true;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
+    _initializeApp();
+  }
 
-    // Setup app state and router
-    _appStateNotifier = AppStateNotifier.instance;
-    _router = createRouter(_appStateNotifier, widget.entryPage);
-    userStream = lunaKraftFirebaseUserStream()
-      ..listen((user) {
-        // Add debug logging for auth state changes
-        print('AUTH STATE CHANGED: User logged in: ${user.loggedIn}');
-        if (user.loggedIn) {
-          print('Authenticated user: ${user.email}');
-        } else {
-          print('User logged out or not authenticated');
-        }
-        _appStateNotifier.update(user);
+  Future<void> _initializeApp() async {
+    try {
+      print('Starting app initialization...');
+
+      // Initialize FlutterFlow theme
+      print('Initializing FlutterFlow theme...');
+      await FlutterFlowTheme.initialize();
+      print('FlutterFlow theme initialized');
+
+      // Setup app state and router
+      print('Setting up app state and router...');
+      _appStateNotifier = AppStateNotifier.instance;
+      _router = createRouter(_appStateNotifier, widget.entryPage);
+      print('App state and router setup complete');
+
+      print('Setting up user stream...');
+      userStream = lunaKraftFirebaseUserStream()
+        ..listen((user) {
+          print('AUTH STATE CHANGED: User logged in: ${user.loggedIn}');
+          if (user.loggedIn) {
+            print('Authenticated user: ${user.email}');
+          } else {
+            print('User logged out or not authenticated');
+          }
+          _appStateNotifier.update(user);
+        });
+      print('User stream setup complete');
+
+      // Add debug logging for JWT token changes
+      jwtTokenStream.listen((jwt) {
+        print(
+            'JWT token refreshed: ${jwt != null ? 'Token present' : 'No token'}');
       });
 
-    // Add debug logging for JWT token changes
-    jwtTokenStream.listen((jwt) {
-      print(
-          'JWT token refreshed: ${jwt != null ? 'Token present' : 'No token'}');
-    });
+      print('Stopping splash image...');
+      _appStateNotifier.stopShowingSplashImage();
+      print('Splash image stopped');
 
-    // We're using our own splash screen
-    _appStateNotifier.stopShowingSplashImage();
+      if (mounted) {
+        print('Setting initialized state...');
+        setState(() {
+          _initialized = true;
+        });
+        print('App initialization complete');
+      }
 
-    // Auto-hide splash screen after a timeout (as a fallback)
-    Timer(Duration(seconds: 5), () {
+      // Auto-hide splash screen after a timeout (as a fallback)
+      Timer(Duration(seconds: 5), () {
+        if (mounted) {
+          print('Auto-hiding splash screen...');
+          setState(() {
+            _showSplashScreen = false;
+          });
+          print('Splash screen hidden');
+        }
+      });
+    } catch (e, stackTrace) {
+      print('Error initializing app: $e');
+      print('Stack trace: $stackTrace');
+      // Show error state if initialization fails
       if (mounted) {
         setState(() {
+          _initialized = true;
           _showSplashScreen = false;
         });
       }
-    });
+    }
   }
 
   @override
   void dispose() {
     authUserSub.cancel();
+    _router.dispose();
+    _showSplashScreen = true;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).clearSnackBars();
+    }
+
     super.dispose();
   }
 
@@ -234,6 +438,16 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_initialized) {
+      return MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
     if (_showSplashScreen) {
       return MaterialApp(
         title: 'LunaKraft',
@@ -268,7 +482,14 @@ class _MyAppState extends State<MyApp> {
         themeMode: _themeMode,
         routerConfig: _router,
         builder: (context, child) {
-          return ConnectivityBanner(child: child!);
+          if (child == null) {
+            return Center(child: CircularProgressIndicator());
+          }
+          return ScaffoldMessenger(
+            child: Builder(
+              builder: (context) => ImprovedConnectivityBanner(child: child),
+            ),
+          );
         },
       ),
     );
@@ -332,85 +553,113 @@ Future<String?> _getDeviceInfo() async {
   }
 }
 
-class ConnectivityBanner extends StatefulWidget {
+class ImprovedConnectivityBanner extends StatefulWidget {
   final Widget child;
-  const ConnectivityBanner({Key? key, required this.child}) : super(key: key);
+  const ImprovedConnectivityBanner({Key? key, required this.child})
+      : super(key: key);
 
   @override
-  State<ConnectivityBanner> createState() => _ConnectivityBannerState();
+  State<ImprovedConnectivityBanner> createState() =>
+      _ImprovedConnectivityBannerState();
 }
 
-class _ConnectivityBannerState extends State<ConnectivityBanner> {
-  late StreamSubscription<ConnectivityResult> _subscription;
+class _ImprovedConnectivityBannerState
+    extends State<ImprovedConnectivityBanner> {
+  late StreamSubscription<bool> _networkStatusSubscription;
   bool _isOffline = false;
-  Timer? _snackbarTimer;
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
     super.initState();
-    _subscription = Connectivity().onConnectivityChanged.listen((result) {
-      final offline = result == ConnectivityResult.none;
-      if (offline != _isOffline) {
+
+    // Subscribe to network status from NetworkService
+    _networkStatusSubscription =
+        NetworkService().networkStatusStream.listen((isConnected) {
+      final wasOffline = _isOffline;
+      if (mounted) {
         setState(() {
-          _isOffline = offline;
+          _isOffline = !isConnected;
         });
-        if (offline) {
-          _showNoInternetSnackbar();
+
+        // Show message when connection changes
+        if (_isOffline && !wasOffline) {
+          _showNoConnectionMessage();
+        } else if (!_isOffline && wasOffline) {
+          _showConnectionRestoredMessage();
         }
-      } else if (!offline) {
-        // If connection is restored, hide snackbar
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
       }
     });
   }
 
   @override
   void dispose() {
-    _subscription.cancel();
-    _snackbarTimer?.cancel();
+    _networkStatusSubscription.cancel();
     super.dispose();
   }
 
-  void _showNoInternetSnackbar() {
-    // Exclude Add Post pages
-    final modalRoute = ModalRoute.of(context);
-    final settingsName = modalRoute?.settings.name ?? '';
-    if (settingsName.contains('AddPost1') ||
-        settingsName.contains('AddPost2') ||
-        settingsName.contains('AddPost4')) {
-      return;
+  void _showNoConnectionMessage() {
+    if (!mounted) return;
+
+    try {
+      _scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.wifi_off, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(child: Text('No internet connection')),
+            ],
+          ),
+          backgroundColor: Colors.redAccent.shade200,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(
+            bottom: 24,
+            left: 16,
+            right: 16,
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      print('Error showing no connection message: $e');
     }
-    // Show a modern snackbar at the bottom
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.wifi_off, color: Colors.white),
-            SizedBox(width: 12),
-            Expanded(child: Text('No internet connection')),
-          ],
+  }
+
+  void _showConnectionRestoredMessage() {
+    if (!mounted) return;
+
+    try {
+      _scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.wifi, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(child: Text('Connection restored')),
+            ],
+          ),
+          backgroundColor: Colors.green.shade600,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(
+            bottom: 24,
+            left: 16,
+            right: 16,
+          ),
+          duration: Duration(seconds: 3),
         ),
-        backgroundColor: Colors.redAccent.shade200,
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.only(
-          bottom: 24,
-          left: 16,
-          right: 16,
-        ),
-        duration: Duration(seconds: 3),
-      ),
-    );
-    // Re-show if still offline after duration
-    _snackbarTimer?.cancel();
-    _snackbarTimer = Timer(Duration(seconds: 3), () {
-      if (_isOffline && mounted) {
-        _showNoInternetSnackbar();
-      }
-    });
+      );
+    } catch (e) {
+      print('Error showing connection restored message: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return widget.child;
+    return ScaffoldMessenger(
+      key: _scaffoldMessengerKey,
+      child: widget.child,
+    );
   }
 }

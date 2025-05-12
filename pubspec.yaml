@@ -32,7 +32,7 @@ dependencies:
   built_value: ^8.9.1
   built_value_generator: ^8.9.1
   sensors_plus: ^4.0.2
-  auto_size_text: 3.0.0
+  auto_size_text: ^3.0.0
   badges: 2.0.2
   cached_network_image: 3.4.1
   cached_network_image_platform_interface: 4.1.1

@@ -44,6 +44,11 @@ service cloud.firestore {
               getUserId(get(postRef).data.userref) == request.auth.uid);
     }
 
+    // Add offline time buffer to prevent stale writes
+    function isStaleWrite() {
+      return request.time > resource.data.lastModified + duration.value(1, 'h');
+    }
+
     match /posts/{document} {
       allow create: if isAuthenticated();
       allow read: if true;
@@ -58,7 +63,11 @@ service cloud.firestore {
     match /User/{document} {
       allow create: if isAuthenticated();
       allow read: if true;
-      allow update: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isOwner(document) || 
+        // Allow FCM token updates even if other writes are in progress
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken', 'lastTokenUpdate'])
+      );
       allow delete: if isOwner(document);
     }
 
@@ -85,7 +94,11 @@ service cloud.firestore {
     match /users/{document} {
       allow create: if isAuthenticated();
       allow read: if true;
-      allow update: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isOwner(document) || 
+        // Allow FCM token updates even if other writes are in progress
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken', 'lastTokenUpdate'])
+      );
       allow delete: if isOwner(document);
     }
 
@@ -137,6 +150,27 @@ service cloud.firestore {
       allow read: if true;
       allow update: if isAuthenticated();
       allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // New rules for bug reports and feature requests
+    match /bug_reports/{document} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    match /feature_requests/{document} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // Add system collection for connectivity checks
+    match /system/{document} {
+      allow read: if true;
+      allow write: if false;
     }
   }
 }

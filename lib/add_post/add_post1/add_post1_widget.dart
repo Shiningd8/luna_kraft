@@ -718,9 +718,9 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                               child: TextFormField(
                                 controller: _model.textController,
                                 focusNode: _model.textFieldFocusNode,
-                                maxLines: 6,
-                                minLines: 2,
-                                maxLength: 250,
+                                maxLines: null,
+                                minLines: 4,
+                                maxLength: 400,
                                 enabled: !_isGenerating,
                                 style: FlutterFlowTheme.of(context)
                                     .bodyLarge
@@ -730,7 +730,8 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                       fontSize: 16,
                                     ),
                                 decoration: InputDecoration(
-                                  hintText: 'Start dreaming here...',
+                                  hintText:
+                                      'Start dreaming here... (min. 45 words)',
                                   hintStyle: FlutterFlowTheme.of(context)
                                       .bodyMedium
                                       .override(
@@ -743,6 +744,11 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                     borderSide: BorderSide.none,
                                   ),
                                   contentPadding: EdgeInsets.all(20),
+                                  counterStyle: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontFamily: 'Figtree',
+                                  ),
                                 ),
                               ),
                             ),
@@ -894,7 +900,7 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     Text(
-                                      '${_model.textController.text.split(' ').where((word) => word.isNotEmpty).length}/10 words minimum',
+                                      '${_model.textController.text.split(' ').where((word) => word.isNotEmpty).length}/45 words minimum',
                                       style: FlutterFlowTheme.of(context)
                                           .bodySmall
                                           .override(
@@ -904,9 +910,9 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                                         .where((word) =>
                                                             word.isNotEmpty)
                                                         .length >=
-                                                    10
-                                                ? Colors.white.withOpacity(0.7)
-                                                : Colors.white.withOpacity(0.5),
+                                                    45
+                                                ? Colors.white
+                                                : Colors.white.withOpacity(0.8),
                                             fontSize: 12,
                                           ),
                                     ),
@@ -922,7 +928,7 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                                 .where(
                                                     (word) => word.isNotEmpty)
                                                 .length >=
-                                            10
+                                            45
                                         ? Color(0xFF6448FE)
                                         : Color(0xFF6448FE).withOpacity(0.5),
                                     _model.textController.text
@@ -930,7 +936,7 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                                 .where(
                                                     (word) => word.isNotEmpty)
                                                 .length >=
-                                            10
+                                            45
                                         ? Color(0xFF9747FF)
                                         : Color(0xFF9747FF).withOpacity(0.5),
                                   ],
@@ -955,7 +961,7 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                                   .where(
                                                       (word) => word.isNotEmpty)
                                                   .length >=
-                                              10 &&
+                                              45 &&
                                           !_isGenerating
                                       ? () async {
                                           setState(() {
@@ -1018,7 +1024,7 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                                                     word
                                                                         .isNotEmpty)
                                                                 .length >=
-                                                            10 &&
+                                                            45 &&
                                                         !_isGenerating
                                                     ? Colors.white
                                                     : Colors.white
@@ -1036,7 +1042,7 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                                         .where((word) =>
                                                             word.isNotEmpty)
                                                         .length >=
-                                                    10
+                                                    45
                                                 ? Colors.white
                                                 : Colors.white.withOpacity(0.7),
                                             size: 24,

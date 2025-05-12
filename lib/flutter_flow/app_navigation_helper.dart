@@ -53,12 +53,43 @@ class AppNavigationHelper {
       duration: duration,
     );
 
+    // Convert references to string IDs if they're document references
+    String? docId;
+    String? userId;
+
+    // Handle document references or string IDs for post reference
+    if (docref is String) {
+      docId = docref;
+    } else if (docref != null) {
+      try {
+        docId = docref.id; // Get ID from DocumentReference
+      } catch (e) {
+        print('Error extracting post ID: $e');
+      }
+    }
+
+    // Handle document references or string IDs for user reference
+    if (userref is String) {
+      userId = userref;
+    } else if (userref != null) {
+      try {
+        userId = userref.id; // Get ID from DocumentReference
+      } catch (e) {
+        print('Error extracting user ID: $e');
+      }
+    }
+
+    print('Navigating to detail post with:'
+        '\ndocId: $docId'
+        '\nuserId: $userId'
+        '\nshowComments: $showComments');
+
     // Navigate to the detailed post with scale transition
     context.pushNamed(
       'Detailedpost',
       queryParameters: {
-        'docref': docref,
-        'userref': userref,
+        if (docId != null) 'docref': docId,
+        if (userId != null) 'userref': userId,
         if (showComments) 'showComments': showComments.toString(),
       },
       extra: <String, dynamic>{

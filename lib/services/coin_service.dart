@@ -178,6 +178,15 @@ class CoinService {
         rawPrice: '1.99',
         currencyCode: 'USD',
         currencySymbol: '\$',
+        productDetails: MockProductDetails(
+          id: 'lunacoin_100',
+          title: '100 Luna Coins',
+          description: '100 Luna Coins for your account',
+          price: '\$1.99',
+          rawPrice: 1.99,
+          currencyCode: 'USD',
+          currencySymbol: '\$',
+        ),
       ),
       CoinProduct(
         id: 'lunacoin_500',
@@ -188,6 +197,15 @@ class CoinService {
         currencyCode: 'USD',
         currencySymbol: '\$',
         bonus: 'BEST VALUE',
+        productDetails: MockProductDetails(
+          id: 'lunacoin_500',
+          title: '500 Luna Coins',
+          description: '500 Luna Coins for your account',
+          price: '\$6.99',
+          rawPrice: 6.99,
+          currencyCode: 'USD',
+          currencySymbol: '\$',
+        ),
       ),
       CoinProduct(
         id: 'lunacoin_1000',
@@ -198,6 +216,15 @@ class CoinService {
         currencyCode: 'USD',
         currencySymbol: '\$',
         bonus: 'MOST POPULAR',
+        productDetails: MockProductDetails(
+          id: 'lunacoin_1000',
+          title: '1000 Luna Coins',
+          description: '1000 Luna Coins for your account',
+          price: '\$9.99',
+          rawPrice: 9.99,
+          currencyCode: 'USD',
+          currencySymbol: '\$',
+        ),
       ),
     ];
 

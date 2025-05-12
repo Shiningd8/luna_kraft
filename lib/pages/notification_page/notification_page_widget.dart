@@ -10,6 +10,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:luna_kraft/components/follow_status_popup.dart';
 import '/flutter_flow/app_navigation_helper.dart';
 import '/widgets/lottie_background.dart';
+import '/services/notification_service.dart';
 export 'notification_page_model.dart';
 
 T createModel<T>(BuildContext context, T Function() model) => model();
@@ -224,6 +225,66 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
                   fontSize: 22,
                 ),
           ),
+          actions: [
+            // Debug button
+            IconButton(
+              icon: Icon(
+                Icons.bug_report,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: () async {
+                // Show a loading dialog
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => Center(
+                    child: Container(
+                      padding: EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'Running notification debug...',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+
+                // Run the debug
+                await NotificationService().debugNotificationSystem();
+
+                // Close the loading dialog
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+
+                // Show results in a snackbar
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content:
+                          Text('Debug complete! Check console for details.'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
         ),
         body: SafeArea(
           child: Column(

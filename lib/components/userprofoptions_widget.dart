@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'userprofoptions_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:ui';
+import 'package:flutter_animate/flutter_animate.dart';
 export 'userprofoptions_model.dart';
 
 class UserprofoptionsWidget extends StatefulWidget {
@@ -111,454 +113,271 @@ class _UserprofoptionsWidgetState extends State<UserprofoptionsWidget> {
 
           final containerUserRecord = snapshot.data!;
 
-          return Container(
-            width: 300.0,
+          return AnimatedContainer(
+            duration: Duration(milliseconds: 400),
+            curve: Curves.easeOutBack,
+            width: 340.0,
             decoration: BoxDecoration(
-              color: FlutterFlowTheme.of(context).secondaryBackground,
+              borderRadius: BorderRadius.circular(24.0),
               boxShadow: [
                 BoxShadow(
-                  blurRadius: 4.0,
-                  color: Color(0x33000000),
-                  offset: Offset(
-                    0.0,
-                    2.0,
-                  ),
-                  spreadRadius: 0.0,
-                )
+                  blurRadius: 24.0,
+                  color: Colors.black.withOpacity(0.18),
+                  offset: Offset(0, 8),
+                ),
               ],
-              borderRadius: BorderRadius.circular(12.0),
             ),
-            child: Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: EdgeInsetsDirectional.fromSTEB(8.0, 0.0, 8.0, 0.0),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.max,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Options',
-                          style: FlutterFlowTheme.of(context)
-                              .headlineSmall
-                              .override(
-                                fontFamily: 'Outfit',
-                                letterSpacing: 0.0,
-                              ),
-                        ),
-                        FlutterFlowIconButton(
-                          borderColor: Colors.transparent,
-                          borderRadius: 8.0,
-                          buttonSize: 40.0,
-                          icon: Icon(
-                            Icons.close_rounded,
-                            color: FlutterFlowTheme.of(context).primaryText,
-                            size: 24.0,
-                          ),
-                          onPressed: () async {
-                            context.safePop();
-                          },
-                        ),
-                      ].divide(SizedBox(width: 8.0)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24.0),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.18),
+                        FlutterFlowTheme.of(context).primary.withOpacity(0.10),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.18),
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(24.0),
                   ),
-                  Padding(
-                    padding: EdgeInsetsDirectional.fromSTEB(8.0, 0.0, 8.0, 0.0),
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: FlutterFlowTheme.of(context).secondaryBackground,
-                        borderRadius: BorderRadius.circular(8.0),
-                        border: Border.all(
-                          color: FlutterFlowTheme.of(context).alternate,
-                          width: 1.0,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  12.0, 12.0, 12.0, 12.0),
-                              child: InkWell(
-                                splashColor: Colors.transparent,
-                                focusColor: Colors.transparent,
-                                hoverColor: Colors.transparent,
-                                highlightColor: Colors.transparent,
-                                onTap: () async {
-                                  context.pushNamed('SavedPosts');
-                                },
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.max,
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      Icons.bookmark_outlined,
-                                      color: FlutterFlowTheme.of(context)
-                                          .primaryText,
-                                      size: 24.0,
-                                    ),
-                                    Text(
-                                      'Saved Posts',
-                                      style: FlutterFlowTheme.of(context)
-                                          .bodyMedium
-                                          .override(
-                                            fontFamily: 'Figtree',
-                                            letterSpacing: 0.0,
-                                          ),
-                                    ),
-                                  ].divide(SizedBox(width: 12.0)),
-                                ),
-                              ),
+                            Text(
+                              'Options',
+                              style: FlutterFlowTheme.of(context)
+                                  .headlineSmall
+                                  .override(
+                                    fontFamily: 'Outfit',
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
-                            if (widget.profpara == currentUserReference)
-                              Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
-                                    12.0, 12.0, 12.0, 12.0),
-                                child: InkWell(
-                                  splashColor: Colors.transparent,
-                                  focusColor: Colors.transparent,
-                                  hoverColor: Colors.transparent,
-                                  highlightColor: Colors.transparent,
-                                  onTap: () async {
-                                    context.pushNamed(
-                                      'blockedusers',
-                                      queryParameters: {
-                                        'userref': serializeParam(
-                                          widget.profpara,
-                                          ParamType.DocumentReference,
-                                        ),
-                                      }.withoutNulls,
-                                    );
-                                  },
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.max,
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      Icon(
-                                        Icons.person_remove_alt_1_rounded,
-                                        color: FlutterFlowTheme.of(context)
-                                            .primaryText,
-                                        size: 24.0,
-                                      ),
-                                      Text(
-                                        'Show Blocked Users',
-                                        style: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .override(
-                                              fontFamily: 'Figtree',
-                                              letterSpacing: 0.0,
-                                            ),
-                                      ),
-                                    ].divide(SizedBox(width: 12.0)),
-                                  ),
+                            GestureDetector(
+                              onTap: () => context.safePop(),
+                              child: AnimatedContainer(
+                                duration: Duration(milliseconds: 300),
+                                curve: Curves.easeOutBack,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                              ),
-                            if (widget.profpara == currentUserReference)
-                              Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
-                                    12.0, 12.0, 12.0, 12.0),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.max,
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          containerUserRecord.isPrivate
-                                              ? Icons.lock_outline
-                                              : Icons.public,
-                                          color: FlutterFlowTheme.of(context)
-                                              .primaryText,
-                                          size: 24.0,
-                                        ),
-                                        SizedBox(width: 12.0),
-                                        Text(
-                                          'Private Account',
-                                          style: FlutterFlowTheme.of(context)
-                                              .bodyMedium
-                                              .override(
-                                                fontFamily: 'Figtree',
-                                                letterSpacing: 0.0,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                    Switch(
-                                      value: containerUserRecord.isPrivate,
-                                      onChanged: (newValue) async {
-                                        // Update the user's privacy setting
-                                        await currentUserReference!.update(
-                                          createUserRecordData(
-                                            isPrivate: newValue,
-                                          ),
-                                        );
-
-                                        // Show confirmation
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              newValue
-                                                  ? 'Your account is now private'
-                                                  : 'Your account is now public',
-                                              style:
-                                                  FlutterFlowTheme.of(context)
-                                                      .bodyMedium
-                                                      .override(
-                                                        fontFamily: 'Figtree',
-                                                        color: Colors.white,
-                                                      ),
-                                            ),
-                                            duration: Duration(seconds: 2),
-                                            backgroundColor:
-                                                FlutterFlowTheme.of(context)
-                                                    .primary,
-                                          ),
-                                        );
-                                      },
-                                      activeColor:
-                                          FlutterFlowTheme.of(context).primary,
-                                      activeTrackColor:
-                                          FlutterFlowTheme.of(context).accent1,
-                                      inactiveTrackColor:
-                                          FlutterFlowTheme.of(context)
-                                              .alternate,
-                                      inactiveThumbColor:
-                                          FlutterFlowTheme.of(context)
-                                              .secondaryText,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            if (widget.profpara != currentUserReference)
-                              if ((currentUserDocument?.blockedUsers.toList() ??
-                                          [])
-                                      .contains(
-                                          containerUserRecord.reference) ==
-                                  false)
-                                Padding(
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                      12.0, 12.0, 12.0, 12.0),
-                                  child: AuthUserStreamWidget(
-                                    builder: (context) => InkWell(
-                                      splashColor: Colors.transparent,
-                                      focusColor: Colors.transparent,
-                                      hoverColor: Colors.transparent,
-                                      highlightColor: Colors.transparent,
-                                      onTap: () async {
-                                        await _blockUser(
-                                            containerUserRecord.reference);
-                                      },
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.max,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          Icon(
-                                            Icons.person_remove_rounded,
-                                            color: FlutterFlowTheme.of(context)
-                                                .error,
-                                            size: 24.0,
-                                          ),
-                                          Text(
-                                            'Block User',
-                                            style: FlutterFlowTheme.of(context)
-                                                .bodyMedium
-                                                .override(
-                                                  fontFamily: 'Figtree',
-                                                  color: FlutterFlowTheme.of(
-                                                          context)
-                                                      .error,
-                                                  letterSpacing: 0.0,
-                                                ),
-                                          ),
-                                        ].divide(SizedBox(width: 12.0)),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            if (widget.profpara != currentUserReference)
-                              if ((currentUserDocument?.blockedUsers.toList() ??
-                                          [])
-                                      .contains(
-                                          containerUserRecord.reference) ==
-                                  true)
-                                Padding(
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                      12.0, 12.0, 12.0, 12.0),
-                                  child: AuthUserStreamWidget(
-                                    builder: (context) => InkWell(
-                                      splashColor: Colors.transparent,
-                                      focusColor: Colors.transparent,
-                                      hoverColor: Colors.transparent,
-                                      highlightColor: Colors.transparent,
-                                      onTap: () async {
-                                        await _blockUser(
-                                            containerUserRecord.reference);
-                                      },
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.max,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          Icon(
-                                            Icons.person_remove_rounded,
-                                            color: FlutterFlowTheme.of(context)
-                                                .error,
-                                            size: 24.0,
-                                          ),
-                                          Text(
-                                            'Unblock User',
-                                            style: FlutterFlowTheme.of(context)
-                                                .bodyMedium
-                                                .override(
-                                                  fontFamily: 'Figtree',
-                                                  color: FlutterFlowTheme.of(
-                                                          context)
-                                                      .error,
-                                                  letterSpacing: 0.0,
-                                                ),
-                                          ),
-                                        ].divide(SizedBox(width: 12.0)),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            if (widget.profpara != currentUserReference)
-                              Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
-                                    12.0, 12.0, 12.0, 12.0),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.max,
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      Icons.flag_rounded,
-                                      color: FlutterFlowTheme.of(context).error,
-                                      size: 24.0,
-                                    ),
-                                    Text(
-                                      'Report User',
-                                      style: FlutterFlowTheme.of(context)
-                                          .bodyMedium
-                                          .override(
-                                            fontFamily: 'Figtree',
-                                            color: FlutterFlowTheme.of(context)
-                                                .error,
-                                            letterSpacing: 0.0,
-                                          ),
-                                    ),
-                                  ].divide(SizedBox(width: 12.0)),
-                                ),
-                              ),
-                            Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  12.0, 12.0, 12.0, 12.0),
-                              child: InkWell(
-                                splashColor: Colors.transparent,
-                                focusColor: Colors.transparent,
-                                hoverColor: Colors.transparent,
-                                highlightColor: Colors.transparent,
-                                onTap: () async {
-                                  context.pushNamed(
-                                    UserpageWidget.routeName,
-                                    queryParameters: {
-                                      'profileparameter': serializeParam(
-                                        widget.profpara,
-                                        ParamType.DocumentReference,
-                                      ),
-                                    }.withoutNulls,
-                                  );
-                                },
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.max,
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      Icons.person_outline,
-                                      color: FlutterFlowTheme.of(context)
-                                          .primaryText,
-                                      size: 24.0,
-                                    ),
-                                    Text(
-                                      'View Profile',
-                                      style: FlutterFlowTheme.of(context)
-                                          .bodyMedium
-                                          .override(
-                                            fontFamily: 'Figtree',
-                                            letterSpacing: 0.0,
-                                          ),
-                                    ),
-                                  ].divide(SizedBox(width: 12.0)),
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  12.0, 12.0, 12.0, 12.0),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.max,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Icons.content_copy_rounded,
-                                    color: FlutterFlowTheme.of(context)
-                                        .primaryText,
-                                    size: 24.0,
-                                  ),
-                                  Text(
-                                    'Copy Profile Link',
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          fontFamily: 'Figtree',
-                                          letterSpacing: 0.0,
-                                        ),
-                                  ),
-                                ].divide(SizedBox(width: 12.0)),
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  12.0, 12.0, 12.0, 12.0),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.max,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Icons.share_rounded,
-                                    color: FlutterFlowTheme.of(context)
-                                        .primaryText,
-                                    size: 24.0,
-                                  ),
-                                  Text(
-                                    'Share Profile',
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          fontFamily: 'Figtree',
-                                          letterSpacing: 0.0,
-                                        ),
-                                  ),
-                                ].divide(SizedBox(width: 12.0)),
+                                padding: EdgeInsets.all(8),
+                                child: Icon(Icons.close_rounded,
+                                    color: Colors.white, size: 24),
                               ),
                             ),
                           ],
                         ),
-                      ),
+                        SizedBox(height: 18),
+                        // Block/Unblock/Report/Copy/Share options only
+                        if (widget.profpara == currentUserReference)
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () async {
+                                context.pushNamed(
+                                  'blockedusers',
+                                  queryParameters: {
+                                    'userref': serializeParam(
+                                      widget.profpara,
+                                      ParamType.DocumentReference,
+                                    ),
+                                  }.withoutNulls,
+                                );
+                              },
+                              child: _buildOptionRow(
+                                context,
+                                icon: Icons.person_remove_alt_1_rounded,
+                                label: 'Show Blocked Users',
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        if (widget.profpara == currentUserReference)
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      containerUserRecord.isPrivate
+                                          ? Icons.lock_outline
+                                          : Icons.public,
+                                      color: Colors.white,
+                                      size: 24.0,
+                                    ),
+                                    SizedBox(width: 12.0),
+                                    Text(
+                                      'Private Account',
+                                      style: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .override(
+                                            fontFamily: 'Figtree',
+                                            color: Colors.white,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                                Switch(
+                                  value: containerUserRecord.isPrivate,
+                                  onChanged: (newValue) async {
+                                    await currentUserReference!.update(
+                                      createUserRecordData(
+                                        isPrivate: newValue,
+                                      ),
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          newValue
+                                              ? 'Your account is now private'
+                                              : 'Your account is now public',
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                fontFamily: 'Figtree',
+                                                color: Colors.white,
+                                              ),
+                                        ),
+                                        duration: Duration(seconds: 2),
+                                        backgroundColor:
+                                            FlutterFlowTheme.of(context)
+                                                .primary,
+                                      ),
+                                    );
+                                  },
+                                  activeColor:
+                                      FlutterFlowTheme.of(context).primary,
+                                  activeTrackColor:
+                                      FlutterFlowTheme.of(context).accent1,
+                                  inactiveTrackColor:
+                                      FlutterFlowTheme.of(context).alternate,
+                                  inactiveThumbColor:
+                                      FlutterFlowTheme.of(context)
+                                          .secondaryText,
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (widget.profpara != currentUserReference)
+                          if ((currentUserDocument?.blockedUsers.toList() ?? [])
+                                  .contains(containerUserRecord.reference) ==
+                              false)
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () async {
+                                  await _blockUser(
+                                      containerUserRecord.reference);
+                                },
+                                child: _buildOptionRow(
+                                  context,
+                                  icon: Icons.person_remove_rounded,
+                                  label: 'Block User',
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            ),
+                        if (widget.profpara != currentUserReference)
+                          if ((currentUserDocument?.blockedUsers.toList() ?? [])
+                                  .contains(containerUserRecord.reference) ==
+                              true)
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () async {
+                                  await _blockUser(
+                                      containerUserRecord.reference);
+                                },
+                                child: _buildOptionRow(
+                                  context,
+                                  icon: Icons.person_remove_rounded,
+                                  label: 'Unblock User',
+                                  color: Colors.greenAccent,
+                                ),
+                              ),
+                            ),
+                        if (widget.profpara != currentUserReference)
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: _buildOptionRow(
+                              context,
+                              icon: Icons.flag_rounded,
+                              label: 'Report User',
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: _buildOptionRow(
+                            context,
+                            icon: Icons.content_copy_rounded,
+                            label: 'Copy Profile Link',
+                            color: Colors.white,
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: _buildOptionRow(
+                            context,
+                            icon: Icons.share_rounded,
+                            label: 'Share Profile',
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ].divide(SizedBox(height: 12.0)),
+                ),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildOptionRow(BuildContext context,
+      {required IconData icon, required String label, required Color color}) {
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeOutBack,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 24),
+          SizedBox(width: 14),
+          Text(
+            label,
+            style: FlutterFlowTheme.of(context).bodyMedium.override(
+                  fontFamily: 'Figtree',
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
       ),
     );
   }

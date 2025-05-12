@@ -28,8 +28,11 @@ class NotificationPermissionDialog extends StatelessWidget {
       },
     );
 
-    // Mark as asked
+    // Mark as asked and store the result
     await prefs.setBool('notification_permission_asked', true);
+    if (result == true) {
+      await prefs.setBool('notification_permission_granted', true);
+    }
 
     return result ?? false;
   }
@@ -103,7 +106,19 @@ class NotificationPermissionDialog extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () async {
-                    Navigator.of(context).pop(false);
+                    try {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool(
+                          'notification_permission_granted', false);
+                      if (context.mounted) {
+                        Navigator.of(context).pop(false);
+                      }
+                    } catch (e) {
+                      print('Error storing notification preference: $e');
+                      if (context.mounted) {
+                        Navigator.of(context).pop(false);
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
@@ -126,9 +141,23 @@ class NotificationPermissionDialog extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () async {
-                    final hasPermission =
-                        await NotificationService().requestPermission();
-                    Navigator.of(context).pop(hasPermission);
+                    try {
+                      final hasPermission =
+                          await NotificationService().requestPermission();
+                      if (hasPermission) {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool(
+                            'notification_permission_granted', true);
+                      }
+                      if (context.mounted) {
+                        Navigator.of(context).pop(hasPermission);
+                      }
+                    } catch (e) {
+                      print('Error requesting notification permission: $e');
+                      if (context.mounted) {
+                        Navigator.of(context).pop(false);
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: FlutterFlowTheme.of(context).primary,

@@ -170,7 +170,7 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                   'Profile',
                   style: FlutterFlowTheme.of(context).headlineMedium.override(
                         fontFamily: 'Outfit',
-                        color: FlutterFlowTheme.of(context).primaryText,
+                        color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -825,7 +825,14 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                           children: [
                             Text(
                               'Recent Dreams',
-                              style: FlutterFlowTheme.of(context).headlineSmall,
+                              style: FlutterFlowTheme.of(context)
+                                  .headlineSmall
+                                  .override(
+                                    fontFamily: 'Outfit',
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                           ],
                         ),
