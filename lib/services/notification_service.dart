@@ -235,6 +235,17 @@ class NotificationService {
     // Initialize local notifications
     await _initializeLocalNotifications();
 
+    // For iOS, configure APNs first with proper settings
+    if (Platform.isIOS) {
+      try {
+        // Check APNs token
+        final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        print('Initial APNS token: ${apnsToken ?? "null"}');
+      } catch (e) {
+        print('Error getting initial APNS token: $e');
+      }
+    }
+
     // Request permissions and register device
     await requestPermission();
 
@@ -427,15 +438,18 @@ class NotificationService {
       // Extract notification data
       final notificationData = _extractNotificationData(message);
 
-      // Show both in-app and system notification
+      // Only show in-app notification (don't trigger system notification)
+      // This prevents duplicate notifications since our Cloud Function will
+      // handle push notifications for background/terminated app states
       showInAppNotification(notificationData);
-
-      // Also show system notification
-      await _showLocalNotification(
-        title: message.notification?.title ?? 'New Notification',
-        body: message.notification?.body ?? 'You have a new notification',
-        payload: message.data.isNotEmpty ? json.encode(message.data) : null,
-      );
+      
+      // Don't show system notification in foreground
+      // System notifications should only be shown when app is in background
+      // await _showLocalNotification(
+      //   title: message.notification?.title ?? 'New Notification',
+      //   body: message.notification?.body ?? 'You have a new notification',
+      //   payload: message.data.isNotEmpty ? json.encode(message.data) : null,
+      // );
     }
   }
 
@@ -1020,6 +1034,45 @@ class NotificationService {
 
     while (token == null && retryCount < maxRetries) {
       try {
+        // For iOS, check if we have APNS token first
+        if (Platform.isIOS) {
+          // Try to get APNS token first if we're on iOS
+          try {
+            final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+            print('Current APNS token: $apnsToken');
+            
+            if (apnsToken == null) {
+              // If APNS token is not available, wait a bit and try again
+              print('APNS token not available yet, waiting...');
+              retryCount++;
+              await Future.delayed(Duration(seconds: 2 * retryCount));
+              continue;
+            }
+            
+            // Ensure we have proper background notification permissions
+            await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+              alert: true,
+              badge: true,
+              sound: true,
+            );
+            
+            // Configure requested notification permissions explicitly
+            NotificationSettings settings = await _firebaseMessaging.requestPermission(
+              alert: true,
+              announcement: false,
+              badge: true,
+              carPlay: false,
+              criticalAlert: false,
+              provisional: true,  // Allow provisional in case user hasn't allowed yet
+              sound: true,
+            );
+            print('iOS Notification settings status: ${settings.authorizationStatus}');
+          } catch (e) {
+            print('Error getting APNS token: $e');
+          }
+        }
+        
+        // Now try to get FCM token
         token = await _firebaseMessaging.getToken();
         if (token == null) {
           retryCount++;
@@ -1052,8 +1105,15 @@ class NotificationService {
         await UserRecord.collection.doc(user.uid).update({
           'fcmToken': token,
           'lastTokenUpdate': FieldValue.serverTimestamp(),
+          'devicePlatform': Platform.isIOS ? 'iOS' : 'Android',  // Store platform to send appropriate payloads
+          'notificationsEnabled': true,  // Track that notifications are enabled
         });
         updateSuccess = true;
+        
+        // Store token in SharedPreferences for reliable recovery
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('fcm_token', token);
+        
       } catch (e) {
         print(
             'Error updating FCM token in Firestore (attempt ${retryCount + 1}): $e');

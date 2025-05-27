@@ -8,6 +8,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/utils/serialization_helpers.dart';
+import '/utils/subscription_util.dart';
 import '/index.dart';
 import '/profile/edit_profile/edit_profile_widget.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,12 @@ import '/flutter_flow/app_navigation_helper.dart';
 import '/services/app_state.dart';
 import '/widgets/lottie_background.dart';
 import '/services/comments_service.dart';
+import '/components/share_options_dialog.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart';
+import '/services/subscription_manager.dart';
+import '/services/purchase_service.dart';
 export 'prof1_model.dart';
 
 class Prof1Widget extends StatefulWidget {
@@ -184,7 +191,7 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                       buttonSize: 40.0,
                       icon: Icon(
                         Icons.more_vert,
-                        color: FlutterFlowTheme.of(context).primaryText,
+                        color: Colors.white,
                         size: 24.0,
                       ),
                       onPressed: () async {
@@ -420,6 +427,172 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                           () =>
                                                               context.pushNamed(
                                                                   'Settings'),
+                                                        ),
+                                                        SizedBox(height: 12),
+                                                        _buildOptionItem(
+                                                          'Restore Purchases',
+                                                          Icons.restore,
+                                                          () async {
+                                                            // Show loading indicator
+                                                            showDialog(
+                                                              context: context,
+                                                              barrierDismissible: false,
+                                                              builder: (BuildContext context) {
+                                                                return AlertDialog(
+                                                                  content: Column(
+                                                                    mainAxisSize: MainAxisSize.min,
+                                                                    children: [
+                                                                      CircularProgressIndicator(),
+                                                                      SizedBox(height: 16),
+                                                                      Text('Restoring purchases...'),
+                                                                    ],
+                                                                  ),
+                                                                );
+                                                              },
+                                                            );
+                                                            
+                                                            try {
+                                                              // Use PurchaseService to refresh
+                                                              final result = await PurchaseService.refreshSubscriptionStatus();
+                                                              
+                                                              // Close loading dialog
+                                                              if (Navigator.canPop(context)) {
+                                                                Navigator.pop(context);
+                                                              }
+                                                              
+                                                              // Show feedback to user
+                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text(
+                                                                    result 
+                                                                      ? 'Purchases restored successfully!' 
+                                                                      : 'No purchases found to restore'
+                                                                  ),
+                                                                  duration: Duration(seconds: 3),
+                                                                ),
+                                                              );
+                                                              
+                                                              // Refresh UI by forcing a rebuild
+                                                              setState(() {});
+                                                            } catch (e) {
+                                                              // Close loading dialog on error
+                                                              if (Navigator.canPop(context)) {
+                                                                Navigator.pop(context);
+                                                              }
+                                                              
+                                                              // Show error
+                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text('Error restoring purchases: $e'),
+                                                                  duration: Duration(seconds: 3),
+                                                                ),
+                                                              );
+                                                            }
+                                                          },
+                                                        ),
+                                                        SizedBox(height: 12),
+                                                        // Emergency fix button - force unlocks benefits
+                                                        _buildOptionItem(
+                                                          'Emergency Fix',
+                                                          Icons.build_circle,
+                                                          () async {
+                                                            // Confirm before proceeding
+                                                            final confirm = await showDialog<bool>(
+                                                              context: context,
+                                                              builder: (BuildContext context) {
+                                                                return AlertDialog(
+                                                                  title: Text('Emergency Fix'),
+                                                                  content: Text(
+                                                                    'This will force-enable all premium features and add 1000 LunaCoins to your account. '
+                                                                    'Use this only if your purchased subscription is not working.'
+                                                                  ),
+                                                                  actions: [
+                                                                    TextButton(
+                                                                      onPressed: () => Navigator.pop(context, false),
+                                                                      child: Text('Cancel'),
+                                                                    ),
+                                                                    TextButton(
+                                                                      onPressed: () => Navigator.pop(context, true),
+                                                                      child: Text('Proceed'),
+                                                                      style: TextButton.styleFrom(
+                                                                        foregroundColor: Colors.red,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                );
+                                                              },
+                                                            ) ?? false;
+                                                            
+                                                            if (!confirm) return;
+                                                            
+                                                            // Show loading indicator
+                                                            showDialog(
+                                                              context: context,
+                                                              barrierDismissible: false,
+                                                              builder: (BuildContext context) {
+                                                                return AlertDialog(
+                                                                  content: Column(
+                                                                    mainAxisSize: MainAxisSize.min,
+                                                                    children: [
+                                                                      CircularProgressIndicator(),
+                                                                      SizedBox(height: 16),
+                                                                      Text('Applying emergency fix...'),
+                                                                    ],
+                                                                  ),
+                                                                );
+                                                              },
+                                                            );
+                                                            
+                                                            try {
+                                                              // Use emergency method to force unlock all benefits
+                                                              final result = await PurchaseService.emergencyForceUnlockAllBenefits();
+                                                              
+                                                              // Close loading dialog
+                                                              if (Navigator.canPop(context)) {
+                                                                Navigator.pop(context);
+                                                              }
+                                                              
+                                                              if (result) {
+                                                                // Success - show confirmation
+                                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                                  SnackBar(
+                                                                    content: Text('Emergency fix applied successfully! You now have full premium access.'),
+                                                                    duration: Duration(seconds: 4),
+                                                                    backgroundColor: Colors.green,
+                                                                  ),
+                                                                );
+                                                                
+                                                                // Close the options menu
+                                                                Navigator.pop(context);
+                                                                
+                                                                // Force UI refresh
+                                                                setState(() {});
+                                                              } else {
+                                                                // Failed
+                                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                                  SnackBar(
+                                                                    content: Text('Failed to apply emergency fix.'),
+                                                                    duration: Duration(seconds: 3),
+                                                                    backgroundColor: Colors.red,
+                                                                  ),
+                                                                );
+                                                              }
+                                                            } catch (e) {
+                                                              // Close loading dialog on error
+                                                              if (Navigator.canPop(context)) {
+                                                                Navigator.pop(context);
+                                                              }
+                                                              
+                                                              // Show error
+                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text('Error applying emergency fix: $e'),
+                                                                  duration: Duration(seconds: 3),
+                                                                  backgroundColor: Colors.red,
+                                                                ),
+                                                              );
+                                                            }
+                                                          },
                                                         ),
                                                         SizedBox(height: 12),
                                                         _fixSignOutOption(),
@@ -786,7 +959,21 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                         child: _buildQuickActionButton(
                           'Dream Analysis',
                           Icons.psychology,
-                          () => context.pushNamed('DreamAnalysis'),
+                          () {
+                            // Check if user has access to dream analysis
+                            if (SubscriptionUtil.hasDreamAnalysis) {
+                              context.pushNamed('DreamAnalysis');
+                            } else {
+                              // Redirect to membership page
+                              context.pushNamed('MembershipPage');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Dream Analysis requires a premium subscription'),
+                                  backgroundColor: FlutterFlowTheme.of(context).primary,
+                                ),
+                              );
+                            }
+                          },
                           FlutterFlowTheme.of(context).primary,
                         ),
                       ),
@@ -977,9 +1164,7 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                           Icon(
                                                             Icons
                                                                 .mode_comment_outlined,
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondary,
+                                                            color: Colors.black,
                                                             size: 20,
                                                           ),
                                                           SizedBox(width: 4),
@@ -1027,6 +1212,186 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                     ],
                   ),
                 ),
+                
+                // Developer Controls Section - Only visible in debug mode
+                if (kDebugMode)
+                  Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(16, 20, 16, 16),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: FlutterFlowTheme.of(context).secondaryBackground.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.developer_mode_rounded,
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  size: 24,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Developer Controls',
+                                  style: FlutterFlowTheme.of(context).titleMedium.override(
+                                    fontFamily: 'Outfit',
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Subscription Troubleshooting Tools',
+                              style: FlutterFlowTheme.of(context).bodyMedium,
+                            ),
+                            SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      await SubscriptionManager.instance.refreshSubscriptionStatus();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Subscription status refreshed'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    icon: Icon(Icons.refresh),
+                                    label: Text('Refresh Status'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: FlutterFlowTheme.of(context).primary,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final result = await SubscriptionManager.instance.applyMissingSubscriptionBenefits();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(result 
+                                            ? 'Benefits applied successfully!' 
+                                            : 'No subscription found or already applied'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    icon: Icon(Icons.card_giftcard),
+                                    label: Text('Apply Benefits'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: FlutterFlowTheme.of(context).secondary,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                final isTestMode = SubscriptionUtil.isPremium;
+                                SubscriptionManager.setTestingMode(!isTestMode);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(isTestMode 
+                                      ? 'Testing mode disabled' 
+                                      : 'Testing mode enabled - Full access granted'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                                setState(() {});
+                              },
+                              icon: Icon(Icons.science),
+                              label: Text('Toggle Testing Mode'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: SubscriptionUtil.isPremium 
+                                  ? Colors.redAccent 
+                                  : Colors.green,
+                                foregroundColor: Colors.white,
+                                minimumSize: Size(double.infinity, 40),
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                // Show loading dialog
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      content: Row(
+                                        children: [
+                                          CircularProgressIndicator(),
+                                          SizedBox(width: 20),
+                                          Text("Deep refreshing from RevenueCat...")
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                                
+                                // Use PurchaseService for deep refresh
+                                try {
+                                  final result = await PurchaseService.refreshSubscriptionStatus();
+                                  
+                                  // Close loading dialog
+                                  Navigator.of(context, rootNavigator: true).pop();
+                                  
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text(result 
+                                      ? 'Subscription refreshed from RevenueCat!' 
+                                      : 'No active subscription found in RevenueCat'),
+                                    duration: Duration(seconds: 4),
+                                  ));
+                                  
+                                  setState(() {});
+                                } catch (e) {
+                                  // Close loading dialog on error
+                                  Navigator.of(context, rootNavigator: true).pop();
+                                  
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text('Error refreshing: ${e.toString()}'),
+                                    duration: Duration(seconds: 4),
+                                  ));
+                                }
+                              },
+                              icon: Icon(Icons.sync_problem),
+                              label: Text('Force RevenueCat Sync'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepPurple,
+                                foregroundColor: Colors.white,
+                                minimumSize: Size(double.infinity, 40),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                
                 SizedBox(height: 80),
               ],
             ),
@@ -2130,325 +2495,718 @@ class _Prof1WidgetState extends State<Prof1Widget> {
         context: context,
         barrierColor: Colors.black.withOpacity(0.5),
         builder: (BuildContext dialogContext) {
-          return Consumer<AppState>(
-            builder: (context, appState, _) {
-              // Debug log to check what backgrounds are available
-              print('Available background options in dialog:');
-              for (var bg in appState.backgroundOptions) {
-                print('Background: ${bg['name']} - ${bg['file']}');
-              }
+          return AuthUserStreamWidget(
+            builder: (context) => Consumer<AppState>(
+              builder: (context, appState, _) {
+                // Debug log to check what backgrounds are available
+                print('Available background options in dialog:');
+                for (var bg in appState.backgroundOptions) {
+                  print('Background: ${bg['name']} - ${bg['file']}');
+                }
 
-              return Dialog(
-                backgroundColor: Colors.transparent,
-                insetPadding: EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  width: double.infinity,
-                  constraints: BoxConstraints(
-                    maxWidth: 400,
-                    maxHeight: MediaQuery.of(context).size.height * 0.7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: FlutterFlowTheme.of(context)
-                        .primaryBackground
-                        .withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color:
-                          FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-                      width: 1,
+                // Get sorted background options (unlocked first)
+                final sortedOptions = appState.sortedBackgroundOptions;
+
+                return Dialog(
+                  backgroundColor: Colors.transparent,
+                  insetPadding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(
+                      maxWidth: 400,
+                      maxHeight: MediaQuery.of(context).size.height * 0.7,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 10,
-                        spreadRadius: 0,
+                    decoration: BoxDecoration(
+                      color: FlutterFlowTheme.of(context)
+                          .primaryBackground
+                          .withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color:
+                            FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                        width: 1,
                       ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Header
-                          Container(
-                            padding: EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: FlutterFlowTheme.of(context)
-                                      .primary
-                                      .withOpacity(0.1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 10,
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Header
+                            Container(
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: FlutterFlowTheme.of(context)
+                                        .primary
+                                        .withOpacity(0.1),
+                                  ),
                                 ),
                               ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Background Collection',
+                                    style: FlutterFlowTheme.of(context)
+                                        .titleMedium
+                                        .override(
+                                          fontFamily: 'Outfit',
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.close),
+                                    onPressed: () => Navigator.pop(context),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Background Collection',
-                                  style: FlutterFlowTheme.of(context)
-                                      .titleMedium
-                                      .override(
-                                        fontFamily: 'Outfit',
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.close),
-                                  onPressed: () => Navigator.pop(context),
-                                ),
-                              ],
-                            ),
-                          ),
 
-                          // Background Options
-                          Flexible(
-                            child: SingleChildScrollView(
-                              child: Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Column(
-                                  children: appState.backgroundOptions
-                                      .map<Widget>((bg) {
-                                    final isSelected =
-                                        appState.selectedBackground ==
-                                            bg['file'];
-                                    return Container(
-                                      margin: EdgeInsets.only(bottom: 16),
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? FlutterFlowTheme.of(context)
-                                                .primary
-                                                .withOpacity(0.1)
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
+                            // User's Luna Coins
+                            Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 16, 
+                                vertical: 8
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    clipBehavior: Clip.antiAlias,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.transparent,
+                                    ),
+                                    child: Image.asset(
+                                      'assets/images/lunacoin.png',
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    '${currentUserDocument?.lunaCoins ?? 0} LunaCoins',
+                                    style: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          fontFamily: 'Figtree',
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).brightness == Brightness.light
+                                              ? Colors.black
+                                              : FlutterFlowTheme.of(context).warning,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Background Options
+                            Flexible(
+                              child: SingleChildScrollView(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Column(
+                                    children: sortedOptions
+                                        .map<Widget>((bg) {
+                                      final isSelected =
+                                          appState.selectedBackground ==
+                                              bg['file'];
+                                      final isUnlocked = appState.isBackgroundUnlocked(bg['file']!);
+                                      final price = appState.getBackgroundPrice(bg['file']!);
+                                      
+                                      return Container(
+                                        margin: EdgeInsets.only(bottom: 16),
+                                        decoration: BoxDecoration(
                                           color: isSelected
                                               ? FlutterFlowTheme.of(context)
                                                   .primary
-                                              : FlutterFlowTheme.of(context)
-                                                  .primary
-                                                  .withOpacity(0.2),
-                                          width: 1.5,
+                                                  .withOpacity(0.1)
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? FlutterFlowTheme.of(context)
+                                                    .primary
+                                                : FlutterFlowTheme.of(context)
+                                                    .primary
+                                                    .withOpacity(0.2),
+                                            width: 1.5,
+                                          ),
                                         ),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Material(
-                                          color: Colors.transparent,
-                                          child: InkWell(
-                                            onTap: () {
-                                              appState
-                                                  .setBackground(bg['file']!);
-                                            },
-                                            child: Padding(
-                                              padding: EdgeInsets.all(12),
-                                              child: Row(
-                                                children: [
-                                                  // Preview
-                                                  Container(
-                                                    width: 60,
-                                                    height: 60,
-                                                    decoration: BoxDecoration(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                      border: Border.all(
-                                                        color: FlutterFlowTheme
-                                                                .of(context)
-                                                            .primary
-                                                            .withOpacity(0.3),
-                                                        width: 1,
-                                                      ),
-                                                      boxShadow: [
-                                                        BoxShadow(
-                                                          color: Colors.black
-                                                              .withOpacity(0.1),
-                                                          blurRadius: 4,
-                                                          spreadRadius: 0,
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    child: ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                      child: Stack(
-                                                        children: [
-                                                          Positioned.fill(
-                                                            child: Container(
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              onTap: () {
+                                                if (isUnlocked) {
+                                                  // Set as active background if unlocked
+                                                  appState.setBackground(bg['file']!);
+                                                } else {
+                                                  // Show purchase dialog if locked
+                                                  _showPurchaseDialog(
+                                                    context, 
+                                                    appState, 
+                                                    bg['file']!, 
+                                                    bg['name']!,
+                                                    price
+                                                  );
+                                                }
+                                              },
+                                              child: Padding(
+                                                padding: EdgeInsets.all(12),
+                                                child: Row(
+                                                  children: [
+                                                    // Preview
+                                                    Stack(
+                                                      children: [
+                                                        Container(
+                                                          width: 60,
+                                                          height: 60,
+                                                          decoration: BoxDecoration(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                    8),
+                                                            border: Border.all(
                                                               color: FlutterFlowTheme
                                                                       .of(context)
-                                                                  .primaryBackground,
-                                                              child: Builder(
-                                                                builder:
-                                                                    (context) {
-                                                                  try {
-                                                                    final bgFile =
-                                                                        bg['file']!;
-                                                                    final isImage = bgFile
-                                                                            .endsWith(
-                                                                                '.png') ||
-                                                                        bgFile.endsWith(
-                                                                            '.jpg') ||
-                                                                        bgFile.endsWith(
-                                                                            '.jpeg');
+                                                                  .primary
+                                                                  .withOpacity(0.3),
+                                                              width: 1,
+                                                            ),
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                color: Colors.black
+                                                                    .withOpacity(0.1),
+                                                                blurRadius: 4,
+                                                                spreadRadius: 0,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          child: ClipRRect(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                    8),
+                                                            child: Stack(
+                                                              children: [
+                                                                Positioned.fill(
+                                                                  child: Container(
+                                                                    color: FlutterFlowTheme
+                                                                            .of(context)
+                                                                        .primaryBackground,
+                                                                    child: Builder(
+                                                                      builder:
+                                                                          (context) {
+                                                                        try {
+                                                                          final bgFile =
+                                                                              bg['file']!;
+                                                                          final isImage = bgFile
+                                                                                  .endsWith(
+                                                                                      '.png') ||
+                                                                              bgFile.endsWith(
+                                                                                  '.jpg') ||
+                                                                              bgFile.endsWith(
+                                                                                  '.jpeg');
 
-                                                                    if (isImage) {
-                                                                      return Image
-                                                                          .asset(
-                                                                        'assets/images/$bgFile',
-                                                                        fit: BoxFit
-                                                                            .cover,
-                                                                        errorBuilder: (context,
-                                                                            error,
-                                                                            stackTrace) {
-                                                                          print(
-                                                                              'Error loading image in preview: $bgFile - $error');
-                                                                          print(
-                                                                              'Stack trace: $stackTrace');
-                                                                          print(
-                                                                              'Attempted to load: assets/images/$bgFile');
+                                                                          if (isImage) {
+                                                                            return Image
+                                                                                .asset(
+                                                                              'assets/images/$bgFile',
+                                                                              fit: BoxFit
+                                                                                  .cover,
+                                                                              errorBuilder: (context,
+                                                                                  error,
+                                                                                  stackTrace) {
+                                                                                print(
+                                                                                    'Error loading image in preview: $bgFile - $error');
+                                                                                print(
+                                                                                    'Stack trace: $stackTrace');
+                                                                                print(
+                                                                                    'Attempted to load: assets/images/$bgFile');
 
-                                                                          // Try fallback to a known working image
-                                                                          return Image
-                                                                              .asset(
-                                                                            'assets/images/applogo.png',
-                                                                            fit:
-                                                                                BoxFit.cover,
-                                                                            errorBuilder: (context,
-                                                                                err,
-                                                                                st) {
-                                                                              return Center(
-                                                                                child: Icon(
-                                                                                  Icons.image_not_supported,
-                                                                                  color: FlutterFlowTheme.of(context).secondaryText,
-                                                                                ),
-                                                                              );
-                                                                            },
-                                                                          );
-                                                                        },
-                                                                      );
-                                                                    } else {
-                                                                      return Lottie
-                                                                          .asset(
-                                                                        'assets/jsons/${bg['file']}',
-                                                                        fit: BoxFit
-                                                                            .cover,
-                                                                        animate:
-                                                                            true,
-                                                                        repeat:
-                                                                            true,
-                                                                        errorBuilder: (context,
-                                                                            error,
-                                                                            stackTrace) {
+                                                                                // Try fallback to a known working image
+                                                                                return Image
+                                                                                    .asset(
+                                                                                  'assets/images/applogo.png',
+                                                                                  fit:
+                                                                                      BoxFit.cover,
+                                                                                  errorBuilder: (context,
+                                                                                      err,
+                                                                                      st) {
+                                                                                    return Center(
+                                                                                      child: Icon(
+                                                                                        Icons.image_not_supported,
+                                                                                        color: FlutterFlowTheme.of(context).secondaryText,
+                                                                                      ),
+                                                                                    );
+                                                                                  },
+                                                                                );
+                                                                              },
+                                                                            );
+                                                                          } else {
+                                                                            return Lottie
+                                                                                .asset(
+                                                                              'assets/jsons/${bg['file']}',
+                                                                              fit: BoxFit
+                                                                                  .cover,
+                                                                              animate:
+                                                                                  true,
+                                                                              repeat:
+                                                                                  true,
+                                                                              errorBuilder: (context,
+                                                                                  error,
+                                                                                  stackTrace) {
+                                                                                print(
+                                                                                    'Error loading Lottie: ${bg['file']} - $error');
+                                                                                return Center(
+                                                                                  child:
+                                                                                      Icon(
+                                                                                        Icons.image_not_supported,
+                                                                                        color: FlutterFlowTheme.of(context).secondaryText,
+                                                                                      ),
+                                                                                );
+                                                                              },
+                                                                            );
+                                                                          }
+                                                                        } catch (e) {
                                                                           print(
-                                                                              'Error loading Lottie: ${bg['file']} - $error');
+                                                                              'Exception loading Lottie: ${bg['file']} - $e');
                                                                           return Center(
                                                                             child:
                                                                                 Icon(
-                                                                              Icons.image_not_supported,
-                                                                              color: FlutterFlowTheme.of(context).secondaryText,
+                                                                              Icons
+                                                                                  .error_outline,
+                                                                              color: FlutterFlowTheme.of(context)
+                                                                                  .error,
                                                                             ),
                                                                           );
-                                                                        },
-                                                                      );
-                                                                    }
-                                                                  } catch (e) {
-                                                                    print(
-                                                                        'Exception loading Lottie: ${bg['file']} - $e');
-                                                                    return Center(
-                                                                      child:
-                                                                          Icon(
-                                                                        Icons
-                                                                            .error_outline,
-                                                                        color: FlutterFlowTheme.of(context)
-                                                                            .error,
+                                                                        }
+                                                                      },
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                // Lock overlay for locked backgrounds
+                                                                if (!isUnlocked)
+                                                                  Positioned.fill(
+                                                                    child: Container(
+                                                                      color: Colors.black.withOpacity(0.5),
+                                                                      child: Center(
+                                                                        child: Icon(
+                                                                          Icons.lock,
+                                                                          color: Colors.white,
+                                                                          size: 24,
+                                                                        ),
                                                                       ),
-                                                                    );
-                                                                  }
-                                                                },
-                                                              ),
+                                                                    ),
+                                                                  ),
+                                                              ],
                                                             ),
                                                           ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  SizedBox(width: 16),
-
-                                                  // Name and selection indicator
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          bg['name']!,
-                                                          style: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .bodyLarge
-                                                              .override(
-                                                                fontFamily:
-                                                                    'Figtree',
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
-                                                              ),
                                                         ),
-                                                        if (isSelected)
+                                                      ],
+                                                    ),
+                                                    SizedBox(width: 16),
+
+                                                    // Name and selection indicator
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
                                                           Text(
-                                                            'Currently Selected',
+                                                            bg['name']!,
                                                             style: FlutterFlowTheme
                                                                     .of(context)
-                                                                .bodySmall
+                                                                .bodyLarge
                                                                 .override(
                                                                   fontFamily:
                                                                       'Figtree',
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .primary,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
                                                                 ),
                                                           ),
-                                                      ],
+                                                          if (isSelected)
+                                                            Text(
+                                                              'Currently Selected',
+                                                              style: FlutterFlowTheme
+                                                                      .of(context)
+                                                                  .bodySmall
+                                                                  .override(
+                                                                    fontFamily:
+                                                                        'Figtree',
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .primary,
+                                                                  ),
+                                                            )
+                                                          else if (!isUnlocked)
+                                                            Text(
+                                                              '$price LunaCoins',
+                                                              style: FlutterFlowTheme
+                                                                      .of(context)
+                                                                  .bodySmall
+                                                                  .override(
+                                                                    fontFamily:
+                                                                        'Figtree',
+                                                                    color: Theme.of(context).brightness == Brightness.light
+                                                                        ? Colors.black
+                                                                        : FlutterFlowTheme.of(context).warning,
+                                                                  ),
+                                                            ),
+                                                        ],
+                                                      ),
                                                     ),
-                                                  ),
 
-                                                  // Selection indicator
-                                                  if (isSelected)
-                                                    Icon(
-                                                      Icons.check_circle,
-                                                      color:
-                                                          FlutterFlowTheme.of(
-                                                                  context)
-                                                              .primary,
-                                                    ),
-                                                ],
+                                                    // Selection indicator or unlock button
+                                                    if (isSelected)
+                                                      Icon(
+                                                        Icons.check_circle,
+                                                        color:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .primary,
+                                                      )
+                                                    else if (!isUnlocked)
+                                                      Icon(
+                                                        Icons.lock,
+                                                        color: FlutterFlowTheme.of(context).secondaryText,
+                                                        size: 20,
+                                                      ),
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  }).toList(),
+                                      );
+                                    }).toList(),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       );
     });
+  }
+
+  // Show purchase dialog for locked backgrounds
+  void _showPurchaseDialog(BuildContext context, AppState appState, String backgroundFile, String backgroundName, int price) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: 350,
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: FlutterFlowTheme.of(context).secondaryBackground.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Text(
+                  'Unlock Background',
+                  style: FlutterFlowTheme.of(context).titleLarge.override(
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  backgroundName,
+                  style: FlutterFlowTheme.of(context).titleMedium,
+                ),
+                SizedBox(height: 16),
+                
+                // Background preview
+                Container(
+                  width: 150,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Builder(
+                      builder: (context) {
+                        try {
+                          final isImage = backgroundFile.endsWith('.png') ||
+                              backgroundFile.endsWith('.jpg') ||
+                              backgroundFile.endsWith('.jpeg');
+
+                          if (isImage) {
+                            return Image.asset(
+                              'assets/images/$backgroundFile',
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    color: FlutterFlowTheme.of(context).secondaryText,
+                                  ),
+                                );
+                              },
+                            );
+                          } else {
+                            return Lottie.asset(
+                              'assets/jsons/$backgroundFile',
+                              fit: BoxFit.cover,
+                              animate: true,
+                              repeat: true,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    color: FlutterFlowTheme.of(context).secondaryText,
+                                  ),
+                                );
+                              },
+                            );
+                          }
+                        } catch (e) {
+                          return Center(
+                            child: Icon(
+                              Icons.error_outline,
+                              color: FlutterFlowTheme.of(context).error,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                SizedBox(height: 24),
+                
+                // Price and user balance
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Column(
+                      children: [
+                        Text(
+                          'Price',
+                          style: FlutterFlowTheme.of(context).labelMedium,
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              clipBehavior: Clip.antiAlias,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.transparent,
+                              ),
+                              child: Image.asset(
+                                'assets/images/lunacoin.png',
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              '$price',
+                              style: FlutterFlowTheme.of(context).bodyLarge.override(
+                                fontFamily: 'Figtree',
+                                fontWeight: FontWeight.bold,
+                                color: FlutterFlowTheme.of(context).warning,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(width: 40),
+                    Column(
+                      children: [
+                        Text(
+                          'Your Balance',
+                          style: FlutterFlowTheme.of(context).labelMedium,
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.account_balance_wallet,
+                              color: FlutterFlowTheme.of(context).secondary,
+                              size: 20,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              '${currentUserDocument?.lunaCoins ?? 0}',
+                              style: FlutterFlowTheme.of(context).bodyLarge.override(
+                                fontFamily: 'Figtree',
+                                fontWeight: FontWeight.bold,
+                                color: (currentUserDocument?.lunaCoins ?? 0) >= price
+                                  ? FlutterFlowTheme.of(context).secondary
+                                  : FlutterFlowTheme.of(context).error,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                SizedBox(height: 24),
+                
+                // Purchase button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    FFButtonWidget(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      text: 'Cancel',
+                      options: FFButtonOptions(
+                        width: 120,
+                        height: 50,
+                        color: FlutterFlowTheme.of(context).secondaryBackground,
+                        textStyle: FlutterFlowTheme.of(context).bodyLarge.override(
+                          fontFamily: 'Figtree',
+                          color: FlutterFlowTheme.of(context).primaryText,
+                        ),
+                        elevation: 0,
+                        borderSide: BorderSide(
+                          color: FlutterFlowTheme.of(context).alternate,
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    FFButtonWidget(
+                      onPressed: (currentUserDocument?.lunaCoins ?? 0) >= price
+                        ? () async {
+                            // Close purchase dialog
+                            Navigator.pop(dialogContext);
+                            
+                            // Unlock the background
+                            bool success = await appState.unlockBackground(backgroundFile);
+                            
+                            if (success) {
+                              // Show success message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Successfully unlocked $backgroundName background!',
+                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                      fontFamily: 'Figtree',
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  backgroundColor: FlutterFlowTheme.of(context).primary,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              
+                              // Apply the background
+                              await appState.setBackground(backgroundFile);
+                              
+                              // Refresh the dialog to show updated state
+                              Navigator.pop(context); // Close the entire collection dialog
+                              _showBackgroundCollectionDialog(context); // Reopen it
+                            } else {
+                              // Show error message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Failed to unlock background. Please try again.',
+                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                      fontFamily: 'Figtree',
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  backgroundColor: FlutterFlowTheme.of(context).error,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          }
+                        : null,
+                      text: 'Purchase',
+                      options: FFButtonOptions(
+                        width: 120,
+                        height: 50,
+                        color: (currentUserDocument?.lunaCoins ?? 0) >= price
+                          ? FlutterFlowTheme.of(context).primary
+                          : FlutterFlowTheme.of(context).alternate,
+                        textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                          fontFamily: 'Figtree',
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        elevation: 3,
+                        borderSide: BorderSide(
+                          color: Colors.transparent,
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        disabledColor: FlutterFlowTheme.of(context).alternate,
+                        disabledTextColor: FlutterFlowTheme.of(context).secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                // Information text
+                if ((currentUserDocument?.lunaCoins ?? 0) < price)
+                  Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: Text(
+                      'Not enough LunaCoins',
+                      style: FlutterFlowTheme.of(context).bodyMedium.override(
+                        fontFamily: 'Figtree',
+                        color: FlutterFlowTheme.of(context).error,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _showDreamCalendarDialog(BuildContext context) async {
@@ -2594,5 +3352,148 @@ class _Prof1WidgetState extends State<Prof1Widget> {
         ),
       ),
     );
+  }
+
+  // Add a method to check if a theme is available based on subscription status
+  bool _isThemeAvailable(String themeName) {
+    // Premium users have access to all themes
+    if (SubscriptionUtil.hasExclusiveThemes) {
+      return true;
+    }
+    
+    // Free themes list for non-premium users
+    final freeThemes = [
+      'default', 'basic', 'simple', 'minimalist'
+      // Add other free theme names here
+    ];
+    
+    return freeThemes.contains(themeName.toLowerCase());
+  }
+  
+  // Show dialog when premium theme is selected by non-premium user
+  void _showPremiumThemeDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: Text('Premium Theme'),
+        content: Text('This theme is only available with a premium subscription.'),
+        actions: [
+          TextButton(
+            child: Text('Close'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          TextButton(
+            child: Text('Get Premium'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.pushNamed(context, 'MembershipPage');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Adjust the existing theme selection methods to use the subscription check
+  Future<void> _selectTheme(String themeName) async {
+    if (_isThemeAvailable(themeName)) {
+      // Apply the theme (implement your existing theme change logic here)
+      // Update the user's theme preference
+      try {
+        await FirebaseFirestore.instance.doc(currentUserReference!.path).update({
+          'themePreference': themeName,
+        });
+        
+        Navigator.pop(context); // Close theme dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Theme updated successfully!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } catch (e) {
+        print('Error updating theme: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update theme: $e'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      _showPremiumThemeDialog();
+    }
+  }
+  
+  // Add a widget to show subscription status in theme selection dialog
+  Widget _buildSubscriptionStatus() {
+    if (SubscriptionUtil.isPremium) {
+      return Container(
+        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        margin: EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: FlutterFlowTheme.of(context).primary.withOpacity(0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: FlutterFlowTheme.of(context).primary,
+              size: 18,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Premium Subscriber',
+              style: FlutterFlowTheme.of(context).bodyMedium.copyWith(
+                color: FlutterFlowTheme.of(context).primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Container(
+        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        margin: EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.withOpacity(0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              color: Colors.grey,
+              size: 18,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Premium themes locked',
+              style: FlutterFlowTheme.of(context).bodyMedium.copyWith(
+                color: Colors.grey,
+              ),
+            ),
+            SizedBox(width: 8),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close theme dialog
+                Navigator.pushNamed(context, 'MembershipPage');
+              },
+              child: Text('Upgrade'),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                minimumSize: Size(0, 0),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

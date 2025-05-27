@@ -1,4 +1,4 @@
-import 'package:in_app_purchase/in_app_purchase.dart';
+// Don't import in_app_purchase to avoid conflict with RevenueCat
 
 class SubscriptionProduct {
   final String id;
@@ -8,7 +8,7 @@ class SubscriptionProduct {
   final String rawPrice;
   final String currencyCode;
   final String currencySymbol;
-  final ProductDetails? productDetails;
+  // Removed ProductDetails to avoid dependency on in_app_purchase
 
   SubscriptionProduct({
     required this.id,
@@ -18,37 +18,9 @@ class SubscriptionProduct {
     required this.rawPrice,
     required this.currencyCode,
     required this.currencySymbol,
-    this.productDetails,
   });
 
-  factory SubscriptionProduct.fromProductDetails(ProductDetails details) {
-    String rawPrice = '0.00';
-    String currencyCode = 'USD';
-    String currencySymbol = '\$';
-
-    if (details.currencyCode != null) {
-      currencyCode = details.currencyCode!;
-    }
-
-    if (details.currencySymbol != null) {
-      currencySymbol = details.currencySymbol!;
-    }
-
-    if (details.rawPrice != null) {
-      rawPrice = details.rawPrice.toString();
-    }
-
-    return SubscriptionProduct(
-      id: details.id,
-      title: details.title,
-      description: details.description,
-      price: details.price,
-      rawPrice: rawPrice,
-      currencyCode: currencyCode,
-      currencySymbol: currencySymbol,
-      productDetails: details,
-    );
-  }
+  // Factory method removed as it depended on ProductDetails
 
   Map<String, dynamic> toMap() {
     return {

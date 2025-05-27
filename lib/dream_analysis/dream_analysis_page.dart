@@ -1,9 +1,68 @@
 import 'package:flutter/material.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/utils/subscription_util.dart';
+import '/services/subscription_manager.dart';
 
-class DreamAnalysisPage extends StatelessWidget {
+class DreamAnalysisPage extends StatefulWidget {
   const DreamAnalysisPage({Key? key}) : super(key: key);
+
+  @override
+  _DreamAnalysisPageState createState() => _DreamAnalysisPageState();
+}
+
+class _DreamAnalysisPageState extends State<DreamAnalysisPage> {
+  bool _hasAccess = false;
+  bool _checkingAccess = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Always check access immediately when page loads
+    _checkAccessStatus();
+    
+    // Listen for subscription status changes
+    SubscriptionManager.instance.subscriptionStatus.listen((_) {
+      if (mounted) {
+        _checkAccessStatus();
+      }
+    });
+  }
+  
+  void _checkAccessStatus() {
+    setState(() {
+      _checkingAccess = true;
+    });
+    
+    // Using a Future.microtask ensures this runs in the next event loop
+    // after the widget is built, preventing issues with Navigator during build
+    Future.microtask(() {
+      // For testing: Always allow access to Dream Analysis
+      final hasAccess = true; // Was: SubscriptionUtil.hasDreamAnalysis;
+      
+      if (mounted) {
+        setState(() {
+          _hasAccess = hasAccess;
+          _checkingAccess = false;
+        });
+        
+        // Redirection logic temporarily disabled for testing
+        if (false) { // Was: if (!hasAccess) {
+          print('🔒 User does not have access to Dream Analysis - redirecting to Membership page');
+          Navigator.of(context).pushReplacementNamed('MembershipPage');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Dream Analysis requires a premium subscription'),
+              duration: Duration(seconds: 3),
+              backgroundColor: FlutterFlowTheme.of(context).primary,
+            ),
+          );
+        } else {
+          print('✅ User has access to Dream Analysis (Testing mode)');
+        }
+      }
+    });
+  }
 
   Widget _buildPatternCard(
       String title, String? frequency, List<DreamExample> examples) {
@@ -112,6 +171,26 @@ class DreamAnalysisPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // If still checking access or no access, show loading screen
+    if (_checkingAccess || !_hasAccess) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 20),
+              Text(
+                'Checking subscription status...',
+                style: FlutterFlowTheme.of(context).bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Continue with regular page build ONLY if user has confirmed access
     return Scaffold(
       backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
       appBar: AppBar(

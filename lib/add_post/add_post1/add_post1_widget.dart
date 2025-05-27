@@ -1,6 +1,12 @@
-import '';
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/api_requests/api_calls.dart';
+import '/backend/cloud_functions/cloud_functions.dart';
 import '/flutter_flow/flutter_flow_animations.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -10,13 +16,13 @@ import '/add_post/create_post/create_post_widget.dart';
 import '/widgets/lottie_background.dart';
 import '/services/app_state.dart' as custom_app_state;
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:simple_gradient_text/simple_gradient_text.dart';
 import 'add_post1_model.dart';
 import '/utils/serialization_helpers.dart';
+import 'package:luna_kraft/backend/backend.dart';
 export 'add_post1_model.dart';
 
 class AddPost1Widget extends StatefulWidget {
@@ -86,6 +92,10 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
       ),
     });
 
+    // Important: Don't auto-generate the dream when the page is first loaded
+    // The user should explicitly click the "Generate Dream" button
+    _model.apiResponse = '';
+    
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
 
@@ -123,6 +133,11 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
     // Access the custom app state
     context.watch<custom_app_state.AppState>();
 
+    // Make sure apiResponse is reset when component is built initially
+    if (_model.apiResponse == null) {
+      _model.apiResponse = '';
+    }
+
     return GestureDetector(
       onTap: () {
         FocusScope.of(context).unfocus();
@@ -131,463 +146,6 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
-        drawer: Drawer(
-          elevation: 16.0,
-          child: Padding(
-            padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 1.0, 0.0),
-            child: Container(
-              width: 270.0,
-              height: double.infinity,
-              constraints: BoxConstraints(
-                maxWidth: 300.0,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0xFFE5E7EB),
-                    offset: Offset(
-                      1.0,
-                      0.0,
-                    ),
-                  )
-                ],
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(0.0),
-                  bottomRight: Radius.circular(20.0),
-                  topLeft: Radius.circular(0.0),
-                  topRight: Radius.circular(20.0),
-                ),
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding:
-                          EdgeInsetsDirectional.fromSTEB(0.0, 20.0, 0.0, 20.0),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
-                          Icon(
-                            Icons.mode_night_sharp,
-                            color: Color(0xFF6F61EF),
-                            size: 32.0,
-                          ),
-                          Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
-                                12.0, 0.0, 0.0, 0.0),
-                            child: Text(
-                              'Hello!',
-                              style: FlutterFlowTheme.of(context)
-                                  .headlineMedium
-                                  .override(
-                                    fontFamily: 'Outfit',
-                                    color: Color(0xFF15161E),
-                                    fontSize: 24.0,
-                                    letterSpacing: 0.0,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                            ),
-                          ),
-                          Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
-                                140.0, 0.0, 0.0, 0.0),
-                            child: InkWell(
-                              splashColor: Colors.transparent,
-                              focusColor: Colors.transparent,
-                              hoverColor: Colors.transparent,
-                              highlightColor: Colors.transparent,
-                              onTap: () async {
-                                if (scaffoldKey.currentState!.isDrawerOpen ||
-                                    scaffoldKey.currentState!.isEndDrawerOpen) {
-                                  Navigator.pop(context);
-                                }
-                              },
-                              child: Icon(
-                                Icons.close_outlined,
-                                color: Color(0xFF553AD5),
-                                size: 35.0,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding:
-                          EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 24.0),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFF1F4F8),
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding:
-                          EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: FlutterFlowTheme.of(context).info,
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.max,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.dashboard_rounded,
-                                color: Color(0xFF6F61EF),
-                                size: 28.0,
-                              ),
-                              Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
-                                    12.0, 0.0, 0.0, 0.0),
-                                child: Text(
-                                  'My account',
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyLarge
-                                      .override(
-                                        fontFamily: 'Plus Jakarta Sans',
-                                        color: Color(0xFF15161E),
-                                        fontSize: 16.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding:
-                          EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.max,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.business_rounded,
-                                color: Color(0xFF606A85),
-                                size: 28.0,
-                              ),
-                              Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
-                                    12.0, 0.0, 0.0, 0.0),
-                                child: Text(
-                                  'Settings',
-                                  style: FlutterFlowTheme.of(context)
-                                      .labelLarge
-                                      .override(
-                                        fontFamily: 'Plus Jakarta Sans',
-                                        color: Color(0xFF606A85),
-                                        fontSize: 16.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding:
-                          EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.max,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.document_scanner_rounded,
-                                color: Color(0xFF606A85),
-                                size: 28.0,
-                              ),
-                              Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
-                                    12.0, 0.0, 0.0, 0.0),
-                                child: Text(
-                                  'Invite a Friend',
-                                  style: FlutterFlowTheme.of(context)
-                                      .labelLarge
-                                      .override(
-                                        fontFamily: 'Plus Jakarta Sans',
-                                        color: Color(0xFF606A85),
-                                        fontSize: 16.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding:
-                          EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.max,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.groups,
-                                color: Color(0xFF606A85),
-                                size: 28.0,
-                              ),
-                              Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
-                                    12.0, 0.0, 0.0, 0.0),
-                                child: Text(
-                                  'Feedback',
-                                  style: FlutterFlowTheme.of(context)
-                                      .labelLarge
-                                      .override(
-                                        fontFamily: 'Plus Jakarta Sans',
-                                        color: Color(0xFF606A85),
-                                        fontSize: 16.0,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding:
-                          EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: InkWell(
-                            splashColor: Colors.transparent,
-                            focusColor: Colors.transparent,
-                            hoverColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                            onTap: () async {
-                              context.pushNamed(
-                                SigninWidget.routeName,
-                                extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
-                                    hasTransition: true,
-                                    transitionType: PageTransitionType.fade,
-                                    duration: Duration(milliseconds: 1000),
-                                  ),
-                                },
-                              );
-                            },
-                            child: Row(
-                              mainAxisSize: MainAxisSize.max,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.account_circle_rounded,
-                                  color: Color(0xFF606A85),
-                                  size: 28.0,
-                                ),
-                                Padding(
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                      12.0, 0.0, 0.0, 0.0),
-                                  child: Text(
-                                    'Sign out',
-                                    style: FlutterFlowTheme.of(context)
-                                        .labelLarge
-                                        .override(
-                                          fontFamily: 'Plus Jakarta Sans',
-                                          color: Color(0xFF606A85),
-                                          fontSize: 16.0,
-                                          letterSpacing: 0.0,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding:
-                            EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 16.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.max,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Divider(
-                              height: 12.0,
-                              thickness: 2.0,
-                              color: Color(0xFFE5E7EB),
-                            ),
-                            Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  0.0, 12.0, 0.0, 0.0),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.max,
-                                children: [
-                                  Container(
-                                    width: 50.0,
-                                    height: 50.0,
-                                    decoration: BoxDecoration(
-                                      color: Color(0x4D9489F5),
-                                      borderRadius: BorderRadius.circular(12.0),
-                                      border: Border.all(
-                                        color: Color(0xFF6F61EF),
-                                        width: 2.0,
-                                      ),
-                                    ),
-                                    child: Padding(
-                                      padding: EdgeInsets.all(2.0),
-                                      child: ClipRRect(
-                                        borderRadius:
-                                            BorderRadius.circular(10.0),
-                                        child: CachedNetworkImage(
-                                          fadeInDuration:
-                                              Duration(milliseconds: 500),
-                                          fadeOutDuration:
-                                              Duration(milliseconds: 500),
-                                          imageUrl:
-                                              'https://images.unsplash.com/photo-1624561172888-ac93c696e10c?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxzZWFyY2h8NjJ8fHVzZXJzfGVufDB8fDB8fA%3D%3D&auto=format&fit=crop&w=900&q=60',
-                                          width: 44.0,
-                                          height: 44.0,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Padding(
-                                      padding: EdgeInsetsDirectional.fromSTEB(
-                                          12.0, 0.0, 0.0, 0.0),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.max,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          AuthUserStreamWidget(
-                                            builder: (context) => GradientText(
-                                              currentUserDisplayName,
-                                              style: FlutterFlowTheme.of(
-                                                      context)
-                                                  .bodyLarge
-                                                  .override(
-                                                    fontFamily:
-                                                        'Plus Jakarta Sans',
-                                                    color: Color(0xFF15161E),
-                                                    fontSize: 16.0,
-                                                    letterSpacing: 0.0,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                              colors: [
-                                                FlutterFlowTheme.of(context)
-                                                    .primary,
-                                                FlutterFlowTheme.of(context)
-                                                    .secondary
-                                              ],
-                                              gradientDirection:
-                                                  GradientDirection.ltr,
-                                              gradientType: GradientType.linear,
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding:
-                                                EdgeInsetsDirectional.fromSTEB(
-                                                    0.0, 4.0, 0.0, 0.0),
-                                            child: Text(
-                                              currentUserEmail,
-                                              style: FlutterFlowTheme.of(
-                                                      context)
-                                                  .labelMedium
-                                                  .override(
-                                                    fontFamily:
-                                                        'Plus Jakarta Sans',
-                                                    color: Color(0xFF606A85),
-                                                    fontSize: 14.0,
-                                                    letterSpacing: 0.0,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding:
-                                                EdgeInsetsDirectional.fromSTEB(
-                                                    0.0, 4.0, 0.0, 0.0),
-                                            child: Text(
-                                              'View Profile',
-                                              style: FlutterFlowTheme.of(
-                                                      context)
-                                                  .bodySmall
-                                                  .override(
-                                                    fontFamily:
-                                                        'Plus Jakarta Sans',
-                                                    color: Color(0xFF6F61EF),
-                                                    fontSize: 12.0,
-                                                    letterSpacing: 0.0,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
         body: LottieBackground(
           child: SafeArea(
             top: true,
@@ -648,12 +206,8 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                     ).animate().fadeIn(duration: 400.ms, curve: Curves.easeOut),
 
                     // Dream input section
-                    if (GeminiAPICall.aiGeneratedText(
-                                (_model.apiResultssd?.jsonBody ?? '')) ==
-                            null ||
-                        GeminiAPICall.aiGeneratedText(
-                                (_model.apiResultssd?.jsonBody ?? '')) ==
-                            '')
+                    if (_model.apiResponse == null ||
+                        _model.apiResponse == '')
                       Padding(
                         padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
                         child: Column(
@@ -882,12 +436,7 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                           curve: Curves.easeOut),
 
                     // Next button
-                    if (GeminiAPICall.aiGeneratedText(
-                                (_model.apiResultssd?.jsonBody ?? '')) ==
-                            null ||
-                        GeminiAPICall.aiGeneratedText(
-                                (_model.apiResultssd?.jsonBody ?? '')) ==
-                            '')
+                    if (_model.apiResponse == null || _model.apiResponse == '')
                       Padding(
                         padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
                         child: Column(
@@ -964,40 +513,184 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                               45 &&
                                           !_isGenerating
                                       ? () async {
-                                          setState(() {
-                                            _isLoading = true;
-                                            _isGenerating = true;
-                                          });
-
-                                          _model.apiResultssd =
-                                              await GeminiAPICall.call(
-                                            userInputText:
-                                                _model.textController.text,
-                                          );
-
-                                          // Add delay to show loading animation
-                                          await Future.delayed(
-                                              Duration(seconds: 5));
-
-                                          if ((_model.apiResultssd?.succeeded ??
-                                              true)) {
-                                            _model.apiResponse =
-                                                valueOrDefault<String>(
-                                              GeminiAPICall.aiGeneratedText(
-                                                (_model.apiResultssd
-                                                        ?.jsonBody ??
-                                                    ''),
+                                          if (_model.textController.text
+                                                  .split(' ')
+                                                  .where((word) =>
+                                                      word.isNotEmpty)
+                                                  .length <
+                                              45) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Please enter at least 45 words.',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                                duration: Duration(seconds: 2),
+                                                backgroundColor:
+                                                    Colors.red.shade400,
                                               ),
-                                              'unset',
                                             );
-                                            safeSetState(() {});
+                                            return;
                                           }
 
+                                          setState(() {
+                                            _isGenerating = true;
+                                            _isLoading = true;
+                                          });
+                                          safeSetState(() {});
+
+                                          try {
+                                            print('===== DEBUG: About to call Gemini API with REAL FIREBASE FUNCTION =====');
+                                            print('🤖 Calling Gemini API with Direct HTTP - Input length: ${_model.textController.text.length} characters');
+                                            
+                                            final userText = _model.textController.text.trim();
+                                            print('📝 First 100 chars of input: ${userText.substring(0, userText.length > 100 ? 100 : userText.length)}...');
+                                            
+                                            print('🔥 Making direct HTTP call to Firebase function: geminiAI');
+                                            // Call directly without helper
+                                            final response = await makeCloudCall(
+                                              'geminiAI',
+                                              {
+                                                'callName': 'GeminiAPICall',
+                                                'variables': {
+                                                  'userInputText': userText,
+                                                },
+                                              },
+                                            );
+                                            
+                                            print('===== DEBUG: Received response from Gemini API =====');
+                                            print('Response received. Type: ${response.runtimeType}, Keys: ${response is Map ? (response as Map).keys.toList() : "not a map"}');
+                                            
+                                            String extractedText = '';
+                                            
+                                            // Handle response - check for direct generatedText field first
+                                            if (response is Map) {
+                                              // Check if debugging is on to print more details
+                                              if (kDebugMode) {
+                                                print('Response map: ${response.toString().substring(0, response.toString().length > 200 ? 200 : response.toString().length)}...');
+                                              }
+                                              
+                                              // Try most likely path first - our updated field generatedText
+                                              if (response['generatedText'] is String) {
+                                                extractedText = response['generatedText'];
+                                                print('Found text from generatedText: ${extractedText.substring(0, extractedText.length > 50 ? 50 : extractedText.length)}...');
+                                              } 
+                                              // Handle response structure directly from Gemini API
+                                              else if (response['jsonBody'] is Map && (response['jsonBody'] as Map)['candidates'] is List) {
+                                                final jsonBody = response['jsonBody'] as Map;
+                                                final candidates = jsonBody['candidates'] as List;
+                                                
+                                                if (candidates.isNotEmpty) {
+                                                  final candidate = candidates[0] as Map;
+                                                  if (candidate['content'] is Map) {
+                                                    final content = candidate['content'] as Map;
+                                                    if (content['parts'] is List && (content['parts'] as List).isNotEmpty) {
+                                                      final parts = content['parts'] as List;
+                                                      extractedText = parts[0]['text']?.toString() ?? '';
+                                                      print('Found text from jsonBody.candidates: ${extractedText.substring(0, extractedText.length > 50 ? 50 : extractedText.length)}...');
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                              // Try various other response formats
+                                              else if (response['candidates'] is List && (response['candidates'] as List).isNotEmpty) {
+                                                final candidates = response['candidates'] as List;
+                                                final candidate = candidates[0];
+                                                
+                                                if (candidate is Map && candidate['content'] is Map) {
+                                                  final content = candidate['content'] as Map;
+                                                  if (content['parts'] is List && (content['parts'] as List).isNotEmpty) {
+                                                    final parts = content['parts'] as List;
+                                                    extractedText = parts[0]['text']?.toString() ?? '';
+                                                    print('Found text from direct candidates: ${extractedText.substring(0, extractedText.length > 50 ? 50 : extractedText.length)}...');
+                                                  }
+                                                }
+                                              }
+                                              // Try looking in body if nested
+                                              else if (response['body'] is Map) {
+                                                final body = response['body'] as Map;
+                                                if (body['candidates'] is List && (body['candidates'] as List).isNotEmpty) {
+                                                  final candidate = (body['candidates'] as List)[0];
+                                                  if (candidate is Map && candidate['content'] is Map) {
+                                                    final content = candidate['content'] as Map;
+                                                    if (content['parts'] is List && (content['parts'] as List).isNotEmpty) {
+                                                      extractedText = (content['parts'] as List)[0]['text']?.toString() ?? '';
+                                                      print('Found text from body.candidates: ${extractedText.substring(0, extractedText.length > 50 ? 50 : extractedText.length)}...');
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                              // Last resort if nothing else worked
+                                              else if (response['data'] is Map) {
+                                                final dataMap = response['data'] as Map;
+                                                print('Looking in data field, keys: ${dataMap.keys.toList()}');
+                                                
+                                                // Try to find text directly or through possible paths
+                                                if (dataMap['text'] is String) {
+                                                  extractedText = dataMap['text'];
+                                                } else if (dataMap['content'] is String) {
+                                                  extractedText = dataMap['content'];
+                                                } else if (dataMap['message'] is String) {
+                                                  extractedText = dataMap['message'];
+                                                }
+                                              }
+                                            }
+                                            
+                                            if (extractedText.isEmpty) {
+                                              print('SIMPLIFIED VERSION - No text found in response');
+                                              setState(() {
+                                                _isGenerating = false;
+                                                _isLoading = false;
+                                              });
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Failed to generate dream. Please try again.',
+                                                    style: TextStyle(color: Colors.white),
+                                                  ),
+                                                  backgroundColor: Colors.red.shade400,
+                                                  duration: Duration(seconds: 3),
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                            
+                                            _model.apiResponse = extractedText;
+                                            print('SIMPLIFIED VERSION - Setting API response: ${_model.apiResponse.substring(0, _model.apiResponse.length > 50 ? 50 : _model.apiResponse.length)}...');
+                                            
+                                            // Save the API result to the model for UI use
+                                            _model.apiResultssd = ApiCallResponse(
+                                              {'text': extractedText},
+                                              {},
+                                              200,
+                                            );
+                                          } catch (e) {
+                                            print('Error generating dream: $e');
+                                            setState(() {
+                                              _isGenerating = false;
+                                              _isLoading = false;
+                                            });
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Failed to generate dream: $e',
+                                                  style: TextStyle(color: Colors.white),
+                                                ),
+                                                backgroundColor: Colors.red.shade400,
+                                                duration: Duration(seconds: 3),
+                                              ),
+                                            );
+                                            return;
+                                          } finally {
                                           setState(() {
                                             _isLoading = false;
                                             _isGenerating = false;
                                           });
                                           safeSetState(() {});
+                                          }
                                         }
                                       : null,
                                   child: Container(
@@ -1095,12 +788,7 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                           .fadeIn(duration: 300.ms, curve: Curves.easeOut),
 
                     // AI Generated Content
-                    if (GeminiAPICall.aiGeneratedText(
-                                (_model.apiResultssd?.jsonBody ?? '')) !=
-                            null &&
-                        GeminiAPICall.aiGeneratedText(
-                                (_model.apiResultssd?.jsonBody ?? '')) !=
-                            '')
+                    if (_model.apiResponse != null && _model.apiResponse != '' && _model.apiResponse != 'unset')
                       Padding(
                         padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
                         child: Column(

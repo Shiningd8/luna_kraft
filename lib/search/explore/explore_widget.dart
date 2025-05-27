@@ -15,13 +15,91 @@ import 'explore_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:luna_kraft/components/standardized_post_item.dart';
 import '/widgets/lottie_background.dart';
+import '/widgets/custom_text_form_field.dart';
+import 'package:go_router/go_router.dart';
+import 'package:rxdart/rxdart.dart';
 export 'explore_model.dart';
 
 class ExploreWidget extends StatefulWidget {
-  const ExploreWidget({super.key});
+  const ExploreWidget({
+    super.key, 
+    this.searchType,
+    this.searchTerm,
+  });
 
   static String routeName = 'Explore';
   static String routePath = '/explore';
+  
+  // Add parameters for tag search
+  final String? searchType;
+  final String? searchTerm;
+  
+  // Add a static method to navigate to explore page with tag search
+  static void navigateToTagSearch(BuildContext context, String tag) {
+    print('DEBUG_TAG_SEARCH: navigateToTagSearch called with tag: $tag');
+    
+    try {
+      // Check if we're already on the explore page
+      final currentRoute = GoRouterState.of(context).matchedLocation;
+      final bool isAlreadyOnExplorePage = currentRoute.startsWith('/explore');
+      
+      print('DEBUG_TAG_SEARCH: Current route: $currentRoute, isAlreadyOnExplorePage: $isAlreadyOnExplorePage');
+      
+      // To preserve the bottom navigation bar, we need to use go_router properly
+      // We should avoid MaterialPageRoute which creates a navigator that hides the bottom navbar
+      if (isAlreadyOnExplorePage) {
+        // If already on the explore page, we need to:
+        // 1. First go to another tab (temporarily)
+        // 2. Then go back to explore with the tag
+        // This forces the explore page to rebuild with the new parameters
+        print('DEBUG_TAG_SEARCH: On explore page, using 2-step navigation to force refresh');
+        
+        // First navigate to home tab (or any other tab) - just enough to trigger a rebuild
+        context.go('/');
+        
+        // Then after a tiny delay, go back to explore with the tag parameter
+        Future.delayed(Duration(milliseconds: 50), () {
+          if (context.mounted) {
+            context.go('/explore?searchType=tag&searchTerm=$tag');
+            print('DEBUG_TAG_SEARCH: Second step - navigated to explore with parameters');
+          }
+        });
+      } else {
+        // If not on explore page, simply go to explore with the tag parameter
+        print('DEBUG_TAG_SEARCH: Not on explore page, navigating directly with parameters');
+        context.go('/explore?searchType=tag&searchTerm=$tag');
+      }
+
+      // Verify after a short delay that navigation was successful
+      Future.delayed(Duration(milliseconds: 300), () {
+        print('DEBUG_TAG_SEARCH: Navigation should be complete. Tag search for: $tag should be active.');
+      });
+    } catch (e) {
+      print('DEBUG_TAG_SEARCH: Error in navigateToTagSearch: $e');
+      
+      // Fallback using named route
+      try {
+        print('DEBUG_TAG_SEARCH: Using fallback named route navigation');
+        context.goNamed(
+          'Explore',
+          queryParameters: {
+            'searchType': 'tag',
+            'searchTerm': tag,
+          },
+        );
+      } catch (navError) {
+        print('DEBUG_TAG_SEARCH: Named route navigation failed: $navError');
+      
+        // Last resort using standard method
+        try {
+          print('DEBUG_TAG_SEARCH: Using standard go navigation as last resort');
+          context.go('/explore?searchType=tag&searchTerm=$tag');
+        } catch (finalError) {
+          print('DEBUG_TAG_SEARCH: All navigation methods failed: $finalError');
+        }
+      }
+    }
+  }
 
   @override
   State<ExploreWidget> createState() => _ExploreWidgetState();
@@ -39,21 +117,38 @@ class _ExploreWidgetState extends State<ExploreWidget> {
   bool _isSearching = false;
   Timer? _debounceTimer;
   bool _isSearchingTags = false; // Toggle between user search and tag search
+  String _timeFilter = 'week'; // Default time filter (week, day, month)
+  List<PostsRecord> _filteredSearchResults = [];
+  bool _processedSearchParams = false; // Track if we've already processed search parameters
 
   @override
   void initState() {
     super.initState();
+    print('DEBUG_TAG_SEARCH: ExploreWidget.initState called');
+    
     _model = detailedpost.createModel(context, () => ExploreModel());
     _model.searchBarTextController ??= _searchController;
 
+    print('DEBUG_TAG_SEARCH: Setting up search controller and default state');
+    
+    // Initialize default state
+    _isSearchingTags = false;
+    _isSearching = false;
+    _filteredSearchResults = [];
+    _postSearchResults = [];
+    _userSearchResults = [];
+    _processedSearchParams = false;
+    
+    // Clear the search controller initially - it will be set if parameters exist
+    _searchController.clear();
+    
+    // Add listener after initializing the controller
     _searchController.addListener(() {
-      if (mounted) {
-        _onSearchChanged(_searchController.text);
-      }
+      _onSearchChanged(_searchController.text);
     });
 
-    print('ExploreWidget initialized');
-
+    print('DEBUG_TAG_SEARCH: Initial state - _isSearchingTags=$_isSearchingTags, _isSearching=$_isSearching');
+    
     // Check if UserRecord collection exists
     UserRecord.collection.limit(1).get().then((snapshot) {
       print('UserRecord collection exists: ${snapshot.docs.isNotEmpty}');
@@ -61,8 +156,7 @@ class _ExploreWidgetState extends State<ExploreWidget> {
         final data = snapshot.docs.first.data();
         if (data != null) {
           final dataMap = data as Map<String, dynamic>;
-          print(
-              'First document has user_name: ${dataMap.containsKey('user_name')}');
+          print('First document has user_name: ${dataMap.containsKey('user_name')}');
         } else {
           print('First document data is null');
         }
@@ -71,17 +165,17 @@ class _ExploreWidgetState extends State<ExploreWidget> {
       print('Error checking UserRecord collection: $error');
     });
 
-    // On page load action.
-    SchedulerBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      _isSearching = false;
-      _postSearchResults = [];
-      safeSetState(() {});
-    });
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         safeSetState(() {});
+      }
+    });
+    
+    // Process navigation arguments - moved this after controller setup
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_processedSearchParams) {
+        print('DEBUG_TAG_SEARCH: About to process search parameters in postFrameCallback');
+        _processSearchParameters();
       }
     });
   }
@@ -89,10 +183,36 @@ class _ExploreWidgetState extends State<ExploreWidget> {
   @override
   void dispose() {
     _isDisposed = true;
-    _searchController.removeListener(() {});
-    _searchController.dispose();
+    print('DEBUG_TAG_SEARCH: ExploreWidget.dispose called - cleaning up resources');
+    
+    // Cancel any pending timers
     _debounceTimer?.cancel();
+    
+    // Remove listener before clearing the controller
+    _searchController.removeListener(() {
+      _onSearchChanged(_searchController.text);
+    });
+    
+    // Log the current search state before disposal
+    print('DEBUG_TAG_SEARCH: Dispose state - _isSearchingTags=$_isSearchingTags, _isSearching=$_isSearching, searchText=${_searchController.text}');
+    
+    // Properly dispose of the controller
+    _searchController.dispose();
     _model.dispose();
+    
+    // Clear cache variables to free memory
+    _exploreUserRecordList = [];
+    _userSearchResults = [];
+    _postSearchResults = [];
+    _filteredSearchResults = [];
+    
+    // Important: Also reset search state flags to ensure next instance starts fresh
+    _isSearchingTags = false;
+    _isSearching = false;
+    _processedSearchParams = false;
+    
+    print('DEBUG_TAG_SEARCH: ExploreWidget fully disposed');
+    
     super.dispose();
   }
 
@@ -148,19 +268,42 @@ class _ExploreWidgetState extends State<ExploreWidget> {
         if (query.isEmpty) {
           _userSearchResults = [];
           _postSearchResults = [];
+          _filteredSearchResults = [];
         } else if (!_isSearchingTags) {
           // Search for users
           final lowercaseQuery = query.toLowerCase();
           _userSearchResults = _exploreUserRecordList.where((user) {
+            // Skip current user
+            if (user.reference == null || currentUserReference == null) {
+              return false;
+            }
+            
+            if (user.reference == currentUserReference) {
+              return false;
+            }
+            
+            // Skip blocked users (safely check for null)
+            if (currentUserDocument != null && 
+                currentUserDocument!.blockedUsers.contains(user.reference)) {
+              return false;
+            }
+            
+            // Skip users who have blocked the current user (safely check for null)
+            if (currentUserReference != null &&
+                user.blockedUsers != null &&
+                user.blockedUsers.contains(currentUserReference)) {
+              return false;
+            }
+            
             final userName = (user.userName ?? '').toLowerCase();
             final displayName = (user.displayName ?? '').toLowerCase();
             return userName.contains(lowercaseQuery) ||
                 displayName.contains(lowercaseQuery);
           }).toList();
         } else {
-          // For tag search, we'll trigger a rebuild which will use the StreamBuilder
-          // for post filtering
-          print('Searching for tag: ${query.trim()}');
+          // For tag search, ensure we're searching without hashtag if present
+          final cleanQuery = query.startsWith('#') ? query.substring(1).trim() : query.trim();
+          print('Searching for tag: $cleanQuery');
         }
       });
     });
@@ -278,7 +421,8 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                         ],
                                       ),
                                       child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(28),
+                                        borderRadius:
+                                            BorderRadius.circular(28),
                                         child: Stack(
                                           children: [
                                             // Animated sliding indicator with glow
@@ -626,7 +770,7 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                         ),
                                       ],
                                     ),
-                                    child: TextFormField(
+                                    child: CustomTextFormField(
                                       controller: _searchController,
                                       decoration: InputDecoration(
                                         hintText: _isSearchingTags
@@ -703,8 +847,6 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                                             fontFamily: 'Figtree',
                                             fontSize: 16,
                                           ),
-                                      textAlignVertical:
-                                          TextAlignVertical.center,
                                     ),
                                   ),
                                 ),
@@ -798,7 +940,7 @@ class _ExploreWidgetState extends State<ExploreWidget> {
       }
 
       return ListView.builder(
-        padding: EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 80), // Added bottom padding of 80
         itemCount: _userSearchResults.length,
         itemBuilder: (context, index) {
           final userItem = _userSearchResults[index];
@@ -813,8 +955,48 @@ class _ExploreWidgetState extends State<ExploreWidget> {
     // Tag search mode
     return StreamBuilder<List<PostsRecord>>(
       stream: queryPostsRecord(
-        queryBuilder: (postsRecord) =>
-            postsRecord.orderBy('date', descending: true),
+        queryBuilder: (postsRecord) {
+          // Start with all the user references we want to include
+          final userReferences = [
+            // Include posts from users that the current user doesn't follow (if not private)
+            ..._exploreUserRecordList
+                .where((user) =>
+                    !user.isPrivate &&
+                    !(currentUserDocument?.blockedUsers
+                            .contains(user.reference) ??
+                        false))
+                .map((user) => user.reference)
+                .toList(),
+            // Also include posts from users that the current user follows
+            ...(currentUserDocument?.followingUsers ?? []),
+          ];
+          
+          // Make sure we include current user in the list
+          if (currentUserReference != null && !userReferences.contains(currentUserReference)) {
+            userReferences.add(currentUserReference!);
+          }
+          
+          // Check if we have any user references to query
+          if (userReferences.isEmpty) {
+            print('No user references available for tag search query');
+            // Return a default query that will return no results but won't error
+            return postsRecord.where('id', isEqualTo: 'no_results');
+          }
+          
+          // Firestore has a limit of 10 items in a whereIn clause
+          // If we have more than 10 users, we need to use a different approach
+          if (userReferences.length > 10) {
+            print('More than 10 user references (${userReferences.length}), using alternative query');
+            // Use a simpler query that doesn't use whereIn
+            return postsRecord
+                .where('is_private', isEqualTo: false)
+                .orderBy('date', descending: true);
+          }
+                    
+          return postsRecord
+              .where('poster', whereIn: userReferences)
+              .orderBy('date', descending: true);
+        },
       ),
       builder: (context, snapshot) {
         // Add error handling
@@ -845,13 +1027,25 @@ class _ExploreWidgetState extends State<ExploreWidget> {
           );
         }
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        // Show loading UI only on first load
+        if (snapshot.connectionState == ConnectionState.waiting && _model.isFirstLoad) {
           return Center(
             child: CircularProgressIndicator(),
           );
         }
 
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+        // Process search results
+        List<PostsRecord> postsToFilter = snapshot.data ?? [];
+        
+        // If we're waiting for new data but have previous results, use the cached data to prevent flickering
+        if (snapshot.connectionState == ConnectionState.waiting && !_model.isFirstLoad && _filteredSearchResults.isNotEmpty) {
+          postsToFilter = _filteredSearchResults;
+        } else if (snapshot.hasData) {
+          // Cache the new results
+          _postSearchResults = snapshot.data!;
+        }
+
+        if (postsToFilter.isEmpty) {
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -863,115 +1057,7 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                 ),
                 SizedBox(height: 12),
                 Text(
-                  'No posts found',
-                  style: FlutterFlowTheme.of(context).titleMedium,
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Try again later',
-                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                        fontFamily: 'Figtree',
-                        color: FlutterFlowTheme.of(context).secondaryText,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
-        }
-
-        // Print all post tags for debugging
-        for (var post in snapshot.data!) {
-          print('Post: ${post.title}, Tags: ${post.tags}');
-        }
-
-        final searchText = _searchController.text.toLowerCase().trim();
-        final filteredPosts = snapshot.data!.where((post) {
-          try {
-            // Skip posts with no poster reference
-            if (post.poster == null) {
-              return false;
-            }
-
-            // Skip posts from private accounts that the user doesn't follow
-            final posterRef = post.poster!;
-
-            // Check if post creator has a private account
-            bool isPrivateAccount = false;
-            bool isFollowingUser = false;
-
-            // Find the user in our cached user list
-            for (var user in _exploreUserRecordList) {
-              if (user.reference == posterRef) {
-                isPrivateAccount = user.isPrivate;
-                isFollowingUser = currentUserDocument?.followingUsers
-                        .contains(user.reference) ??
-                    false;
-                break;
-              }
-            }
-
-            // Skip posts from private accounts that the user doesn't follow
-            if (isPrivateAccount && !isFollowingUser) {
-              return false;
-            }
-
-            // Safely handle potentially null or empty tags
-            if (post.tags == null || post.tags.isEmpty) {
-              return false;
-            }
-
-            // Match posts that have the tag as a whole word or part of a tag
-            final postTags = post.tags.toLowerCase();
-
-            // Debug prints
-            print('Searching for "$searchText" in post tags: "$postTags"');
-
-            // Try different matching strategies:
-            // 1. Exact match
-            if (postTags == searchText) {
-              print('Exact match found!');
-              return true;
-            }
-
-            // 2. Contains match
-            if (postTags.contains(searchText)) {
-              print('Contains match found!');
-              return true;
-            }
-
-            // 3. Word boundary match (if tags are comma-separated)
-            if (postTags
-                .split(',')
-                .map((tag) => tag.trim())
-                .any((tag) => tag.contains(searchText))) {
-              print('Tag list match found!');
-              return true;
-            }
-
-            return false;
-          } catch (e) {
-            print('Error filtering post: $e');
-            return false;
-          }
-        }).toList();
-
-        print(
-            'Found ${filteredPosts.length} matching posts for tag "$searchText"');
-
-        if (filteredPosts.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.search_off_rounded,
-                  color: FlutterFlowTheme.of(context).secondaryText,
-                  size: 48,
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'No posts found with tag: "$searchText"',
+                  'No posts found with tag: "${_searchController.text}"',
                   style: FlutterFlowTheme.of(context).titleMedium,
                 ),
                 SizedBox(height: 4),
@@ -986,6 +1072,125 @@ class _ExploreWidgetState extends State<ExploreWidget> {
               ],
             ),
           );
+        }
+
+        final searchText = _searchController.text.toLowerCase().trim();
+        
+        // Only filter posts if we have a valid search term
+        List<PostsRecord> filteredPosts;
+        
+        // Cache search results to prevent flickering
+        if (!_model.isFirstLoad && _filteredSearchResults.isNotEmpty && snapshot.connectionState == ConnectionState.waiting) {
+          // Use previously filtered results while waiting for new data
+          filteredPosts = _filteredSearchResults;
+        } else {
+          try {
+            // Get clean search term once for efficiency
+            final cleanSearchText = searchText.toLowerCase().trim();
+            
+            if (cleanSearchText.isEmpty) {
+              filteredPosts = []; // No search term, no results
+            } else {
+              // Filter the posts based on the search text
+              filteredPosts = postsToFilter.where((post) {
+                try {
+                  // Skip posts with no poster reference
+                  if (post.poster == null) {
+                    return false;
+                  }
+                  
+                  // First check: Private posts (personal posts)
+                  // Private posts should ONLY be visible to their creator, regardless of followers
+                  if (post.isPrivate) {
+                    return post.poster == currentUserReference; // Only show to creator
+                  }
+  
+                  // Second check: Posts from private accounts (but public posts)
+                  // These should only be visible to followers
+                  final posterRef = post.poster!;
+                  bool isPrivateAccount = false;
+                  bool isFollowingUser = false;
+  
+                  // Find the user in our cached user list
+                  for (var user in _exploreUserRecordList) {
+                    if (user.reference == posterRef) {
+                      isPrivateAccount = user.isPrivate;
+                      isFollowingUser = currentUserDocument?.followingUsers
+                              .contains(user.reference) ??
+                          false;
+                      break;
+                    }
+                  }
+  
+                  // If this is a private account and the current user isn't following them,
+                  // don't show the post (unless it's the current user's own post)
+                  if (isPrivateAccount && !isFollowingUser && post.poster != currentUserReference) {
+                    return false;
+                  }
+  
+                  // Safely handle potentially null or empty tags
+                  if (post.tags == null || post.tags.isEmpty) {
+                    return false;
+                  }
+  
+                  // Split the post tags by comma and trim each tag
+                  final postTagsList = post.tags
+                      .toLowerCase()
+                      .split(',')
+                      .map((t) => t.trim())
+                      .where((t) => t.isNotEmpty)
+                      .toList();
+                  
+                  // Try different matching strategies:
+                  // 1. Exact tag match (preferred)
+                  if (postTagsList.contains(cleanSearchText)) {
+                    return true;
+                  }
+                  
+                  // 2. Starts with search (for partial tag search)
+                  for (var tag in postTagsList) {
+                    if (tag.startsWith(cleanSearchText)) {
+                      return true;
+                    }
+                  }
+                  
+                  // 3. Contains match (least preferred, but useful for partial text)
+                  if (cleanSearchText.length > 2) { // Only for search terms longer than 2 characters
+                    for (var tag in postTagsList) {
+                      if (tag.contains(cleanSearchText)) {
+                        return true;
+                      }
+                    }
+                  }
+  
+                  return false;
+                } catch (e) {
+                  print('Error filtering post: $e');
+                  return false;
+                }
+              }).toList();
+            }
+            
+            // Cache the filtered results
+            _filteredSearchResults = filteredPosts;
+          } catch (e) {
+            print('Error during tag filtering: $e');
+            // Use empty list to avoid crash
+            filteredPosts = [];
+          }
+        }
+        
+        // Only print debug information on first run to reduce log spam
+        if (_model.isFirstLoad) {
+          print('Found ${filteredPosts.length} matching posts for tag "$searchText"');
+          // Mark that we've completed the first load
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _model.isFirstLoad = false;
+              });
+            }
+          });
         }
 
         return Column(
@@ -1110,41 +1315,44 @@ class _ExploreWidgetState extends State<ExploreWidget> {
             ),
             // List of posts
             Expanded(
-              child: ListView.builder(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                itemCount: filteredPosts.length,
-                itemBuilder: (context, index) {
-                  final post = filteredPosts[index];
-                  // Skip rendering posts with missing poster references
-                  if (post.poster == null) {
-                    return SizedBox(); // Return empty widget for invalid posts
-                  }
-
-                  // Double-check that post isn't from a private account that user doesn't follow
-                  bool isPrivateAccount = false;
-                  bool isFollowingUser = false;
-
-                  // Find the user in our cached user list
-                  for (var user in _exploreUserRecordList) {
-                    if (user.reference == post.poster) {
-                      isPrivateAccount = user.isPrivate;
-                      isFollowingUser = currentUserDocument?.followingUsers
-                              .contains(user.reference) ??
-                          false;
-                      break;
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 20), // Extra bottom padding
+                child: ListView.builder(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 80), // Added bottom padding of 80
+                  itemCount: filteredPosts.length,
+                  itemBuilder: (context, index) {
+                    final post = filteredPosts[index];
+                    // Skip rendering posts with missing poster references
+                    if (post.poster == null) {
+                      return SizedBox(); // Return empty widget for invalid posts
                     }
-                  }
 
-                  // Skip posts from private accounts that the user doesn't follow
-                  if (isPrivateAccount && !isFollowingUser) {
-                    return SizedBox(); // Don't display posts from private accounts
-                  }
+                    // Double-check that post isn't from a private account that user doesn't follow
+                    bool isPrivateAccount = false;
+                    bool isFollowingUser = false;
 
-                  return Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: _buildPostCard(post),
-                  );
-                },
+                    // Find the user in our cached user list
+                    for (var user in _exploreUserRecordList) {
+                      if (user.reference == post.poster) {
+                        isPrivateAccount = user.isPrivate;
+                        isFollowingUser = currentUserDocument?.followingUsers
+                                .contains(user.reference) ??
+                            false;
+                        break;
+                      }
+                    }
+
+                    // Skip posts from private accounts that the user doesn't follow
+                    if (isPrivateAccount && !isFollowingUser) {
+                      return SizedBox(); // Don't display posts from private accounts
+                    }
+
+                    return Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: _buildPostCard(post),
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -1211,7 +1419,8 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                       user.reference != currentUserReference &&
                       !(currentUserDocument?.blockedUsers
                               .contains(user.reference) ??
-                          false))
+                          false) &&
+                      !(user.blockedUsers.contains(currentUserReference) ?? false))
                   .toList();
 
               final uservariable = filteredUsers
@@ -1248,46 +1457,305 @@ class _ExploreWidgetState extends State<ExploreWidget> {
             },
           ),
         ),
-        // Recent Posts Section
+        // Popular Posts Section with Time Filter Toggle
         SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
-            child: Container(
-              margin: EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Column(
+              children: [
+                Container(
+                  margin: EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: FlutterFlowTheme.of(context)
+                              .primary
+                              .withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.favorite_rounded,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 18,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Most Liked Posts',
+                              style:
+                                  FlutterFlowTheme.of(context).titleMedium.override(
+                                        fontFamily: 'Outfit',
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: FlutterFlowTheme.of(context).primary,
+                                      ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Time Filter Toggle
+                Container(
+                  margin: EdgeInsets.symmetric(vertical: 10),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                      child: Container(
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.25),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.15),
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.25),
+                              blurRadius: 20,
+                              spreadRadius: -5,
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              // Calculate positions based on container width
+                              final containerWidth = constraints.maxWidth;
+                              final tabWidth = containerWidth / 3;
+                              
+                              return Stack(
+                                children: [
+                                  // Animated sliding indicator
+                                  AnimatedPositioned(
+                                    duration: Duration(milliseconds: 400),
+                                    curve: Curves.easeOutBack,
+                                    left: _timeFilter == 'day' 
+                                        ? 0 
+                                        : _timeFilter == 'week' 
+                                            ? tabWidth
+                                            : tabWidth * 2,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: tabWidth,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(28),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Color(0xFF7963DF).withOpacity(0.8),
+                                            blurRadius: 25,
+                                            spreadRadius: -5,
+                                          ),
+                                        ],
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(28),
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(28),
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                Color(0xFF8A74F9),
+                                                Color(0xFF6953CF),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Toggle buttons
+                                  Row(
+                                    children: [
+                                      // Today button
+                                      Expanded(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () {
+                                              if (_timeFilter != 'day') {
+                                                HapticFeedback.selectionClick();
+                                                setState(() => _timeFilter = 'day');
+                                              }
+                                            },
+                                            splashColor: Colors.transparent,
+                                            highlightColor: Colors.transparent,
+                                            child: Center(
+                                              child: Text(
+                                                'Today',
+                                                style: TextStyle(
+                                                  color: _timeFilter == 'day'
+                                                      ? Colors.white
+                                                      : FlutterFlowTheme.of(context).secondaryText,
+                                                  fontWeight: _timeFilter == 'day'
+                                                      ? FontWeight.w600
+                                                      : FontWeight.normal,
+                                                  fontSize: _timeFilter == 'day' ? 16 : 14,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      // Week button
+                                      Expanded(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () {
+                                              if (_timeFilter != 'week') {
+                                                HapticFeedback.selectionClick();
+                                                setState(() => _timeFilter = 'week');
+                                              }
+                                            },
+                                            splashColor: Colors.transparent,
+                                            highlightColor: Colors.transparent,
+                                            child: Center(
+                                              child: Text(
+                                                'This Week',
+                                                style: TextStyle(
+                                                  color: _timeFilter == 'week'
+                                                      ? Colors.white
+                                                      : FlutterFlowTheme.of(context).secondaryText,
+                                                  fontWeight: _timeFilter == 'week'
+                                                      ? FontWeight.w600
+                                                      : FontWeight.normal,
+                                                  fontSize: _timeFilter == 'week' ? 16 : 14,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      // Month button
+                                      Expanded(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () {
+                                              if (_timeFilter != 'month') {
+                                                HapticFeedback.selectionClick();
+                                                setState(() => _timeFilter = 'month');
+                                              }
+                                            },
+                                            splashColor: Colors.transparent,
+                                            highlightColor: Colors.transparent,
+                                            child: Center(
+                                              child: Text(
+                                                'This Month',
+                                                style: TextStyle(
+                                                  color: _timeFilter == 'month'
+                                                      ? Colors.white
+                                                      : FlutterFlowTheme.of(context).secondaryText,
+                                                  fontWeight: _timeFilter == 'month'
+                                                      ? FontWeight.w600
+                                                      : FontWeight.normal,
+                                                  fontSize: _timeFilter == 'month' ? 16 : 14,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              );
+                            }
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Dynamic status indicator
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Builder(
+              builder: (context) {
+                // Create status message based on _timeFilter
+                String timeHeaderMessage = '';
+                switch (_timeFilter) {
+                  case 'day':
+                    timeHeaderMessage = 'Showing most liked posts from today';
+                    break;
+                  case 'week':
+                    timeHeaderMessage = 'Showing most liked posts from this week';
+                    break;
+                  case 'month':
+                    timeHeaderMessage = 'Showing most liked posts from this month';
+                    break;
+                }
+                
+                return AnimatedOpacity(
+                  opacity: 1.0,
+                  duration: Duration(milliseconds: 500),
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: FlutterFlowTheme.of(context)
-                          .primary
-                          .withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
+                      color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                        width: 1,
+                      ),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.article_rounded,
+                          Icons.auto_awesome,
                           color: FlutterFlowTheme.of(context).primary,
-                          size: 16,
+                          size: 18,
                         ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Recent Posts',
-                          style:
-                              FlutterFlowTheme.of(context).titleMedium.override(
-                                    fontFamily: 'Outfit',
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: FlutterFlowTheme.of(context).primary,
-                                  ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            timeHeaderMessage,
+                            style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                  fontFamily: 'Figtree',
+                                  fontSize: 14,
+                                  color: FlutterFlowTheme.of(context).primaryText,
+                                ),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ),
@@ -1297,22 +1765,10 @@ class _ExploreWidgetState extends State<ExploreWidget> {
           sliver: StreamBuilder<List<PostsRecord>>(
             stream: queryPostsRecord(
               queryBuilder: (postsRecord) =>
-                  postsRecord.where('poster', whereIn: [
-                ...exploreUserRecordList
-                    .where((user) =>
-                        !user.isPrivate &&
-                        !(currentUserDocument?.blockedUsers
-                                .contains(user.reference) ??
-                            false) &&
-                        !(currentUserDocument?.followingUsers
-                                .contains(user.reference) ??
-                            false))
-                    .map((user) => user.reference)
-                    .toList(),
-              ]).orderBy('date', descending: true),
+                  postsRecord.where('is_private', isEqualTo: false).orderBy('date', descending: true),
             ),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return SliverToBoxAdapter(
                   child: Center(
                     child: SizedBox(
@@ -1328,9 +1784,33 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                 );
               }
 
-              List<PostsRecord> posts = snapshot.data!;
+              if (snapshot.hasError) {
+                print('Error loading posts: ${snapshot.error}');
+                return SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: FlutterFlowTheme.of(context).error,
+                            size: 40,
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            'Error loading posts',
+                            style: FlutterFlowTheme.of(context).titleMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
 
-              if (posts.isEmpty) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.all(24),
@@ -1355,9 +1835,10 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                 );
               }
 
+              List<PostsRecord> allPosts = snapshot.data!;
+
               // Filter out posts that don't have a valid poster reference
-              final validPosts =
-                  posts.where((post) => post.poster != null).toList();
+              final validPosts = allPosts.where((post) => post.poster != null).toList();
 
               if (validPosts.isEmpty) {
                 return SliverToBoxAdapter(
@@ -1384,16 +1865,114 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                 );
               }
 
+              // Filter for posts from non-private, non-blocked users
+              final filteredByUserPosts = validPosts.where((post) {
+                // Find the user for this post
+                final posterRef = post.poster!;
+                bool isPrivateAccount = false;
+                bool isBlockedUser = false;
+                bool hasBlockedCurrentUser = false;
+
+                // Get user info from our cached user list
+                for (var user in _exploreUserRecordList) {
+                  if (user.reference == posterRef) {
+                    isPrivateAccount = user.isPrivate;
+                    isBlockedUser = currentUserDocument?.blockedUsers.contains(user.reference) ?? false;
+                    hasBlockedCurrentUser = user.blockedUsers.contains(currentUserReference) ?? false;
+                    break;
+                  }
+                }
+
+                // Skip posts from private accounts, blocked users, or users who blocked current user
+                if (isPrivateAccount || isBlockedUser || hasBlockedCurrentUser) {
+                  return false;
+                }
+
+                return true;
+              }).toList();
+              
+              // Get the appropriate time cutoff based on the current time filter
+              DateTime timeCutoff = DateTime.now();
+              switch (_timeFilter) {
+                case 'day':
+                  timeCutoff = DateTime.now().subtract(Duration(hours: 24));
+                  break;
+                case 'week':
+                  timeCutoff = DateTime.now().subtract(Duration(days: 7));
+                  break;
+                case 'month':
+                  timeCutoff = DateTime.now().subtract(Duration(days: 30));
+                  break;
+                default:
+                  timeCutoff = DateTime.now().subtract(Duration(days: 7));
+              }
+              
+              // Filter posts by time period
+              final filteredByTimePosts = filteredByUserPosts
+                  .where((post) => post.date != null && post.date!.isAfter(timeCutoff))
+                  .toList();
+                  
+              // Sort posts by like count (descending)
+              filteredByTimePosts.sort((a, b) => b.likes.length.compareTo(a.likes.length));
+
+              final postsToShow = filteredByTimePosts.isEmpty 
+                  ? (filteredByUserPosts..sort((a, b) => b.likes.length.compareTo(a.likes.length)))
+                  : filteredByTimePosts;
+
+              // Update status message if no posts are found for the selected time period
+              String statusMessage = '';
+              if (filteredByTimePosts.isEmpty && filteredByUserPosts.isNotEmpty) {
+                switch (_timeFilter) {
+                  case 'day':
+                    statusMessage = 'No posts found from today. Showing all-time most liked posts instead.';
+                    break;
+                  case 'week':
+                    statusMessage = 'No posts found from this week. Showing all-time most liked posts instead.';
+                    break;
+                  case 'month':
+                    statusMessage = 'No posts found from this month. Showing all-time most liked posts instead.';
+                    break;
+                }
+              }
+              
+              // Take the top posts to display (limit to 50)
+              final finalPostsToShow = postsToShow.take(50).toList();
+
+              if (finalPostsToShow.isEmpty) {
+                return SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.search_off_rounded,
+                            color: FlutterFlowTheme.of(context).secondaryText,
+                            size: 48,
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            'No matching posts found',
+                            style: FlutterFlowTheme.of(context).titleMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+
               return SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    final post = validPosts[index];
+                    final post = finalPostsToShow[index];
                     return Padding(
                       padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
                       child: _buildPostCard(post),
                     );
                   },
-                  childCount: validPosts.length,
+                  childCount: finalPostsToShow.length,
                 ),
               );
             },
@@ -1599,22 +2178,42 @@ class _ExploreWidgetState extends State<ExploreWidget> {
     if (post.poster == null) {
       return SizedBox(); // Don't display posts without a valid poster reference
     }
+    
+    // Use ValueKey to maintain widget identity across rebuilds
+    return KeyedSubtree(
+      key: ValueKey('post-${post.reference.id}'),
+      child: StreamBuilder<UserRecord>(
+        stream: UserRecord.getDocument(post.poster!),
+        builder: (context, snapshot) {
+          // Try to find user in cached user list first
+          UserRecord? cachedUser;
+          for (var user in _exploreUserRecordList) {
+            if (user.reference == post.poster) {
+              cachedUser = user;
+              break;
+            }
+          }
+          
+          // Handle error case - user document doesn't exist or other error
+          if (snapshot.hasError) {
+            print('Error loading user for post ${post.reference.id}: ${snapshot.error}');
+            
+            // If we have cached user data, use it instead
+            if (cachedUser != null) {
+              return _buildPostCardContent(post, cachedUser);
+            }
+            
+            return SizedBox(); // Don't display the post if we can't load the user
+          }
 
-    return StreamBuilder<UserRecord>(
-      stream: UserRecord.getDocument(post.poster!),
-      builder: (context, snapshot) {
-        // Handle error case - user document doesn't exist or other error
-        if (snapshot.hasError) {
-          print(
-              'Error loading user for post ${post.reference.id}: ${snapshot.error}');
-          return SizedBox(); // Don't display the post if we can't load the user
-        }
-
-        if (!snapshot.hasData) {
-          // Instead of showing a loading indicator, we'll check if this might be a deleted user
-          if (snapshot.connectionState == ConnectionState.done) {
-            // If the connection is done but we have no data, the user probably doesn't exist
-            return SizedBox(); // Don't display posts from non-existent users
+          // If we have data from the stream, use it
+          if (snapshot.hasData) {
+            return _buildPostCardContent(post, snapshot.data!);
+          }
+          
+          // If we're waiting but have cached user data, use the cached version
+          if (cachedUser != null) {
+            return _buildPostCardContent(post, cachedUser);
           }
 
           // Only show brief loading if we're still waiting for a response
@@ -1647,57 +2246,58 @@ class _ExploreWidgetState extends State<ExploreWidget> {
               ),
             ),
           );
-        }
-
-        final user = snapshot.data!;
-
-        // Create a custom enhanced post card with glassmorphism
-        return TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: 0.8, end: 1.0),
-          duration: Duration(milliseconds: 500),
-          curve: Curves.easeOutBack,
-          builder: (context, scale, child) {
-            return Transform.scale(
-              scale: scale,
-              child: Container(
-                margin: EdgeInsets.only(bottom: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: FlutterFlowTheme.of(context)
-                            .secondaryBackground
-                            .withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: FlutterFlowTheme.of(context)
-                              .primary
-                              .withOpacity(0.3),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 15,
-                            spreadRadius: -5,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: StandardizedPostItem(
-                        post: post,
-                        user: user,
-                        animateEntry: true,
-                        animationIndex: 0,
-                      ),
+        },
+      ),
+    );
+  }
+  
+  // Extract the post card content to a separate method for better organization
+  Widget _buildPostCardContent(PostsRecord post, UserRecord posterUser) {
+    // Create a custom enhanced post card with glassmorphism
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.8, end: 1.0),
+      duration: Duration(milliseconds: 500),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            margin: EdgeInsets.only(bottom: 16),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: FlutterFlowTheme.of(context)
+                        .secondaryBackground
+                        .withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: FlutterFlowTheme.of(context)
+                          .primary
+                          .withOpacity(0.3),
+                      width: 1.5,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 15,
+                        spreadRadius: -5,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: StandardizedPostItem(
+                    post: post,
+                    user: posterUser,
+                    animateEntry: true,
+                    animationIndex: 0,
                   ),
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
@@ -1791,7 +2391,7 @@ class _ExploreWidgetState extends State<ExploreWidget> {
                               color: FlutterFlowTheme.of(context)
                                   .primary
                                   .withOpacity(0.3 * value),
-                              blurRadius: 12 * value,
+                              blurRadius: 15 * value,
                               spreadRadius: -2,
                             ),
                           ],
@@ -1925,5 +2525,145 @@ class _ExploreWidgetState extends State<ExploreWidget> {
         ),
       ),
     );
+  }
+
+  // Extracted method to process search parameters for better organization
+  void _processSearchParameters() {
+    if (!mounted || _processedSearchParams) return;
+    
+    // Mark as processed to prevent double processing
+    _processedSearchParams = true;
+    
+    print('DEBUG_TAG_SEARCH: Start processing search parameters');
+    
+    // Print route information for debugging
+    print('DEBUG_TAG_SEARCH: Widget params - searchType: ${widget.searchType}, searchTerm: ${widget.searchTerm}');
+    
+    // First check direct widget constructor parameters - do this first since it doesn't rely on router state
+    if (widget.searchType == 'tag' && widget.searchTerm != null && widget.searchTerm!.isNotEmpty) {
+      print('DEBUG_TAG_SEARCH: Using direct widget parameters for search: ${widget.searchTerm}');
+      _setupTagSearch(widget.searchTerm!);
+      return; // Exit early to avoid attempting to use GoRouterState
+    }
+    
+    // Only try to access GoRouterState if we're in the context of a GoRouter
+    GoRouterState? goRouterState;
+    Map<String, String>? queryParams;
+    
+    try {
+      // Try to get GoRouterState, but don't crash if it's not available
+      goRouterState = GoRouterState.of(context);
+      queryParams = goRouterState.uri.queryParameters;
+      print('DEBUG_TAG_SEARCH: GoRouter state: ${goRouterState.uri}');
+      print('DEBUG_TAG_SEARCH: Query parameters: $queryParams');
+    } catch (e) {
+      print('DEBUG_TAG_SEARCH: Unable to access GoRouterState: $e');
+      // If we can't access router state but have direct parameters, we already processed them above
+      // Nothing more to do here
+      if (widget.searchType != null && widget.searchTerm != null) return;
+      
+      queryParams = null; // Ensure it's null if we couldn't get it
+    }
+    
+    // Store whether we processed any parameters from the URL
+    bool processedUrlParameters = false;
+    
+    // Check for route arguments from Navigator
+    final modalRoute = ModalRoute.of(context);
+    final routeArgs = modalRoute?.settings.arguments as Map<String, dynamic>?;
+    print('DEBUG_TAG_SEARCH: Route arguments: $routeArgs');
+    
+    // Then check query parameters (GoRouter)
+    if (queryParams != null && queryParams.containsKey('searchTerm')) {
+      final searchType = queryParams['searchType'] ?? 'tag';  // Default to tag search if not specified
+      final searchTerm = queryParams['searchTerm'];
+      print('DEBUG_TAG_SEARCH: Found query parameter searchType: $searchType, searchTerm: $searchTerm');
+      
+      if (searchTerm != null && searchTerm.isNotEmpty) {
+        print('DEBUG_TAG_SEARCH: Setting up tag search for: $searchTerm (from query params)');
+        // Set search mode to tags if searchType is 'tag' or not specified
+        _isSearchingTags = (searchType == 'tag');
+        // Set the search text
+        _searchController.text = searchTerm;
+        // Trigger search
+        _isSearching = true;
+        // Mark as not first load
+        _model.isFirstLoad = false;
+        processedUrlParameters = true;
+        setState(() {});
+        
+        // Try to clear URL parameters after processing to prevent persistent search
+        try {
+          if (mounted && goRouterState != null) {
+            print('DEBUG_TAG_SEARCH: Clearing URL parameters to prevent persistence');
+            
+            // Use replaceNamed to keep the same route but without parameters
+            // This prevents the parameters from persisting in browser history
+            context.replaceNamed('Explore');
+          }
+        } catch (e) {
+          print('DEBUG_TAG_SEARCH: Error clearing URL: $e');
+        }
+      }
+    } 
+    // Then check route arguments (Navigator)
+    else if (routeArgs != null && routeArgs.containsKey('searchTerm')) {
+      final searchType = routeArgs['searchType'] as String? ?? 'tag';  // Default to tag search
+      final searchTerm = routeArgs['searchTerm'] as String?;
+      print('DEBUG_TAG_SEARCH: Found route argument searchType: $searchType, searchTerm: $searchTerm');
+      
+      if (searchTerm != null && searchTerm.isNotEmpty) {
+        print('DEBUG_TAG_SEARCH: Setting up tag search for: $searchTerm (from route args)');
+        _setupTagSearch(searchTerm);
+        processedUrlParameters = true;
+      }
+    } else {
+      // No search parameters found, explicitly reset search state
+      print('DEBUG_TAG_SEARCH: No search parameters found, resetting search state');
+      _resetSearchState();
+    }
+    
+    print('DEBUG_TAG_SEARCH: Finished processing search parameters, processedUrlParameters=$processedUrlParameters');
+  }
+  
+  // Helper method to reset search state
+  void _resetSearchState() {
+    print('DEBUG_TAG_SEARCH: Explicitly resetting search state');
+    _searchController.clear();
+    _isSearchingTags = false;
+    _isSearching = false;
+    _filteredSearchResults = [];
+    _postSearchResults = [];
+    _userSearchResults = [];
+    _model.isFirstLoad = true;
+    setState(() {});
+  }
+  
+  // Helper method to set up tag search with a given term
+  void _setupTagSearch(String searchTerm) {
+    print('DEBUG_TAG_SEARCH: Setting up tag search in _setupTagSearch method: $searchTerm');
+    
+    // Normalize the search term (remove hashtag if present, trim spaces)
+    String normalizedTerm = searchTerm.trim();
+    if (normalizedTerm.startsWith('#')) {
+      normalizedTerm = normalizedTerm.substring(1).trim();
+    }
+    
+    print('DEBUG_TAG_SEARCH: Normalized search term: "$normalizedTerm" (original: "$searchTerm")');
+    
+    // Set search mode to tags
+    _isSearchingTags = true;
+    
+    // Set the search text
+    _searchController.text = normalizedTerm;
+    
+    // Trigger search
+    _isSearching = true;
+    
+    // Mark as not first load
+    _model.isFirstLoad = false;
+    
+    print('DEBUG_TAG_SEARCH: Search state updated: _isSearchingTags=$_isSearchingTags, _isSearching=$_isSearching');
+    setState(() {});
   }
 }

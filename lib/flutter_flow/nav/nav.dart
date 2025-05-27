@@ -8,6 +8,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/services.dart';
@@ -26,6 +27,8 @@ import '/auth/base_auth_user_provider.dart';
 import '/backend/backend.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/flutter_flow/flutter_flow_icon_button.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
 import '/signreg/signin/signin_widget.dart';
 import '/signreg/forgot_password/forgot_password_widget.dart';
@@ -493,12 +496,27 @@ GoRouter createRouter(AppStateNotifier appStateNotifier, [Widget? entryPage]) =>
         FFRoute(
           name: ExploreWidget.routeName,
           path: ExploreWidget.routePath,
-          builder: (context, params) => params.isEmpty
+          builder: (context, params) {
+            // Extract search parameters from the extra if available
+            final searchType = params.state.extra != null 
+                ? (params.state.extra as Map<String, dynamic>)['searchType'] as String?
+                : null;
+            final searchTerm = params.state.extra != null 
+                ? (params.state.extra as Map<String, dynamic>)['searchTerm'] as String?
+                : null;
+                
+            print('ExploreWidget FFRoute - searchType: $searchType, searchTerm: $searchTerm');
+                
+            return params.isEmpty
               ? NavBarPage(initialPage: 'Explore')
               : NavBarPage(
                   initialPage: 'Explore',
-                  page: ExploreWidget(),
-                ),
+                  page: ExploreWidget(
+                    searchType: searchType,
+                    searchTerm: searchTerm,
+                  ),
+                );
+          },
         ),
         FFRoute(
           name: UserpageWidget.routeName,
@@ -601,6 +619,157 @@ GoRouter createRouter(AppStateNotifier appStateNotifier, [Widget? entryPage]) =>
           builder: (context, params) => SecondPage(
             title: params.getParam('title', ParamType.String) ?? 'Second Page',
           ),
+        ),
+        FFRoute(
+          name: 'Profile',
+          path: '/profile/:userId',
+          builder: (context, params) {
+            final userId = params.getParam('userId', ParamType.String);
+            if (userId != null) {
+              // Create a document reference from the user ID
+              final userRef = FirebaseFirestore.instance.collection('User').doc(userId);
+              return UserpageWidget(profileparameter: userRef);
+            }
+            return Scaffold(
+              body: Center(child: Text('User not found')),
+            );
+          },
+        ),
+        FFRoute(
+          name: 'AppDownload',
+          path: '/download',
+          builder: (context, params) {
+            // This page will only be shown if the app is opened via a web link
+            // We'll try to auto-launch the appropriate app store based on platform
+            
+            // Extract any referral parameters
+            final referralType = params.getParam('referral', ParamType.String);
+            final profileId = params.getParam('id', ParamType.String);
+            
+            // Auto-launch app store on mobile platforms
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              // Wait for the widget to build before launching
+              Future.delayed(Duration(milliseconds: 200), () {
+                url_launcher.launchUrl(
+                  Uri.parse(
+                    Platform.isIOS
+                        ? 'https://apps.apple.com/app/your-app-id'
+                        : 'https://play.google.com/store/apps/details?id=com.flutterflow.lunakraft'
+                  ),
+                );
+              });
+            });
+            
+            return Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FlutterFlowIconButton(
+                      borderColor: FlutterFlowTheme.of(context).primary,
+                      borderRadius: 50,
+                      borderWidth: 1,
+                      buttonSize: 60,
+                      fillColor: FlutterFlowTheme.of(context).primary,
+                      icon: Icon(
+                        Icons.download_rounded,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                      onPressed: () {
+                        // No-op, just for visual
+                      },
+                    ),
+                    SizedBox(height: 24),
+                    Text(
+                      'Luna Kraft App',
+                      style: FlutterFlowTheme.of(context).headlineMedium,
+                    ),
+                    SizedBox(height: 12),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'Please download the Luna Kraft app to view profiles and content.',
+                        textAlign: TextAlign.center,
+                        style: FlutterFlowTheme.of(context).bodyMedium,
+                      ),
+                    ),
+                    SizedBox(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            // Launch iOS App Store
+                            url_launcher.launchUrl(
+                              Uri.parse('https://apps.apple.com/app/your-app-id')
+                            );
+                          },
+                          child: Container(
+                            width: 150,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.apple, color: Colors.white),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'App Store',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 20),
+                        GestureDetector(
+                          onTap: () {
+                            // Launch Google Play Store
+                            url_launcher.launchUrl(
+                              Uri.parse('https://play.google.com/store/apps/details?id=com.flutterflow.lunakraft')
+                            );
+                          },
+                          child: Container(
+                            width: 150,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: FlutterFlowTheme.of(context).primary,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.android, color: Colors.white),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Play Store',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
@@ -1054,9 +1223,25 @@ class _NavBarPageState extends State<NavBarPage>
 
   @override
   Widget build(BuildContext context) {
+    // See if we have search parameters from route arguments
+    String? searchType;
+    String? searchTerm;
+    
+    final modalRoute = ModalRoute.of(context);
+    final args = modalRoute?.settings.arguments as Map<String, dynamic>?;
+    
+    if (args != null) {
+      searchType = args['searchType'] as String?;
+      searchTerm = args['searchTerm'] as String?;
+      print('NavBarPage received search parameters - searchType: $searchType, searchTerm: $searchTerm');
+    }
+    
+    // Create tabs with search parameters for Explore if needed
     final tabs = {
       'HomePage': HomePageWidget(),
-      'Explore': ExploreWidget(),
+      'Explore': searchType == 'tag' && searchTerm != null
+          ? ExploreWidget(searchType: searchType, searchTerm: searchTerm)
+          : ExploreWidget(),
       'DreamEntrySelection': DreamEntrySelectionWidget(),
       'MembershipPage': MembershipPageWidget(),
       'prof1': Prof1Widget(),

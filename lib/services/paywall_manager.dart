@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'purchase_service.dart';
 import 'models/subscription_product.dart';
 import 'models/coin_product.dart';
-import 'subscription_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // This is a placeholder for the PaywallManager
 // The implementation has been temporarily removed and will be re-implemented from scratch
@@ -179,7 +180,7 @@ class PaywallManager {
                   Navigator.of(context).pop();
 
                   // Show result
-                  final success = results.any((result) => result.success);
+                  final success = results.any((result) => result.success ?? false);
                   await showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
@@ -311,6 +312,130 @@ class PaywallManager {
     } catch (e) {
       debugPrint(
           'PaywallManager.showCoinPurchase(): Error showing coin purchase dialog - $e');
+    }
+  }
+
+  // Purchase a product by ID directly
+  static Future<PurchaseResult> purchaseProductById(String productId) async {
+    try {
+      // First ensure RevenueCat is initialized
+      await PurchaseService.init();
+      
+      // Purchase directly using product ID
+      final result = await PurchaseService.purchaseProductById(productId);
+      
+      // If the purchase was successful and it's a lunacoin purchase, update the user's coins
+      if (result.success && productId.contains('lunacoin')) {
+        if (PurchaseService.isSimulatorMode) {
+          await _updateUserCoinsForSimulatedPurchase(productId);
+        } else {
+          await _updateUserCoinsAfterPurchase(productId);
+        }
+      }
+      
+      return result;
+    } catch (e) {
+      debugPrint('Error in purchaseProductById: $e');
+      return PurchaseResult(
+        success: false,
+        message: 'Error: $e',
+      );
+    }
+  }
+  
+  // Updates user's coins after a successful purchase
+  static Future<void> _updateUserCoinsAfterPurchase(String productId) async {
+    try {
+      // Only proceed if we have a logged in user
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        debugPrint('Cannot update coins: No user is logged in');
+        return;
+      }
+      
+      // Extract coin amount from the product ID
+      int coinAmount = 0;
+      if (productId.contains('100') && !productId.contains('1000')) coinAmount = 100;
+      else if (productId.contains('500')) coinAmount = 500;
+      else if (productId.contains('1000')) coinAmount = 1000;
+      
+      if (coinAmount == 0) {
+        debugPrint('Cannot determine coin amount from product ID: $productId');
+        return;
+      }
+      
+      debugPrint('Adding $coinAmount coins to user ${currentUser.uid}');
+      
+      // Update user document in Firestore to add the coins
+      final userRef = FirebaseFirestore.instance.collection('User').doc(currentUser.uid);
+      
+      // Get current coins
+      final userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        debugPrint('User document not found');
+        return;
+      }
+      
+      final currentCoins = userDoc.data()?['luna_coins'] as int? ?? 0;
+      final newCoins = currentCoins + coinAmount;
+      
+      // Update the document
+      await userRef.update({
+        'luna_coins': newCoins,
+        'last_coin_update': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint('Updated user coins from $currentCoins to $newCoins');
+    } catch (e) {
+      debugPrint('Error updating user coins: $e');
+    }
+  }
+  
+  // Updates user's coins for simulated purchases in simulator mode
+  static Future<void> _updateUserCoinsForSimulatedPurchase(String productId) async {
+    try {
+      // Only proceed if we have a logged in user
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        debugPrint('Cannot update coins: No user is logged in');
+        return;
+      }
+      
+      // Extract coin amount from the product ID
+      int coinAmount = 0;
+      if (productId.contains('100') && !productId.contains('1000')) coinAmount = 100;
+      else if (productId.contains('500')) coinAmount = 500;
+      else if (productId.contains('1000')) coinAmount = 1000;
+      
+      if (coinAmount == 0) {
+        debugPrint('Cannot determine coin amount from product ID: $productId');
+        return;
+      }
+      
+      debugPrint('🔧 SIMULATOR MODE: Adding $coinAmount coins to user ${currentUser.uid}');
+      
+      // Update user document in Firestore to add the coins
+      final userRef = FirebaseFirestore.instance.collection('User').doc(currentUser.uid);
+      
+      // Get current coins
+      final userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        debugPrint('User document not found');
+        return;
+      }
+      
+      final currentCoins = userDoc.data()?['luna_coins'] as int? ?? 0;
+      final newCoins = currentCoins + coinAmount;
+      
+      // Update the document
+      await userRef.update({
+        'luna_coins': newCoins,
+        'last_coin_update': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint('🔧 SIMULATOR MODE: Updated user coins from $currentCoins to $newCoins');
+    } catch (e) {
+      debugPrint('Error updating user coins: $e');
     }
   }
 }

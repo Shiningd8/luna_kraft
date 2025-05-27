@@ -18,6 +18,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:convert';
+import '/widgets/custom_text_form_field.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -146,12 +147,6 @@ class _SettingsPageState extends State<SettingsPage>
                     title: 'Theme',
                     subtitle: 'Light, Dark, System Default',
                     onTap: () => _showThemeDialog(context),
-                  ),
-                  _buildSettingTile(
-                    icon: Icons.notifications_outlined,
-                    title: 'Notification Preferences',
-                    subtitle: 'Likes, Comments, Follows, Mentions',
-                    onTap: () => _showNotificationPreferences(context),
                   ),
                 ],
               ),
@@ -391,44 +386,6 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  void _showNotificationPreferences(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text('Notification Preferences'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildNotificationToggle('Likes', 'notify_likes'),
-              _buildNotificationToggle('Comments', 'notify_comments'),
-              _buildNotificationToggle('Follows', 'notify_follows'),
-              _buildNotificationToggle('Mentions', 'notify_mentions'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotificationToggle(String title, String key) {
-    return FutureBuilder<bool>(
-      future: Future.value(_prefs.getBool(key) ?? true),
-      builder: (context, snapshot) {
-        return SwitchListTile(
-          title: Text(title),
-          value: snapshot.data ?? true,
-          onChanged: (bool newValue) async {
-            await _prefs.setBool(key, newValue);
-            if (mounted) {
-              setState(() {});
-            }
-          },
-        );
-      },
-    );
-  }
-
   void _navigateToEditProfile(BuildContext context) {
     context.pushNamed('EditProfile');
   }
@@ -474,17 +431,14 @@ class _SettingsPageState extends State<SettingsPage>
                 style: FlutterFlowTheme.of(context).bodySmall,
               ),
               SizedBox(height: 8),
-              TextFormField(
+              CustomTextFormField(
                 controller: deleteController,
                 onChanged: (value) {
                   setState(() {
                     isDeleteButtonEnabled = value.toLowerCase() == 'delete';
                   });
                 },
-                decoration: InputDecoration(
-                  hintText: 'Type "delete"',
-                  border: OutlineInputBorder(),
-                ),
+                hintText: 'Type "delete"',
               ),
             ],
           ),
@@ -527,9 +481,11 @@ class _SettingsPageState extends State<SettingsPage>
                         navigator.pop();
 
                         try {
-                          // Check if user is signed in with Google
+                          // Check if user is signed in with Google or Apple
                           final isGoogleUser = user.providerData
                               .any((info) => info.providerId == 'google.com');
+                          final isAppleUser = user.providerData
+                              .any((info) => info.providerId == 'apple.com');
 
                           if (isGoogleUser) {
                             print('Reauthenticating Google user...');
@@ -547,6 +503,59 @@ class _SettingsPageState extends State<SettingsPage>
                             );
                             await user.reauthenticateWithCredential(credential);
                             print('Google reauthentication successful');
+                          } else if (isAppleUser) {
+                            print('Handling Apple user account deletion...');
+                            // Apple users cannot easily reauthenticate through the app
+                            // Firebase allows recent sign-in to delete without reauthentication
+                            try {
+                              // Try direct deletion first, which might work for recent Apple sign-ins
+                              await user.delete();
+                              print('Apple user deletion successful without reauthentication');
+                            } catch (authError) {
+                              print('Apple user deletion requires reauthentication: $authError');
+                              // Show an explanatory dialog with instructions
+                              await showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (BuildContext context) => AlertDialog(
+                                  title: Text('Apple Sign-In Verification Required'),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'To delete your account securely, you need to verify your identity with Apple. Please follow these steps:',
+                                        style: FlutterFlowTheme.of(context).bodySmall,
+                                      ),
+                                      SizedBox(height: 12),
+                                      Text(
+                                        '1. Sign out from the app\n2. Sign in again with your Apple ID\n3. Then try deleting your account again',
+                                        style: FlutterFlowTheme.of(context).bodyMedium,
+                                      ),
+                                    ],
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () async {
+                                        // Sign the user out and redirect to login
+                                        await FirebaseAuth.instance.signOut();
+                                        Navigator.pop(context);
+                                        router.go('/');
+                                      },
+                                      child: Text(
+                                        'Sign Out Now',
+                                        style: TextStyle(color: FlutterFlowTheme.of(context).primary),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              // Don't proceed with deletion flow
+                              throw Exception('Apple user reauthentication required');
+                            }
                           } else {
                             // For email/password users, show password dialog
                             final password = await showDialog<String>(
@@ -563,13 +572,10 @@ class _SettingsPageState extends State<SettingsPage>
                                           .bodySmall,
                                     ),
                                     SizedBox(height: 8),
-                                    TextFormField(
+                                    CustomTextFormField(
                                       controller: passwordController,
                                       obscureText: true,
-                                      decoration: InputDecoration(
-                                        hintText: 'Enter your password',
-                                        border: OutlineInputBorder(),
-                                      ),
+                                      hintText: 'Enter your password',
                                     ),
                                   ],
                                 ),
@@ -605,86 +611,96 @@ class _SettingsPageState extends State<SettingsPage>
                             print('Email/password reauthentication successful');
                           }
 
-                          // Delete authentication first
-                          print('Deleting authentication...');
-                          await user.delete();
-                          print('Authentication deleted successfully');
+                          // Only proceed with deletion if we haven't thrown an exception
+                          // for Apple users requiring reauthentication
+                          
+                          // Delete authentication first (if not Apple user that needs reauthentication)
+                          if (!isAppleUser || user.metadata.lastSignInTime!.isAfter(
+                              DateTime.now().subtract(Duration(minutes: 5)))) {
+                            print('Deleting authentication...');
+                            if (!isAppleUser) {
+                              // For non-Apple users, we've already reauthenticated above
+                              await user.delete();
+                            }
+                            // For Apple users, we already tried deletion earlier
+                            print('Authentication deleted successfully');
 
-                          // Get user's posts
-                          print('Fetching user posts...');
-                          final userPosts = await FirebaseFirestore.instance
-                              .collection('posts')
-                              .where('poster', isEqualTo: userRef)
-                              .get();
-                          print('Found ${userPosts.docs.length} posts');
+                            // Get user's posts
+                            print('Fetching user posts...');
+                            final userPosts = await FirebaseFirestore.instance
+                                .collection('posts')
+                                .where('poster', isEqualTo: userRef)
+                                .get();
+                            print('Found ${userPosts.docs.length} posts');
 
-                          // Get user document data
-                          print('Fetching user document...');
-                          final userDoc = await userRef.get();
-                          final userData =
-                              userDoc.data() as Map<String, dynamic>? ?? {};
+                            // Get user document data
+                            print('Fetching user document...');
+                            final userDoc = await userRef.get();
+                            final userData =
+                                userDoc.data() as Map<String, dynamic>? ?? {};
 
-                          final followers = List<DocumentReference>.from(
-                              userData['users_following_me'] ?? []);
-                          final following = List<DocumentReference>.from(
-                              userData['following_users'] ?? []);
+                            final followers = List<DocumentReference>.from(
+                                userData['users_following_me'] ?? []);
+                            final following = List<DocumentReference>.from(
+                                userData['following_users'] ?? []);
 
-                          print('Followers: ${followers.length}');
-                          print('Following: ${following.length}');
+                            print('Followers: ${followers.length}');
+                            print('Following: ${following.length}');
 
-                          // Create batch
-                          print('Starting batch operations...');
-                          final batch = FirebaseFirestore.instance.batch();
+                            // Create batch
+                            print('Starting batch operations...');
+                            final batch = FirebaseFirestore.instance.batch();
 
-                          // Delete posts
-                          for (var post in userPosts.docs) {
-                            batch.delete(post.reference);
-                          }
+                            // Delete posts
+                            for (var post in userPosts.docs) {
+                              batch.delete(post.reference);
+                            }
 
-                          // Update followers
-                          for (var followerRef in followers) {
-                            batch.update(followerRef, {
-                              'following_users':
-                                  FieldValue.arrayRemove([userRef])
-                            });
-                          }
+                            // Update followers
+                            for (var followerRef in followers) {
+                              batch.update(followerRef, {
+                                'following_users':
+                                    FieldValue.arrayRemove([userRef])
+                              });
+                            }
 
-                          // Update following
-                          for (var followingRef in following) {
-                            batch.update(followingRef, {
-                              'users_following_me':
-                                  FieldValue.arrayRemove([userRef])
-                            });
-                          }
+                            // Update following
+                            for (var followingRef in following) {
+                              batch.update(followingRef, {
+                                'users_following_me':
+                                    FieldValue.arrayRemove([userRef])
+                              });
+                            }
 
-                          // Delete user document
-                          batch.delete(userRef);
+                            // Delete user document
+                            batch.delete(userRef);
 
-                          // Commit batch
-                          print('Committing batch operations...');
-                          await batch.commit();
-                          print('Batch operations completed successfully');
+                            // Commit batch
+                            print('Committing batch operations...');
+                            await batch.commit();
+                            print('Batch operations completed successfully');
 
-                          // Sign out
-                          print('Signing out...');
-                          await FirebaseAuth.instance.signOut();
-                          if (isGoogleUser) {
-                            await GoogleSignIn().signOut();
-                          }
-                          print('Signed out successfully');
+                            // Sign out
+                            print('Signing out...');
+                            await FirebaseAuth.instance.signOut();
+                            if (isGoogleUser) {
+                              await GoogleSignIn().signOut();
+                            }
+                            print('Signed out successfully');
 
-                          // Clear app state
-                          print('Clearing app state...');
-                          await FFAppState().initializePersistedState();
-                          print('App state cleared');
+                            // Clear app state
+                            print('Clearing app state...');
+                            await FFAppState().initializePersistedState();
+                            print('App state cleared');
 
-                          // Navigate to sign in
-                          print('Attempting navigation...');
-                          if (!_isDisposed) {
-                            print('Widget not disposed, navigating...');
-                            await Future.delayed(Duration(milliseconds: 100));
-                            router.go('/');
-                            print('Navigation completed');
+                            // Navigate to sign in
+                            print('Attempting navigation...');
+                            if (!_isDisposed) {
+                              print('Widget not disposed, navigating...');
+                              await Future.delayed(Duration(milliseconds: 100));
+                              router.go('/');
+                              print('Navigation completed');
+                            }
                           }
                         } catch (e) {
                           print('Error during account deletion process: $e');
@@ -784,13 +800,10 @@ class _SettingsPageState extends State<SettingsPage>
                     ],
                   ),
                 ),
-              TextField(
+              CustomTextFormField(
                 controller: bugReportController,
                 maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: 'Describe the issue...',
-                  border: OutlineInputBorder(),
-                ),
+                hintText: 'Describe the issue...',
                 enabled: !_isSubmitting,
               ),
             ],
@@ -876,13 +889,10 @@ class _SettingsPageState extends State<SettingsPage>
                     ],
                   ),
                 ),
-              TextField(
+              CustomTextFormField(
                 controller: featureRequestController,
                 maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: 'Describe your feature request...',
-                  border: OutlineInputBorder(),
-                ),
+                hintText: 'Describe your feature request...',
                 enabled: !_isSubmitting,
               ),
             ],

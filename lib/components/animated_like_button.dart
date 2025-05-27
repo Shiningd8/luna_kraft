@@ -81,7 +81,7 @@ class _AnimatedLikeButtonState extends State<AnimatedLikeButton>
     final activeColor =
         widget.activeColor ?? FlutterFlowTheme.of(context).primary;
     final inactiveColor = widget.inactiveColor ??
-        FlutterFlowTheme.of(context).secondaryText.withOpacity(0.8);
+        Colors.white;
 
     return Row(
       mainAxisSize: MainAxisSize.min,

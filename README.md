@@ -51,3 +51,80 @@ To replace the placeholder notification icons with your own:
    - `android/app/src/main/res/values/colors.xml` - update the `notification_color` value
 
 Note: The XML vector icon at `android/app/src/main/res/drawable/notification_icon.xml` serves as a fallback and should be kept.
+
+# Luna Kraft - Flutter iOS Build Instructions
+
+This README provides instructions for building the Luna Kraft Flutter iOS app.
+
+## Building the iOS App
+
+We've created a custom build script that resolves common issues with the iOS build process:
+
+1. **RevenueCat Swift Compatibility Issue**: Fixes the ambiguous type lookup for `SubscriptionPeriod`
+2. **AppFrameworkInfo.plist Missing Issue**: Ensures the required plist file exists
+
+### To build the iOS app:
+
+1. Navigate to the project root directory
+2. Run the build script:
+
+```bash
+./build_ios.sh
+```
+
+This script will:
+- Run the `fix_flutter_build.sh` script in the iOS directory to apply necessary fixes
+- Build the Flutter iOS app without code signing (for testing)
+
+Note: When prompted for your password, it's needed to fix permission issues with some of the pod files.
+
+### For manual builds:
+
+If you prefer to build manually or integrate with CI/CD, you can:
+
+1. Navigate to the iOS directory and run the fix script:
+
+```bash
+cd ios
+./fix_flutter_build.sh
+```
+
+2. Then build as normal:
+
+```bash
+cd ..
+flutter build ios --no-codesign
+```
+
+## Deploying to App Store
+
+For App Store deployment, after running the fixes:
+
+1. Open the Xcode workspace:
+
+```
+ios/Runner.xcworkspace
+```
+
+2. Configure signing and build settings in Xcode
+3. Archive and upload to App Store Connect
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Try cleaning the project:
+
+```bash
+flutter clean
+flutter pub get
+cd ios
+pod install
+cd ..
+```
+
+2. Then run the build script again:
+
+```bash
+./build_ios.sh
+```

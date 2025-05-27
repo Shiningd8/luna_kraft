@@ -17,23 +17,27 @@ class ShareOptionsDialog extends StatelessWidget {
   }) : super(key: key);
 
   static void show(BuildContext context, PostsRecord post, UserRecord user) {
-    // Show directly as a dialog without using a bottom sheet
-    // This way we don't have to pop anything
-    ShareUtil.sharePost(context, post, user);
+    // Call directly to ShareUtil with proper error handling
+    try {
+      ShareUtil.sharePost(context, post, user);
+    } catch (e) {
+      print('Error showing share dialog: $e');
+      // If context is still valid, show error
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to show share dialog: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     // This widget is no longer needed, but we'll keep a minimal implementation
-    // for backward compatibility
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-      ShareUtil.sharePost(context, post, user);
-    });
-
-    // Return an empty container that will be removed quickly
+    // for backward compatibility. We don't want to automatically pop or trigger share here.
     return const SizedBox.shrink();
   }
 }

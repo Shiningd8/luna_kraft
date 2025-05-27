@@ -260,6 +260,7 @@ class _SharePosterWidgetState extends State<SharePosterWidget> {
                                 ),
                               ],
                             ),
+                            textAlign: TextAlign.left,
                           ),
                         ],
                       ),
@@ -285,22 +286,12 @@ class _SharePosterWidgetState extends State<SharePosterWidget> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Logo with glow effect
+                        // Logo without glow effect
                         Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.amber.withOpacity(0.3),
-                                blurRadius: 10,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
                           child: Image.asset(
                             'assets/images/lunamoon.png',
-                            width: 28,
-                            height: 28,
+                            width: 24,
+                            height: 24,
                             color: Colors.amber[300],
                             errorBuilder: (context, error, stackTrace) {
                               return Icon(
@@ -311,7 +302,7 @@ class _SharePosterWidgetState extends State<SharePosterWidget> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4), // Reduced spacing
                         Text(
                           'LunaKraft',
                           style: GoogleFonts.figtree(

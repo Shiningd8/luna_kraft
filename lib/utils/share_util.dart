@@ -5,13 +5,13 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:share_plus/share_plus.dart' show Share, XFile;
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '/backend/schema/posts_record.dart';
 import '/backend/schema/user_record.dart';
-import '/components/share_poster_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/components/share_poster_widget.dart';
 
 class ShareUtil {
   // Main method to share a post
@@ -28,6 +28,7 @@ class ShareUtil {
 
       // Show preview dialog
       final bool? shouldShare = await _showSharePreview(context, posterWidget);
+      print("Share dialog result: $shouldShare"); // Debug log
 
       // If user cancels, exit
       if (shouldShare != true || !context.mounted) return;
@@ -97,11 +98,24 @@ class ShareUtil {
 
         // Share the file
         if (file.existsSync() && dialogContext.mounted) {
+          // Use Share.shareXFiles with proper context and ensure it opens the share sheet
           await Share.shareXFiles(
             [XFile(file.path)],
             text: 'Check out this dream: ${post.title}',
             subject: 'Dream: ${post.title}',
-          );
+          ).then((_) {
+            print("Share completed successfully");
+          }).catchError((error) {
+            print("Share error: $error");
+            if (dialogContext.mounted) {
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(
+                  content: Text('Error sharing: $error'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          });
         } else {
           throw Exception('Image file not found or context unmounted');
         }
@@ -319,7 +333,7 @@ class ShareUtil {
                     curve: Curves.easeOut,
                   ),
 
-              // Action Button with more modern styling
+              // Action Button with more modern styling - Make sure it always responds to tap
               Container(
                 decoration: BoxDecoration(
                   color: FlutterFlowTheme.of(dialogContext).secondaryBackground,
@@ -339,7 +353,11 @@ class ShareUtil {
                   borderRadius: BorderRadius.circular(20),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(20),
-                    onTap: () => Navigator.of(dialogContext).pop(true),
+                    // Make sure we pop with true result to trigger the second phase
+                    onTap: () {
+                      // Ensure dialog is closed with positive result
+                      Navigator.of(dialogContext).pop(true);
+                    },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       child: Row(

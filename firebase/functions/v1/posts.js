@@ -69,4 +69,49 @@ exports.deletePost = functions.https.onCall(async (data, context) => {
             "Error deleting post: " + error.message
         );
     }
+});
+
+// Add a V1 gemini function to handle API calls to Gemini
+const apiManager = require('../api_manager');
+
+// Export a V1 function for Gemini API calls
+exports.geminiAI = functions.https.onCall(async (data, context) => {
+  try {
+    console.log(`[V1] Making API call for ${data["callName"]} with data: ${JSON.stringify(data).substring(0, 200)}...`);
+    
+    // Validate input
+    if (!data || !data["callName"]) {
+      console.error("[V1] Invalid request: Missing callName");
+      return {
+        statusCode: 400,
+        error: "Missing callName in request",
+      };
+    }
+    
+    var response = await apiManager.makeApiCall(context, data);
+    console.log(`[V1] Done making API Call! Status: ${response.statusCode}`);
+    
+    // Extract and add generated text for easier access
+    if (response.body && response.body.candidates && 
+        response.body.candidates.length > 0 && 
+        response.body.candidates[0].content && 
+        response.body.candidates[0].content.parts && 
+        response.body.candidates[0].content.parts.length > 0) {
+      
+      const generatedText = response.body.candidates[0].content.parts[0].text;
+      if (generatedText) {
+        response.generatedText = generatedText;
+        console.log(`[V1] Generated text successfully extracted (first 100 chars): ${generatedText.substring(0, 100)}...`);
+      }
+    }
+    
+    return response;
+  } catch (err) {
+    console.error(`[V1] Error performing API call: ${err}`);
+    console.error(`[V1] Stack trace: ${err.stack}`);
+    return {
+      statusCode: 400,
+      error: `${err}`,
+    };
+  }
 }); 

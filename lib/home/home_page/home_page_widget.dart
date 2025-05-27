@@ -10,7 +10,6 @@ import '/widgets/space_background.dart';
 import '/services/app_state.dart';
 import '/backend/schema/util/schema_util.dart';
 import '/backend/schema/util/firestore_util.dart';
-import '/widgets/notification_permission_dialog.dart';
 import '/widgets/notification_test_button.dart';
 import '/index.dart';
 import 'package:flutter/material.dart';
@@ -35,12 +34,13 @@ import '/widgets/lottie_background.dart';
 import 'package:luna_kraft/components/standardized_post_item.dart';
 import '/components/dream_fact_widget.dart';
 import '/components/share_options_dialog.dart';
-import 'package:luna_kraft/components/native_ad_post.dart';
 import '/utils/tag_formatter.dart';
 import '/utils/serialization_helpers.dart';
 import '/services/comments_service.dart';
 import '/utils/share_util.dart';
 import '/components/invite_friend_dialog.dart';
+import '/services/notification_service.dart';
+import '/utils/subscription_util.dart';
 
 // Separate class for home feed content
 class _HomeFeedContent extends StatefulWidget {
@@ -57,18 +57,50 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
   String _errorMessage = '';
   PostsRecord? _latestPost;
   Map<String, UserRecord> _userCache = {};
-
-  // Ad unit ID for native advanced ads
-  static const String _nativeAdUnitId =
-      'ca-app-pub-3940256099942544/2247696110';
-
-  // Frequency of ads (show an ad after this many posts)
-  static const int _adFrequency = 5;
+  // Keep track of loading state for different sections
+  bool _loadingFollowingPosts = true;
+  bool _loadingPublicPosts = true;
+  // Add a scroll controller for smoother scrolling
+  late ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
     _loadPosts();
+    // Initialize the scroll controller
+    _scrollController = ScrollController();
+    // Start preloading user data
+    _preloadUserData();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // Preload user data for filtering private accounts
+  Future<void> _preloadUserData() async {
+    try {
+      // Get all users to identify private accounts
+      final usersSnapshot = await FirebaseFirestore.instance
+          .collection('User')
+          .get();
+      
+      for (var doc in usersSnapshot.docs) {
+        try {
+          final userData = UserRecord.getDocumentFromData(
+            doc.data(),
+            doc.reference,
+          );
+          _userCache[doc.id] = userData;
+        } catch (e) {
+          print('Error processing user data: $e');
+        }
+      }
+    } catch (e) {
+      print('Error preloading user data: $e');
+    }
   }
 
   Future<void> _loadPosts() async {
@@ -83,7 +115,6 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
     try {
       // Clear existing posts
       _allPosts.clear();
-      _userCache.clear();
       _latestPost = null;
 
       // First get ALL posts from the database
@@ -114,13 +145,20 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
             continue;
           }
 
-          // Check if this is a public post or from current user or followed user
+          // Check if this is a public post or from current user
           final isCurrentUserPost = post.poster == currentUserReference;
           final isFollowedUser =
               currentUserDocument?.followingUsers?.contains(post.poster) ??
                   false;
 
-          if (!post.isPrivate || isCurrentUserPost || isFollowedUser) {
+          // Skip posts from blocked users
+          final isBlockedUser = currentUserDocument?.blockedUsers?.contains(post.poster) ?? false;
+          if (isBlockedUser) {
+            continue;
+          }
+
+          // Only include public posts OR your own posts (including private ones)
+          if (!post.isPrivate || isCurrentUserPost) {
             allPosts.add(post);
           }
         } catch (e) {
@@ -329,49 +367,119 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
           );
         }
 
-        List<PostsRecord> posts = snapshot.data!;
+        // Filter out private posts from other users
+        List<PostsRecord> allPosts = snapshot.data!.where((post) => 
+          !post.isPrivate || post.poster == currentUserReference
+        ).toList();
+        
         final followingUsers = currentUserDocument?.followingUsers ?? [];
+        final blockedUsers = currentUserDocument?.blockedUsers ?? [];
         final isFollowingAnyone = followingUsers.isNotEmpty;
         PostsRecord? latestPost;
 
+        // Log preloaded user cache status
+        print('Preloaded user cache has ${_userCache.length} users');
+
         // Find the latest post from current user
-        for (var post in posts) {
+        for (var post in allPosts) {
           if (post.poster == currentUserReference) {
             latestPost = post;
             break;
           }
         }
 
-        // Filter out posts that don't have a valid poster reference
-        final validPosts = posts.where((post) {
+        // Separate posts into following posts and other public posts
+        // For following users, include more recent posts (last week)
+        final oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
+        
+        // 1. Posts from following users (not private, not blocked)
+        final followingPosts = allPosts.where((post) {
           // Skip posts without a valid poster reference
           if (post.poster == null) {
             return false;
           }
 
           // Skip the latest post as it will be displayed separately
-          if (latestPost != null &&
-              post.reference.id == latestPost.reference.id) {
+          if (latestPost != null && post.reference.id == latestPost.reference.id) {
             return false;
           }
 
-          // Skip posts from current user (they'll only see their latest post in purple box)
+          // Skip posts from current user (they'll see their latest post in the purple box)
           if (post.poster == currentUserReference) {
             return false;
           }
 
-          final isFromFollowedUser = followingUsers.contains(post.poster);
+          // Skip posts from blocked users
+          if (blockedUsers.contains(post.poster)) {
+            return false;
+          }
 
-          // Show post if:
-          // 1. If not following anyone: It's a public post
-          // 2. If following someone: It's from a followed user
-          final shouldShow = (!isFollowingAnyone && !post.isPrivate) ||
-              (isFollowingAnyone && isFromFollowedUser);
+          // Skip private posts unless they belong to followed users
+          if (post.isPrivate && !followingUsers.contains(post.poster)) {
+            return false;
+          }
 
-          return shouldShow;
+          // Skip posts older than a week
+          if (post.date == null || post.date!.isBefore(oneWeekAgo)) {
+            return false;
+          }
+
+          // Only include posts from followed users
+          return followingUsers.contains(post.poster);
         }).toList();
 
-        if (validPosts.isEmpty && latestPost == null) {
+        // 2. Other public posts (not from following, not private, not blocked, not from private accounts)
+        final publicPosts = allPosts.where((post) {
+          // Skip posts without a valid poster reference
+          if (post.poster == null) {
+            return false;
+          }
+
+          // Skip the latest post as it will be displayed separately
+          if (latestPost != null && post.reference.id == latestPost.reference.id) {
+            return false;
+          }
+
+          // Skip posts from current user (they'll see their latest post in the purple box)
+          if (post.poster == currentUserReference) {
+            return false;
+          }
+
+          // Skip posts from blocked users
+          if (blockedUsers.contains(post.poster)) {
+            return false;
+          }
+
+          // Skip private posts
+          if (post.isPrivate) {
+            return false;
+          }
+          
+          // Skip posts from private accounts that user doesn't follow
+          if (post.poster != null) {
+            final posterId = post.poster!.id;
+            final userData = _userCache[posterId];
+            
+            // If we have user data and the account is private, check follow status
+            if (userData != null && userData.isPrivate) {
+              // If user doesn't follow this private account, skip the post
+              if (!followingUsers.contains(post.poster)) {
+                return false;
+              }
+            }
+          }
+
+          // Skip posts from following users (they're already in followingPosts)
+          if (followingUsers.contains(post.poster)) {
+            return false;
+          }
+
+          // Include all other public posts
+          return true;
+        }).toList();
+
+        // If there are no valid posts to display
+        if (followingPosts.isEmpty && publicPosts.isEmpty && latestPost == null) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -406,18 +514,15 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
           );
         }
 
-        // Calculate the number of items in the list, including ads
-        final int regularItems =
-            (latestPost != null ? 1 : 0) + validPosts.length;
-        // Calculate ads - one per 5 posts
-        final int adItems = (regularItems / _adFrequency).floor();
-        // No maximum cap on ads since we want one per 5 posts
-        final int totalItems = regularItems + adItems;
-
+        // Build the combined feed
         return RefreshIndicator(
           onRefresh: () async {
             setState(() {});
           },
+          displacement: 50,
+          edgeOffset: 0,
+          color: FlutterFlowTheme.of(context).primary,
+          backgroundColor: Colors.transparent,
           child: ListView.builder(
             padding: EdgeInsets.only(
               left: 16,
@@ -425,47 +530,22 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
               top: 8,
               bottom: 80,
             ),
-            itemCount: totalItems,
+            controller: _scrollController,
+            physics: const ClampingScrollPhysics(),
+            itemCount: (latestPost != null ? 1 : 0) + 
+                      // Add section for users not following anyone
+                      (followingUsers.isEmpty ? 1 : 0) +
+                      followingPosts.length + 
+                      (followingUsers.isNotEmpty && followingPosts.isEmpty ? 1 : 0) + // Message for no recent posts from followers
+                      // Always show divider and "Discover More Dreams" header
+                      1 + // Divider for everyone
+                      publicPosts.length,
             itemBuilder: (context, index) {
-              // Calculate the actual post index, considering ads
-              int postIndex = index;
-
-              // Adjust for ads that have been inserted before this index
-              final int adsBeforeIndex = (index / (_adFrequency + 1)).floor();
-              postIndex = index - adsBeforeIndex;
-
-              // Check if this position should show an ad
-              // We want to show an ad after every _adFrequency posts
-              if ((postIndex + 1) % (_adFrequency + 1) == 0 && postIndex > 0) {
-                // Check if the previous item was also an ad
-                final int previousIndex = index - 1;
-
-                // Skip this ad if the previous item was an ad (prevent consecutive ads)
-                if (previousIndex >= 0) {
-                  final int previousPostIndex = previousIndex -
-                      (previousIndex / (_adFrequency + 1)).floor();
-
-                  if ((previousPostIndex + 1) % (_adFrequency + 1) == 0) {
-                    // Skip this ad position to avoid consecutive ads
-                    return SizedBox();
-                  }
-                }
-
-                return Padding(
-                  padding: EdgeInsets.only(bottom: 16),
-                  child: NativeAdPost(
-                    adUnitId: _nativeAdUnitId,
-                    animateEntry: true,
-                    animationIndex: index,
-                  ),
-                );
-              }
-
-              // Adjust index back to the actual post index
-              postIndex = index - (index / (_adFrequency + 1)).floor();
-
+              int currentIndex = index;
+              
               // First item is the latest post from the current user
-              if (latestPost != null && postIndex == 0) {
+              if (latestPost != null && currentIndex == 0) {
+                currentIndex++;
                 return StreamBuilder<UserRecord>(
                   stream: UserRecord.getDocument(latestPost.poster!),
                   builder: (context, userSnapshot) {
@@ -483,65 +563,292 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
                   },
                 );
               }
-
-              // Adjust index for feed posts
-              final feedPostIndex =
-                  latestPost != null ? postIndex - 1 : postIndex;
-
-              // Check if the index is valid
-              if (feedPostIndex >= validPosts.length) {
-                return SizedBox();
-              }
-
-              final post = validPosts[feedPostIndex];
-
-              return StreamBuilder<UserRecord>(
-                stream: UserRecord.getDocument(post.poster!),
-                builder: (context, userSnapshot) {
-                  // Handle error case - user document doesn't exist or other error
-                  if (userSnapshot.hasError) {
-                    print(
-                        'Error loading user for post ${post.reference.id}: ${userSnapshot.error}');
-                    return SizedBox();
-                  }
-
-                  if (!userSnapshot.hasData) {
-                    return SizedBox();
-                  }
-
-                  final userRecord = userSnapshot.data!;
-
-                  // Double-check that post isn't from a private account that user doesn't follow
-                  if (userRecord.isPrivate &&
-                      post.poster != currentUserReference &&
-                      !(currentUserDocument?.followingUsers
-                              ?.contains(post.poster) ??
-                          false)) {
-                    print('Skipping post from private account: ${post.title}');
-                    return SizedBox();
-                  }
-
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: 16),
-                    child: StandardizedPostItem(
-                      post: post,
-                      user: userRecord,
-                      animateEntry: true,
-                      animationIndex: index,
-                      onLike: () {
-                        final isCurrentlyLiked =
-                            post.likes.contains(currentUserReference);
-                        _updatePostLikeState(post, !isCurrentlyLiked);
-                      },
-                      onSave: () {
-                        final isCurrentlySaved =
-                            post.postSavedBy.contains(currentUserReference);
-                        _updatePostSaveState(post, !isCurrentlySaved);
-                      },
+              
+              // "Follow friends" section for users not following anyone
+              if (followingUsers.isEmpty && currentIndex == (latestPost != null ? 1 : 0)) {
+                currentIndex++;
+                return Padding(
+                  padding: EdgeInsets.only(bottom: 16, top: 8),
+                  child: Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                          FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                        width: 1,
+                      ),
                     ),
-                  );
-                },
-              );
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 24,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Follow Friends & Family',
+                              style: FlutterFlowTheme.of(context).titleSmall.override(
+                                fontFamily: 'Outfit',
+                                color: FlutterFlowTheme.of(context).primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Connect with friends and family to see their dreams in your feed.',
+                          style: FlutterFlowTheme.of(context).bodyMedium.override(
+                            fontFamily: 'Figtree',
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () {
+                            context.pushNamed('ExploreUsers');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: FlutterFlowTheme.of(context).primary,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.explore, size: 18),
+                              SizedBox(width: 8),
+                              Text('Explore Users'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              
+              // Following users posts
+              if (currentIndex < (latestPost != null ? 1 : 0) + 
+                             (followingUsers.isEmpty ? 1 : 0) + 
+                             followingPosts.length) {
+                final postIndex = currentIndex - (latestPost != null ? 1 : 0) - (followingUsers.isEmpty ? 1 : 0);
+                final post = followingPosts[postIndex];
+                
+                return StreamBuilder<UserRecord>(
+                  stream: UserRecord.getDocument(post.poster!),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData) {
+                      return SizedBox();
+                    }
+                    
+                    final user = userSnapshot.data!;
+                    
+                    // If this is a private post and the user isn't following the poster, don't show it
+                    if (post.isPrivate && !followingUsers.contains(post.poster)) {
+                      return SizedBox();
+                    }
+                    
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: StandardizedPostItem(
+                        post: post,
+                        user: user,
+                        animateEntry: true,
+                        animationIndex: currentIndex,
+                        onLike: () {
+                          final isCurrentlyLiked = post.likes.contains(currentUserReference);
+                          _updatePostLikeState(post, !isCurrentlyLiked);
+                        },
+                        onSave: () {
+                          final isCurrentlySaved = post.postSavedBy.contains(currentUserReference);
+                          _updatePostSaveState(post, !isCurrentlySaved);
+                        },
+                      ),
+                    );
+                  },
+                );
+              }
+              
+              // No recent posts message for followed users
+              if (followingUsers.isNotEmpty && followingPosts.isEmpty && 
+                  currentIndex == (latestPost != null ? 1 : 0) + (followingUsers.isEmpty ? 1 : 0)) {
+                return Padding(
+                  padding: EdgeInsets.only(bottom: 16, top: 8),
+                  child: Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                          FlutterFlowTheme.of(context).primary.withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'No Recent Dreams',
+                              style: FlutterFlowTheme.of(context).titleSmall.override(
+                                fontFamily: 'Outfit',
+                                color: FlutterFlowTheme.of(context).primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'People you follow haven\'t shared any dreams in the past week. You\'ll see their recent dreams here when they do!',
+                          style: FlutterFlowTheme.of(context).bodyMedium.override(
+                            fontFamily: 'Figtree',
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              
+              // Always show Divider between any posts above and public posts
+              if (currentIndex == (latestPost != null ? 1 : 0) + 
+                             (followingUsers.isEmpty ? 1 : 0) +
+                             followingPosts.length +
+                             (followingUsers.isNotEmpty && followingPosts.isEmpty ? 1 : 0)) {
+                return Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Column(
+                    children: [
+                      Divider(
+                        color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                        thickness: 1.5,
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.explore,
+                                color: FlutterFlowTheme.of(context).primary,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Discover More Dreams',
+                                style: FlutterFlowTheme.of(context).titleSmall.override(
+                                  fontFamily: 'Outfit',
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              
+              // Public posts section
+              if (currentIndex >= (latestPost != null ? 1 : 0) + 
+                               (followingUsers.isEmpty ? 1 : 0) +
+                               followingPosts.length + 
+                               (followingUsers.isNotEmpty && followingPosts.isEmpty ? 1 : 0) +
+                               1) { // +1 for the divider
+                final postIndex = currentIndex - 
+                                 (latestPost != null ? 1 : 0) - 
+                                 (followingUsers.isEmpty ? 1 : 0) -
+                                 followingPosts.length - 
+                                 (followingUsers.isNotEmpty && followingPosts.isEmpty ? 1 : 0) -
+                                 1; // -1 for the divider
+                
+                if (postIndex >= publicPosts.length) {
+                  return SizedBox();
+                }
+                
+                final post = publicPosts[postIndex];
+                
+                // Double-check: Only show this post if user is not private
+                return StreamBuilder<UserRecord>(
+                  stream: UserRecord.getDocument(post.poster!),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData) {
+                      return SizedBox();
+                    }
+                    
+                    final user = userSnapshot.data!;
+                    
+                    // Skip posts from private accounts that user doesn't follow
+                    if (user.isPrivate && !followingUsers.contains(post.poster)) {
+                      return SizedBox(); // Don't show this post
+                    }
+                    
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: StandardizedPostItem(
+                        post: post,
+                        user: user,
+                        animateEntry: true,
+                        animationIndex: currentIndex,
+                        onLike: () {
+                          final isCurrentlyLiked = post.likes.contains(currentUserReference);
+                          _updatePostLikeState(post, !isCurrentlyLiked);
+                        },
+                        onSave: () {
+                          final isCurrentlySaved = post.postSavedBy.contains(currentUserReference);
+                          _updatePostSaveState(post, !isCurrentlySaved);
+                        },
+                      ),
+                    );
+                  },
+                );
+              }
+              
+              return SizedBox();
             },
           ),
         );
@@ -667,15 +974,18 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
                             latestPost.tags.isNotEmpty)
                           Padding(
                             padding: EdgeInsets.only(top: 8),
-                            child: TagFormatter.buildTagsWidget(
+                            child: TagFormatter.buildClickableTagsWidget(
                               context,
-                              latestPost.tags,
+                              latestPost.tags.split(',')
+                                  .map((tag) => tag.trim())
+                                  .where((tag) => tag.isNotEmpty)
+                                  .toList(),
                               style: FlutterFlowTheme.of(context)
                                   .bodySmall
                                   .override(
                                     fontFamily: 'Figtree',
                                     fontWeight: FontWeight.w500,
-                                    color: FlutterFlowTheme.of(context).primary,
+                                    color: Colors.white,
                                   ),
                             ),
                           ),
@@ -848,8 +1158,7 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
                                     await UserRecord.getDocumentOnce(
                                         latestPost.poster!);
                                 if (posterUser != null) {
-                                  ShareOptionsDialog.show(
-                                      context, latestPost, posterUser);
+                                  ShareOptionsDialog.show(context, latestPost, posterUser);
                                 }
                               },
                               padding: EdgeInsets.symmetric(
@@ -1415,7 +1724,21 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                           title: 'Dream Analysis',
                                           onTap: () {
                                             Navigator.pop(context);
+                                            // Direct navigation to Dream Analysis for testing
                                             context.pushNamed('DreamAnalysis');
+                                            
+                                            // Subscription check disabled for testing
+                                            // if (SubscriptionUtil.hasDreamAnalysis) {
+                                            //   context.pushNamed('DreamAnalysis');
+                                            // } else {
+                                            //   // Redirect to membership page
+                                            //   context.pushNamed('MembershipPage');
+                                            //   ScaffoldMessenger.of(context).showSnackBar(
+                                            //     SnackBar(
+                                            //       content: Text('Dream Analysis requires a premium subscription'),
+                                            //       backgroundColor: FlutterFlowTheme.of(context).primary,
+                                            //     ),
+                                            //   );
                                           },
                                         ),
                                         _buildDrawerItem(
@@ -1625,7 +1948,22 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       title: 'Dream Analysis',
                       onTap: () {
                         Navigator.pop(context);
+                        // Direct navigation to Dream Analysis for testing
                         context.pushNamed('DreamAnalysis');
+                        
+                        // Subscription check disabled for testing
+                        // if (SubscriptionUtil.hasDreamAnalysis) {
+                        //   context.pushNamed('DreamAnalysis');
+                        // } else {
+                        //   // Redirect to membership page
+                        //   context.pushNamed('MembershipPage');
+                        //   ScaffoldMessenger.of(context).showSnackBar(
+                        //     SnackBar(
+                        //       content: Text('Dream Analysis requires a premium subscription'),
+                        //       backgroundColor: FlutterFlowTheme.of(context).primary,
+                        //     ),
+                        //   );
+                        // }
                       },
                     ),
                     _buildDrawerItem(
@@ -2009,14 +2347,19 @@ class _HomePageWidgetState extends State<HomePageWidget>
   }
 
   void _onScroll() {
-    if (_scrollController.offset > 50 && !_isScrolled) {
-      setState(() {
-        _isScrolled = true;
-      });
-    } else if (_scrollController.offset <= 50 && _isScrolled) {
-      setState(() {
-        _isScrolled = false;
-      });
+    // Only update state if absolutely needed, and don't perform any actions that would affect scroll position
+    if (_scrollController.hasClients && mounted) {
+      final currentOffset = _scrollController.offset;
+      final newIsScrolled = currentOffset > 50;
+      final newShowHeaderShadow = currentOffset > 10;
+      
+      // Only call setState if values actually changed to prevent unnecessary rebuilds
+      if (newIsScrolled != _isScrolled || newShowHeaderShadow != _showHeaderShadow) {
+        setState(() {
+          _isScrolled = newIsScrolled;
+          _showHeaderShadow = newShowHeaderShadow;
+        });
+      }
     }
   }
 
@@ -2034,82 +2377,46 @@ class _HomePageWidgetState extends State<HomePageWidget>
     _checkingNotificationPermission = true;
 
     try {
-      // Check if the user is logged in
       if (currentUser?.uid == null) {
         _checkingNotificationPermission = false;
         return;
       }
 
-      // Check if we've already asked for permission
       final prefs = await SharedPreferences.getInstance();
-      final permissionAsked =
-          prefs.getBool('notification_permission_asked') ?? false;
-      final permissionGranted =
-          prefs.getBool('notification_permission_granted') ?? false;
+      final permissionAsked = prefs.getBool('notification_permission_asked') ?? false;
+      final permissionGranted = prefs.getBool('notification_permission_granted') ?? false;
 
-      // If permission already granted, no need to show dialog
       if (permissionGranted) {
         _checkingNotificationPermission = false;
         return;
       }
 
-      // If we haven't asked before or it's a new user, show immediately
       if (!permissionAsked) {
-        // Show the permission dialog immediately for new users
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          NotificationPermissionDialog.show(context).then((granted) async {
-            // Store the time we asked
-            final currentTimeMillis = DateTime.now().millisecondsSinceEpoch;
-            await prefs.setInt(
-                'notification_permission_last_asked_time', currentTimeMillis);
-
-            if (granted) {
-              // If permission granted, make sure user is registered with FCM
-              await prefs.setBool('notification_permission_granted', true);
-              // The NotificationService.requestPermission already registers the token
-            }
-          });
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          final hasPermission = await NotificationService().requestPermission();
+          final currentTimeMillis = DateTime.now().millisecondsSinceEpoch;
+          await prefs.setInt('notification_permission_last_asked_time', currentTimeMillis);
+          await prefs.setBool('notification_permission_asked', true);
+          await prefs.setBool('notification_permission_granted', hasPermission);
         });
         _checkingNotificationPermission = false;
         return;
       }
 
-      // Don't ask if we've already asked in the last week
-      final lastAskedTimeMillis =
-          prefs.getInt('notification_permission_last_asked_time') ?? 0;
+      final lastAskedTimeMillis = prefs.getInt('notification_permission_last_asked_time') ?? 0;
       final currentTimeMillis = DateTime.now().millisecondsSinceEpoch;
       final weekInMillis = 7 * 24 * 60 * 60 * 1000;
 
-      if (permissionAsked &&
-          (currentTimeMillis - lastAskedTimeMillis < weekInMillis)) {
+      if (permissionAsked && (currentTimeMillis - lastAskedTimeMillis < weekInMillis)) {
         _checkingNotificationPermission = false;
         return;
       }
 
-      // For returning users who previously denied permission,
-      // show the dialog after some activity
-      // Check if the user has been active for a sufficient amount of time
-      final firstOpenTime =
-          prefs.getInt('first_open_time') ?? currentTimeMillis;
-
-      if (firstOpenTime == currentTimeMillis) {
-        // First time opening the app, save the timestamp
-        await prefs.setInt('first_open_time', currentTimeMillis);
-      }
-
-      // For returning users who denied before, wait a bit before asking again
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        NotificationPermissionDialog.show(context).then((granted) async {
-          // Store the time we asked
-          await prefs.setInt(
-              'notification_permission_last_asked_time', currentTimeMillis);
-
-          if (granted) {
-            // If permission granted, make sure user is registered with FCM
-            await prefs.setBool('notification_permission_granted', true);
-            // The NotificationService.requestPermission already registers the token
-          }
-        });
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final hasPermission = await NotificationService().requestPermission();
+        await prefs.setInt('notification_permission_last_asked_time', currentTimeMillis);
+        await prefs.setBool('notification_permission_asked', true);
+        await prefs.setBool('notification_permission_granted', hasPermission);
       });
     } catch (e) {
       print('Error checking notification permission: $e');

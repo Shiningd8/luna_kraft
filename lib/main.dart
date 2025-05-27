@@ -1,15 +1,19 @@
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'dart:ui';
 import 'dart:async';
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
+// import 'package:firebase_app_check/firebase_app_check.dart';
+import 'auth/firebase_auth/firebase_app_check_stub.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io' show Platform;
+// import 'package:unity_ads_plugin/unity_ads_plugin.dart';
+// import 'services/unity_ads_service.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -26,12 +30,12 @@ import '/components/base_layout.dart';
 import '/flutter_flow/flutter_flow_widget_state.dart' as ff;
 import '/utils/logging_config.dart';
 import '/splash_screen.dart';
-import '/services/native_ad_factory.dart';
 import '/services/purchase_service.dart';
 import '/services/subscription_manager.dart';
 import '/onboarding/onboarding_manager.dart';
 import '/services/notification_service.dart';
 import '/services/network_service.dart';
+import '/services/app_state_tracker.dart';
 import '/widgets/notification_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -39,14 +43,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/services.dart';
+import '/utils/deep_link_helper.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+// import 'services/ads_provider.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     // Ensure Firebase is initialized since this can run when app is terminated
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      print('Firebase initialized in background handler');
+    }
+    
     print('Handling a background message: ${message.messageId}');
     print('Background message data: ${message.data}');
 
@@ -132,30 +145,51 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Set system UI overlay style to prevent text selection grey boxes
+  SystemChrome.setSystemUIOverlayStyle(
+    SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+    ),
+  );
+  
   GoRouter.optionURLReflectsImperativeAPIs = true;
   usePathUrlStrategy();
 
   // Initialize log filtering
   LoggingConfig.initialize();
 
-  // Register background handler before Firebase initialization
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // Initialize Firebase properly with options
+  // Initialize Firebase properly with options first - before any Firebase usage
   try {
-    // This ensures Firebase is initialized properly for background notifications
-    await initFirebase();
-
-    // Make sure messaging is properly initialized
-    await FirebaseMessaging.instance.setAutoInitEnabled(true);
-
-    print('Firebase initialized successfully');
+    // This ensures Firebase is initialized once
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      print('Firebase initialized successfully - first initialization');
+    } else {
+      print('Firebase was already initialized');
+    }
   } catch (e) {
     print('Error initializing Firebase: $e');
   }
 
+  // Initialize dynamic links handler
+  try {
+    await DeepLinkHelper.initDynamicLinks();
+    print('Dynamic links handler initialized');
+  } catch (e) {
+    print('Error initializing dynamic links handler: $e');
+  }
+  
+  // Register background handler after Firebase initialization
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   // Initialize notification service early
   await NotificationService().initialize();
+  
+  // Initialize app state tracker
+  AppStateTracker().initialize();
 
   // Configure Firebase App Check safely
   await _configureFirebaseAppCheck();
@@ -221,70 +255,46 @@ Future<void> main() async {
     print('Error preloading onboarding status: $e');
   }
 
-  // Initialize AdMob
-  try {
-    await MobileAds.instance.initialize();
-    print('AdMob SDK initialized successfully');
-
-    // Register the custom native ad factory
-    LunaKraftNativeAdFactory.registerNativeAdFactory();
-
-    // Completely disable AdMob validator popups in debug mode
-    if (kDebugMode) {
-      final RequestConfiguration config = RequestConfiguration(
-        tagForChildDirectedTreatment: TagForChildDirectedTreatment.unspecified,
-        testDeviceIds: ['TEST_DEVICE_ID'],
-        tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.unspecified,
-        maxAdContentRating: MaxAdContentRating.g,
-      );
-
-      MobileAds.instance.updateRequestConfiguration(config);
-
-      // Set a flag in userDefaults/SharedPreferences to disable validator
-      try {
-        // Disable validator completely for both platforms
-        print('Setting ad validator disabled flag');
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('admob_validator_disabled', true);
-
-        // This approach helps disable validator on iOS
-        if (Platform.isIOS) {
-          print('Setting iOS ad validator disabled flag');
-          // iOS-specific code would go here if needed
-        }
-        // For Android
-        else if (Platform.isAndroid) {
-          print('Setting Android ad validator disabled flag');
-          // Android-specific code would go here if needed
-        }
-      } catch (e) {
-        print('Error setting platform-specific validator flags: $e');
-      }
-
-      print('AdMob validator completely disabled');
-    } else {
-      // Set test device IDs for development
-      MobileAds.instance.updateRequestConfiguration(
-        RequestConfiguration(
-          testDeviceIds: ['TEST_DEVICE_ID'], // Replace with your test device ID
-        ),
-      );
-    }
-  } catch (e) {
-    print('Error initializing AdMob SDK: $e');
-  }
-
   // Initialize subscription service
   try {
+    print('Starting RevenueCat initialization...');
+    
+    // First configure RevenueCat
+    await Purchases.setLogLevel(LogLevel.debug);
+    await Purchases.configure(PurchasesConfiguration('appl_aUbICkbeGteMFoiMsBOJzdjVoTE'));
+    
+    // Wait to ensure RevenueCat is fully initialized
+    await Future.delayed(Duration(seconds: 1));
+    
+    // Now call our PurchaseService init which handles caching and other setup
     await PurchaseService.init();
+    
+    print('RevenueCat configuration complete');
+    
     if (kDebugMode) {
-      print(
-          'Subscription service initialized in DEBUG MODE - Using mock purchases');
+      print('Subscription service initialized in DEBUG MODE - Using mock purchases');
     } else {
       print('Subscription service initialized successfully');
     }
+    
+    // Explicitly verify initialization is successful
+    try {
+      final customerInfo = await Purchases.getCustomerInfo();
+      print('✅ RevenueCat customer info successfully retrieved: ${customerInfo.originalAppUserId}');
+    } catch (verifyError) {
+      print('⚠️ RevenueCat verification check failed, but continuing: $verifyError');
+    }
   } catch (e) {
     print('Error initializing subscription service: $e');
+    
+    // Fallback approach - try direct configuration 
+    try {
+      print('Attempting fallback initialization of RevenueCat...');
+      await Purchases.configure(PurchasesConfiguration('appl_aUbICkbeGteMFoiMsBOJzdjVoTE'));
+      print('Fallback initialization completed');
+    } catch (fallbackError) {
+      print('Fallback initialization also failed: $fallbackError');
+    }
   }
 
   // Initialize subscription manager
@@ -303,17 +313,77 @@ Future<void> main() async {
   // Initialize our custom AppState for music
   final musicAppState = custom_app_state.AppState();
 
+  // Customize text selection controls to prevent large grey box
+  final ThemeData theme = ThemeData(
+    // Default brightness and colors
+    brightness: Brightness.light,
+    primaryColor: Color(0xFF7963DF),
+    primarySwatch: MaterialColor(0xFF7963DF, {
+      50: Color(0xFFEEEBFA),
+      100: Color(0xFFD4CDF2),
+      200: Color(0xFFB8ACE9),
+      300: Color(0xFF9C8AE0),
+      400: Color(0xFF8A77DA),
+      500: Color(0xFF7963DF),
+      600: Color(0xFF715BCA),
+      700: Color(0xFF6651B4),
+      800: Color(0xFF5B479F),
+      900: Color(0xFF4B3577),
+    }),
+    
+    // Text selection configuration
+    textSelectionTheme: TextSelectionThemeData(
+      selectionColor: Color(0xFF7963DF).withOpacity(0.2),
+      cursorColor: Color(0xFF7963DF),
+      selectionHandleColor: Color(0xFF7963DF),
+    ),
+    
+    // Platform setting
+    platform: TargetPlatform.android,
+    
+    // Input decoration
+    inputDecorationTheme: InputDecorationTheme(
+      focusedBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: Color(0xFF7963DF), width: 1.0),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      fillColor: Colors.white.withOpacity(0.05),
+      filled: true,
+    ),
+    
+    // AppBar theme
+    appBarTheme: AppBarTheme(
+      backgroundColor: Color(0xFF7963DF),
+      foregroundColor: Colors.white,
+      systemOverlayStyle: SystemUiOverlayStyle.light,
+    ),
+    
+    // Material 2 design
+    useMaterial3: false,
+    
+    // Cupertino theme overrides
+    cupertinoOverrideTheme: CupertinoThemeData(
+      primaryColor: Color(0xFF7963DF),
+      textTheme: CupertinoTextThemeData(
+        primaryColor: Color(0xFF7963DF),
+      ),
+    ),
+    
+    // Enhanced visual density and typography
+    visualDensity: VisualDensity.adaptivePlatformDensity,
+  );
+
   runApp(MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (context) => appState),
       ChangeNotifierProvider(create: (context) => musicAppState),
     ],
-    child: MyApp(),
+    child: MyApp(theme: theme),
   ));
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key, this.entryPage});
+  const MyApp({super.key, this.entryPage, required this.theme});
 
   // This widget is the root of your application.
   @override
@@ -323,6 +393,7 @@ class MyApp extends StatefulWidget {
       context.findAncestorStateOfType<_MyAppState>()!;
 
   final Widget? entryPage;
+  final ThemeData theme;
 }
 
 class _MyAppState extends State<MyApp> {
@@ -340,6 +411,9 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _initializeApp();
+    
+    // Set app state to foreground when app starts
+    AppStateTracker().setForeground();
   }
 
   Future<void> _initializeApp() async {
@@ -417,6 +491,9 @@ class _MyAppState extends State<MyApp> {
     _router.dispose();
     _showSplashScreen = true;
 
+    // Clean up app state tracker
+    AppStateTracker().dispose();
+
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -451,10 +528,7 @@ class _MyAppState extends State<MyApp> {
     if (_showSplashScreen) {
       return MaterialApp(
         title: 'LunaKraft',
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          useMaterial3: false,
-        ),
+        theme: widget.theme,
         debugShowCheckedModeBanner: false,
         home: SplashScreen(
           onAnimationComplete: hideSplashScreen,
@@ -471,13 +545,23 @@ class _MyAppState extends State<MyApp> {
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: const [Locale('en', '')],
-        theme: ThemeData(
-          brightness: Brightness.light,
-          useMaterial3: false,
+        theme: widget.theme.copyWith(
+          cupertinoOverrideTheme: CupertinoThemeData(
+            primaryColor: Color(0xFF7963DF),
+            textTheme: CupertinoTextThemeData(
+              primaryColor: Color(0xFF7963DF),
+            ),
+          ),
         ),
         darkTheme: ThemeData(
           brightness: Brightness.dark,
           useMaterial3: false,
+          cupertinoOverrideTheme: CupertinoThemeData(
+            primaryColor: Color(0xFF7963DF),
+            textTheme: CupertinoTextThemeData(
+              primaryColor: Color(0xFF7963DF),
+            ),
+          ),
         ),
         themeMode: _themeMode,
         routerConfig: _router,
@@ -523,7 +607,7 @@ Future<void> _configureFirebaseAppCheck() async {
       );
     } else if (Platform.isAndroid) {
       await FirebaseAppCheck.instance.activate(
-        androidProvider: AndroidProvider.playIntegrity,
+        androidProvider: true, // Use boolean for stub implementation
       );
     } else if (Platform.isIOS) {
       await FirebaseAppCheck.instance.activate(

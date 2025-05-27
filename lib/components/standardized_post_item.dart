@@ -176,6 +176,11 @@ class _StandardizedPostItemState extends State<StandardizedPostItem> {
 
   @override
   Widget build(BuildContext context) {
+    // Skip rendering if the post author has blocked the current user
+    if (widget.user.blockedUsers.contains(currentUserReference)) {
+      return SizedBox.shrink(); // Return empty widget
+    }
+    
     Widget postWidget = GestureDetector(
       onTap: () => AppNavigationHelper.navigateToDetailedPost(
         context,
@@ -314,22 +319,17 @@ class _StandardizedPostItemState extends State<StandardizedPostItem> {
                   if (widget.post.tags != null &&
                       widget.post.tags.isNotEmpty) ...[
                     SizedBox(height: 8),
-                    Container(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: TagFormatter.buildTagsWidget(
-                        context,
-                        widget.post.tags,
-                        style: FlutterFlowTheme.of(context).bodySmall.override(
-                              fontFamily: 'Figtree',
-                              color: Colors.white.withOpacity(0.9),
-                              fontWeight: FontWeight.w500,
-                            ),
-                      ),
+                    TagFormatter.buildClickableTagsWidget(
+                      context,
+                      widget.post.tags.split(',')
+                          .map((tag) => tag.trim())
+                          .where((tag) => tag.isNotEmpty)
+                          .toList(),
+                      style: FlutterFlowTheme.of(context).bodySmall.override(
+                            fontFamily: 'Figtree',
+                            color: Colors.white.withOpacity(0.9),
+                            fontWeight: FontWeight.w500,
+                          ),
                     ),
                   ],
                   // Interaction buttons

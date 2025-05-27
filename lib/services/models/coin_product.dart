@@ -1,4 +1,4 @@
-import 'package:in_app_purchase/in_app_purchase.dart';
+// Don't import in_app_purchase to avoid conflict with RevenueCat
 
 class CoinProduct {
   final String id;
@@ -9,7 +9,7 @@ class CoinProduct {
   final String currencyCode;
   final String currencySymbol;
   final String? bonus;
-  final ProductDetails? productDetails;
+  // Removed ProductDetails to avoid dependency on in_app_purchase
 
   CoinProduct({
     required this.id,
@@ -20,45 +20,12 @@ class CoinProduct {
     required this.currencyCode,
     required this.currencySymbol,
     this.bonus,
-    this.productDetails,
   });
 
-  factory CoinProduct.fromProductDetails(ProductDetails details,
-      {int? coinAmount, String? bonus}) {
-    String rawPrice = '0.00';
-    String currencyCode = 'USD';
-    String currencySymbol = '\$';
-
-    // Extract coin amount from product ID if not provided
-    coinAmount ??= _extractCoinAmount(details.id);
-
-    if (details.currencyCode != null) {
-      currencyCode = details.currencyCode!;
-    }
-
-    if (details.currencySymbol != null) {
-      currencySymbol = details.currencySymbol!;
-    }
-
-    if (details.rawPrice != null) {
-      rawPrice = details.rawPrice.toString();
-    }
-
-    return CoinProduct(
-      id: details.id,
-      title: details.title,
-      amount: coinAmount,
-      price: details.price,
-      rawPrice: rawPrice,
-      currencyCode: currencyCode,
-      currencySymbol: currencySymbol,
-      bonus: bonus,
-      productDetails: details,
-    );
-  }
+  // Factory method removed as it depended on ProductDetails
 
   // Helper to extract coin amount from product ID
-  static int _extractCoinAmount(String productId) {
+  static int extractCoinAmount(String productId) {
     // Try to parse the number from the product ID
     try {
       final regex = RegExp(r'(\d+)');

@@ -20,10 +20,6 @@ class LottieBackground extends StatelessWidget {
             bgFile.endsWith('.jpg') ||
             bgFile.endsWith('.jpeg');
 
-        // Debug logs
-        print('LottieBackground: Selected background file = $bgFile');
-        print('LottieBackground: Is image? $isImage');
-
         return Stack(
           fit: StackFit.expand,
           children: [

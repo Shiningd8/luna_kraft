@@ -13,6 +13,7 @@ import 'schema/user_record.dart';
 import 'schema/notifications_record.dart';
 import 'schema/analyze_record.dart';
 import 'schema/comments_record.dart';
+import 'schema/reports_record.dart';
 
 export 'dart:async' show StreamSubscription;
 export 'package:cloud_firestore/cloud_firestore.dart' hide Order;
@@ -27,6 +28,7 @@ export 'schema/user_record.dart';
 export 'schema/notifications_record.dart';
 export 'schema/analyze_record.dart';
 export 'schema/comments_record.dart';
+export 'schema/reports_record.dart';
 
 Future<void> initializeFirebase() async {
   await Firebase.initializeApp(
@@ -401,4 +403,46 @@ Future<List<CommentsRecord>> queryCommentsRecordOnce({
   }
   final snapshot = await query.get();
   return snapshot.docs.map((d) => CommentsRecord.fromSnapshot(d)).toList();
+}
+
+/// Functions to query ReportsRecords (as a Stream and as a Future).
+Future<int> queryReportsRecordCount({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+}) async {
+  final builder = queryBuilder ?? (q) => q;
+  var query = builder(_firestore.collection('reports'));
+  if (limit > 0) {
+    query = query.limit(limit);
+  }
+  final snapshot = await query.count().get();
+  return snapshot.count ?? 0;
+}
+
+Stream<List<ReportsRecord>> queryReportsRecord({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) {
+  final builder = queryBuilder ?? (q) => q;
+  var query = builder(_firestore.collection('reports'));
+  if (limit > 0 || singleRecord) {
+    query = query.limit(singleRecord ? 1 : limit);
+  }
+  return query.snapshots().map(
+      (s) => s.docs.map((d) => ReportsRecord.fromSnapshot(d)).toList());
+}
+
+Future<List<ReportsRecord>> queryReportsRecordOnce({
+  Query Function(Query)? queryBuilder,
+  int limit = -1,
+  bool singleRecord = false,
+}) async {
+  final builder = queryBuilder ?? (q) => q;
+  var query = builder(_firestore.collection('reports'));
+  if (limit > 0 || singleRecord) {
+    query = query.limit(singleRecord ? 1 : limit);
+  }
+  final snapshot = await query.get();
+  return snapshot.docs.map((d) => ReportsRecord.fromSnapshot(d)).toList();
 }

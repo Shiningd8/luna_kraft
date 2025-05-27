@@ -1,0 +1,217 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "47471F39",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "6745802970",
+      "localizations" : [
+        {
+          "description" : "Get 100 Lunacoins to your account",
+          "displayName" : "Lunacoins 100",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "ios.lunacoin_100",
+      "referenceName" : "Lunacoin_100",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "6745811018",
+      "localizations" : [
+        {
+          "description" : "Get 1000 Lunacoins",
+          "displayName" : "Lunacoins 1000",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "ios.lunacoin_1000",
+      "referenceName" : "Lunacoin_1000",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "6.99",
+      "familyShareable" : false,
+      "internalID" : "6745803560",
+      "localizations" : [
+        {
+          "description" : "Get 500 Lunacoins to your account",
+          "displayName" : "Lunacoin 500",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "ios.lunacoin_500",
+      "referenceName" : "Lunacoin_500",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6745803045",
+    "_developerTeamID" : "3V7HYZPA3V",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 768867883.93466794,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21685148",
+      "localizations" : [
+
+      ],
+      "name" : "Premium Subscriptions",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "19.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6745803951",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Get access to premium features for a month",
+              "displayName" : "Monthly Premium",
+              "locale" : "en_GB"
+            }
+          ],
+          "productID" : "ios.premium_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Premium Monthly",
+          "subscriptionGroupID" : "21685148",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : true,
+          "groupNumber" : 3,
+          "internalID" : "6745804036",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Get access to premium features for a week",
+              "displayName" : "Weekly Premium",
+              "locale" : "en_GB"
+            }
+          ],
+          "productID" : "ios.premium_weekly_sub",
+          "recurringSubscriptionPeriod" : "P1W",
+          "referenceName" : "Premium Weekly",
+          "subscriptionGroupID" : "21685148",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "74.99",
+          "familyShareable" : true,
+          "groupNumber" : 1,
+          "internalID" : "6745803917",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Get access to Premium features for a year",
+              "displayName" : "Yearly Premium",
+              "locale" : "en_GB"
+            }
+          ],
+          "productID" : "ios.premium_yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Premium Yearly",
+          "subscriptionGroupID" : "21685148",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

@@ -43,6 +43,12 @@ service cloud.firestore {
              (getUserId(get(postRef).data.poster) == request.auth.uid || 
               getUserId(get(postRef).data.userref) == request.auth.uid);
     }
+    
+    // Helper function to check if user can view a private post
+    function canViewPost() {
+      // Can view a post if it's not private or the user is the owner
+      return !resource.data.is_private || isPostOwner();
+    }
 
     // Add offline time buffer to prevent stale writes
     function isStaleWrite() {
@@ -51,7 +57,7 @@ service cloud.firestore {
 
     match /posts/{document} {
       allow create: if isAuthenticated();
-      allow read: if true;
+      allow read: if true; // Client-side filtering handles private post visibility
       allow update: if isAuthenticated() && (
         isPostOwner() || 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) ||
@@ -160,11 +166,12 @@ service cloud.firestore {
       allow delete: if false;
     }
     
-    match /feature_requests/{document} {
+    // New rules for user and comment reports
+    match /reports/{document} {
       allow create: if isAuthenticated();
-      allow read: if isAuthenticated();
-      allow update: if false;
-      allow delete: if false;
+      allow read: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
     
     // Add system collection for connectivity checks

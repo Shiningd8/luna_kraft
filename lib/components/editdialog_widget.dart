@@ -11,7 +11,8 @@ import '/auth/firebase_auth/auth_util.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:luna_kraft/flutter_flow/flutter_flow_animations.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+// import 'package:cloud_functions/cloud_functions.dart';
+import '../services/cloud_functions_stub.dart';
 
 class EditdialogWidget extends StatefulWidget {
   const EditdialogWidget({

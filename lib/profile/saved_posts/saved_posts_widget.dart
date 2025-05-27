@@ -45,9 +45,9 @@ class _SavedPostsWidgetState extends State<SavedPostsWidget>
     );
 
     _scrollController.addListener(() {
-      if (_scrollController.offset > 300 && !_showScrollToTop) {
+      if (_scrollController.position.pixels > 300 && !_showScrollToTop) {
         setState(() => _showScrollToTop = true);
-      } else if (_scrollController.offset <= 300 && _showScrollToTop) {
+      } else if (_scrollController.position.pixels <= 300 && _showScrollToTop) {
         setState(() => _showScrollToTop = false);
       }
     });
@@ -288,18 +288,21 @@ class _SavedPostsWidgetState extends State<SavedPostsWidget>
                       color: Colors.white,
                       strokeWidth: 3,
                       displacement: 50,
+                      edgeOffset: 0,
                       child: AnimationLimiter(
                         child: ListView.builder(
                           controller: _scrollController,
+                          physics: const ClampingScrollPhysics(),
                           padding: EdgeInsets.fromLTRB(16, 8, 16, 90),
                           itemCount: validPosts.length,
                           itemBuilder: (context, index) {
                             final post = validPosts[index];
                             return AnimationConfiguration.staggeredList(
                               position: index,
-                              duration: Duration(milliseconds: 375),
+                              duration: Duration(milliseconds: 250),
                               child: SlideAnimation(
-                                verticalOffset: 30.0,
+                                verticalOffset: 20.0,
+                                curve: Curves.easeOutCubic,
                                 child: FadeInAnimation(
                                   child: StreamBuilder<UserRecord>(
                                     stream:

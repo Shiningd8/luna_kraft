@@ -8,19 +8,22 @@ async function _geminiAPICall(context, ffVariables) {
   var headers = { "Content-Type": `application/json` };
   var params = {};
 
-  // Create the request body as a JavaScript object instead of a string template
+  // Properly form the prompt with the user input without using template literals for the variable
+  const promptText = 'You are a helpful dream-writing assistant. A user has shared fragments of a dream they remember. Your task is to weave these fragments into a complete dream narrative (200-220 words) using first person narration. The fragments should be integrated naturally throughout the story, not just used as a starting point. Create a coherent dream that incorporates all elements the user mentioned without adding any new characters, places, or names beyond what they provided. Keep your writing simple and straightforward while making the dream feel authentic. Also use simple english thats easy to understand. The dream fragments are: ' + userInputText;
+
+  // Create the request body as a JavaScript object
   const requestBody = {
     contents: [
       {
         parts: [
           {
-            text: "You are a helpful dream-writing assistant. A user has shared fragments of a dream they remember. Your task is to weave these fragments into a complete dream narrative (200-220 words) using first person narration. The fragments should be integrated naturally throughout the story, not just used as a starting point. Create a coherent dream that incorporates all elements the user mentioned without adding any new characters, places, or names beyond what they provided. Keep your writing simple and straightforward while making the dream feel authentic. Also use simple english thats easy to understand. The dream fragments are: ${escapeStringForJson(userInputText)}"
+            text: promptText
           }
         ]
       }
     ],
     generationConfig: {
-      temperature: 0.05, // Much lower temperature for more precise, literal responses
+      temperature: 0.05, // Lower temperature for more precise, literal responses
       maxOutputTokens: 300,
       topP: 0.7,
       topK: 20
@@ -45,7 +48,9 @@ async function _geminiAPICall(context, ffVariables) {
     ]
   };
 
-  return makeApiRequest({
+  console.log(`Making Gemini API request with prompt beginning: ${promptText.substring(0, 100)}...`);
+
+  const response = await makeApiRequest({
     method: "post",
     url,
     headers,
@@ -54,6 +59,25 @@ async function _geminiAPICall(context, ffVariables) {
     returnBody: true,
     isStreamingApi: false,
   });
+
+  console.log(`Received Gemini API response with status: ${response.statusCode}`);
+  
+  // Process the response for easier consumption by the client
+  if (response.statusCode === 200 && response.body) {
+    try {
+      // Extract the generated text
+      const generatedText = response.body.candidates[0].content.parts[0].text;
+      
+      // Add it as a top-level field for easier access
+      response.body.generatedText = generatedText;
+      
+      console.log(`Successfully extracted generated text: ${generatedText.substring(0, 100)}...`);
+    } catch (error) {
+      console.error(`Error extracting text from response: ${error}`);
+    }
+  }
+
+  return response;
 }
 
 /// Helper functions to route to the appropriate API Call.

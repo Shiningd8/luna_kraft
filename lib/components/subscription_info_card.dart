@@ -218,11 +218,11 @@ class SubscriptionInfoCard extends StatelessWidget {
 
   // Format the subscription name for display
   String _formatSubscriptionName(String subscriptionId) {
-    if (subscriptionId.contains('weekly')) {
+    if (subscriptionId.contains('weekly') || subscriptionId == 'ios.premium_weekly_sub') {
       return 'Premium Weekly';
-    } else if (subscriptionId.contains('monthly')) {
+    } else if (subscriptionId.contains('monthly') || subscriptionId == 'ios.premium_monthly') {
       return 'Premium Monthly';
-    } else if (subscriptionId.contains('yearly')) {
+    } else if (subscriptionId.contains('yearly') || subscriptionId == 'ios.premium_yearly') {
       return 'Premium Yearly';
     } else {
       return 'Premium';

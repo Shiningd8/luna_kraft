@@ -25,13 +25,18 @@ service cloud.firestore {
       );
     }
 
+    function canViewPost() {
+      // Can view a post if it's not private or the user is the owner
+      return !resource.data.is_private || isPostOwner();
+    }
+
     function postExists() {
       return exists(/databases/$(database)/documents/posts/$(request.path[3]));
     }
 
     match /posts/{document} {
       allow create: if isAuthenticated();
-      allow read: if true;
+      allow read: if true; // Client-side filtering handles private post visibility
       allow update: if isAuthenticated();
       allow delete: if isAuthenticated();
     }

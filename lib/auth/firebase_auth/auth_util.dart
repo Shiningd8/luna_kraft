@@ -8,7 +8,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:otp/otp.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:page_transition/page_transition.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'firebase_app_check_stub.dart';
+import 'dart:io';
 
 import '/backend/backend.dart';
 import '/services/app_state.dart';

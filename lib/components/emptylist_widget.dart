@@ -58,13 +58,16 @@ class _EmptylistWidgetState extends State<EmptylistWidget> {
       },
       child: Column(
         mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Lottie.asset(
-            'assets/jsons/Animation_-_1741509763923.json',
-            width: 200.0,
-            height: 171.5,
-            fit: BoxFit.contain,
-            animate: true,
+          Center(
+            child: Lottie.asset(
+              'assets/jsons/Animation_-_1741509763923.json',
+              width: 200.0,
+              height: 171.5,
+              fit: BoxFit.contain,
+              animate: true,
+            ),
           ),
           Padding(
             padding: EdgeInsetsDirectional.fromSTEB(0.0, 16.0, 0.0, 0.0),
@@ -73,7 +76,7 @@ class _EmptylistWidgetState extends State<EmptylistWidget> {
               style: FlutterFlowTheme.of(context).headlineMedium.override(
                     fontFamily: 'Outfit',
                     letterSpacing: 0.0,
-                    color: FlutterFlowTheme.of(context).primaryText,
+                    color: Colors.white,
                     fontWeight: FontWeight.w600,
                   ),
             ),

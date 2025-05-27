@@ -18,7 +18,8 @@ import 'package:luna_kraft/flutter_flow/flutter_flow_util.dart';
 import 'package:luna_kraft/flutter_flow/flutter_flow_widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:luna_kraft/auth/firebase_auth/auth_util.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+// import 'package:cloud_functions/cloud_functions.dart';
+import '../services/cloud_functions_stub.dart';
 
 class AnimatedEditDialog extends StatefulWidget {
   const AnimatedEditDialog({
@@ -692,7 +693,7 @@ class _AnimatedEditDialogState extends State<AnimatedEditDialog> {
                         bgColor: Color(0xFF4B39EF).withOpacity(0.1),
                         iconColor: Color(0xFF4B39EF),
                         onTap: () {
-                          Navigator.pop(context);
+                          // Don't pop here, let _sharePost handle it
                           _sharePost(context, post);
                         },
                         animationDelay: 250,
@@ -846,15 +847,22 @@ class _AnimatedEditDialogState extends State<AnimatedEditDialog> {
 
   // Add share post functionality
   void _sharePost(BuildContext context, PostsRecord post) {
-    // Get the user record for the post
+    // Store the navigator context before popping
+    final navigatorContext = Navigator.of(context).context;
+    
+    // Close the dialog first
+    Navigator.pop(context);
+    
+    // Get the user record for the post using the navigator context
     UserRecord.getDocumentOnce(post.poster!).then((user) {
-      if (user != null) {
-        ShareOptionsDialog.show(context, post, user);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (user != null && navigatorContext.mounted) {
+        // Use the stored navigator context which is still valid
+        ShareOptionsDialog.show(navigatorContext, post, user);
+      } else if (navigatorContext.mounted) {
+        ScaffoldMessenger.of(navigatorContext).showSnackBar(
           SnackBar(
             content: Text('Cannot share: User information unavailable'),
-            backgroundColor: FlutterFlowTheme.of(context).error,
+            backgroundColor: FlutterFlowTheme.of(navigatorContext).error,
           ),
         );
       }

@@ -128,7 +128,7 @@ class _AnalysisWidgetState extends State<AnalysisWidget>
       final userRef =
           FirebaseFirestore.instance.collection('User').doc(currentUser.uid);
 
-      // Get recent dreams
+      // Get recent dreams (including private posts since they're the user's own posts)
       final dreamsQuery = await PostsRecord.collection
           .where('userref', isEqualTo: userRef)
           .orderBy('date', descending: true)

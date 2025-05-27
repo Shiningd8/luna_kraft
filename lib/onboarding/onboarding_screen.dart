@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:luna_kraft/onboarding/onboarding_data.dart';
 import 'package:luna_kraft/onboarding/onboarding_page.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'dart:math' as math;
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onComplete;
@@ -108,32 +109,45 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               },
             ),
 
-            // Animated stars in background
-            ...List.generate(30, (index) {
-              final random = index * 3.14159 / 15;
+            // Animated stars in background with natural pattern
+            ...List.generate(40, (index) {
+              // Use Math.sin and Math.cos with random values to create organic patterns
+              final randomAngle = (index * 0.62831853 + index * 0.1);
+              final randomRadius = (index % 5) * 60.0 + (index * 3.7) % 40;
+              final randomSize = (index % 3) * 0.7 + 1.2; // Varied star sizes
+              final delay = (index * 37) % 500; // Varied animation delays
+              
               return Positioned(
-                left: 100 * (index % 5) + 20,
-                top: 60 * (index ~/ 5) + 40,
+                // Use sin/cos for more organic positioning, with varied offsets
+                left: MediaQuery.of(context).size.width * (0.1 + 0.8 * ((math.sin(randomAngle) + 1) / 2)),
+                top: 80 + 200 * ((math.cos(randomAngle) + 1) / 2) + (index % 7) * 10,
                 child: Container(
-                  width: 4,
-                  height: 4,
+                  width: randomSize,
+                  height: randomSize,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Colors.white.withOpacity(0.7 + (index % 4) * 0.1),
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.5),
+                        blurRadius: randomSize,
+                        spreadRadius: randomSize * 0.2,
+                      ),
+                    ],
                   ),
                 )
                     .animate(
-                      onPlay: (controller) => controller.repeat(),
+                      onPlay: (controller) => controller.repeat(reverse: true),
                     )
                     .scaleXY(
-                      begin: 0.5,
-                      end: 1.5,
+                      begin: 0.7,
+                      end: 1.2,
                       curve: Curves.easeInOut,
-                      duration: 1500.ms,
+                      duration: (1200 + (index % 7) * 300).ms,
                     )
                     .fadeIn(
                       curve: Curves.easeIn,
-                      duration: (700 + index * 100).ms,
+                      duration: (700 + delay).ms,
                     ),
               );
             }),
@@ -299,55 +313,165 @@ class SimpleFinalOnboardingPage extends StatelessWidget {
         child: Center(
           child: Stack(
             children: [
-              // Moon
+              // Enhanced Moon with lunar details
               Positioned(
                 top: 50,
                 right: 0,
                 left: 0,
                 child: Center(
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.9),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.white.withOpacity(0.5),
-                          blurRadius: 20,
-                          spreadRadius: 10,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Moon glow
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.3),
+                              blurRadius: 30,
+                              spreadRadius: 15,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ).animate().scale(
-                        begin: Offset(0.8, 0.8),
-                        end: Offset(1.0, 1.0),
-                        duration: 2000.ms,
-                        curve: Curves.easeOut,
                       ),
+                      
+                      // Main moon surface
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            center: Alignment(-0.2, -0.2),
+                            radius: 0.9,
+                            colors: [
+                              Color(0xFFF5F5F5), // Bright white center
+                              Color(0xFFE0E0E0), // Light gray
+                              Color(0xFFCECECE), // Medium gray edge
+                            ],
+                            stops: [0.0, 0.7, 1.0],
+                          ),
+                        ),
+                      ),
+                      
+                      // Lunar craters
+                      Positioned(
+                        top: 30,
+                        left: 30,
+                        child: Container(
+                          width: 15,
+                          height: 15,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black.withOpacity(0.05),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.5),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                                offset: Offset(-1, -1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      
+                      // Smaller crater
+                      Positioned(
+                        top: 60,
+                        right: 35,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black.withOpacity(0.04),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.5),
+                                blurRadius: 3,
+                                spreadRadius: 1,
+                                offset: Offset(-1, -1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      
+                      // Tiny crater
+                      Positioned(
+                        bottom: 35,
+                        left: 40,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black.withOpacity(0.03),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.5),
+                                blurRadius: 2,
+                                spreadRadius: 1,
+                                offset: Offset(-1, -1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ).animate().scale(
+                    begin: Offset(0.8, 0.8),
+                    end: Offset(1.0, 1.0),
+                    duration: 2000.ms,
+                    curve: Curves.easeOut,
+                  ),
                 ),
               ),
 
-              // Stars in random positions
-              ...List.generate(20, (index) {
-                final delay = (index * 100).ms;
-                final size = 4.0 + (index % 3) * 2.0;
+              // Stars in random positions with natural pattern
+              ...List.generate(25, (index) {
+                final randomAngle = (index * 0.52831853 + index * 0.07);
+                final randomRadius = 80 + (index % 7) * 15;
+                final randomSize = 2.0 + (index % 4) * 0.8;
+                final delay = (index * 43) % 600;
+
+                // Calculate position using polar coordinates for a more natural spread
+                final x = constraints.maxWidth / 2 + 
+                    randomRadius * math.cos(randomAngle) * 
+                    (0.5 + (index % 5) * 0.1);
+                    
+                final y = 120 + 
+                    randomRadius * math.sin(randomAngle) * 
+                    (0.5 + (index % 3) * 0.1);
 
                 return Positioned(
-                  left: (index * 17) % (constraints.maxWidth - 40),
-                  top: ((index * 25) % 200) + 20,
+                  left: x % constraints.maxWidth,
+                  top: y % 250,
                   child: Container(
-                    width: size,
-                    height: size,
+                    width: randomSize,
+                    height: randomSize,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Colors.white.withOpacity(0.8 + (index % 3) * 0.1),
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withOpacity(0.6),
+                          blurRadius: randomSize,
+                          spreadRadius: randomSize * 0.2,
+                        ),
+                      ],
                     ),
-                  ).animate(delay: delay).fadeIn(duration: 500.ms).scaleXY(
-                        begin: 0.5,
-                        end: 1.0,
-                        duration: 1000.ms,
-                      ),
+                  ).animate(delay: delay.ms)
+                    .fadeIn(duration: 800.ms)
+                    .scaleXY(
+                      begin: 0.6,
+                      end: 1.2,
+                      duration: (1500 + (index % 5) * 300).ms,
+                    ),
                 );
               }),
             ],

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '/services/notification_service.dart';
+import '/services/app_state_tracker.dart';
 
 class NotificationHandler extends StatefulWidget {
   final Widget child;
@@ -31,6 +32,13 @@ class _NotificationHandlerState extends State<NotificationHandler>
     WidgetsBinding.instance.addObserver(this);
     _isAppActive =
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+        
+    // Update app state
+    if (_isAppActive) {
+      AppStateTracker().setForeground();
+    } else {
+      AppStateTracker().setBackground();
+    }
 
     // Subscribe to notification events in a safe way
     _setupNotificationListener();
@@ -93,7 +101,11 @@ class _NotificationHandlerState extends State<NotificationHandler>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _isAppActive = state == AppLifecycleState.resumed;
 
+    // Update app state in Firestore based on lifecycle
     if (_isAppActive) {
+      // App became active
+      AppStateTracker().setForeground();
+      
       // App became active, we can listen to notifications
       _setupNotificationListener();
 
@@ -102,6 +114,9 @@ class _NotificationHandlerState extends State<NotificationHandler>
         _addDebugButtonOverlay();
       }
     } else {
+      // App is going to background
+      AppStateTracker().setBackground();
+      
       // App is going to background, cancel subscription to avoid issues
       _notificationSubscription?.cancel();
       _notificationSubscription = null;
@@ -161,7 +176,14 @@ class _NotificationHandlerState extends State<NotificationHandler>
         child: Overlay(
           initialEntries: [
             OverlayEntry(
-              builder: (context) => widget.child,
+              builder: (context) => GestureDetector(
+                onTap: () {
+                  // This will dismiss the keyboard when tapping anywhere outside a text field
+                  FocusScope.of(context).unfocus();
+                  FocusManager.instance.primaryFocus?.unfocus();
+                },
+                child: widget.child,
+              ),
             ),
           ],
         ),

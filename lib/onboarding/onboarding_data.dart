@@ -89,17 +89,7 @@ final List<OnboardingPageData> onboardingPages = [
     animationType: AnimationType.lottie,
   ),
 
-  // 7. Permission Requests
-  OnboardingPageData(
-    title: "Stay in the Loop",
-    description:
-        "Get notified when someone reacts to your dream or when a new dream trend arises.",
-    animationPath: "assets/lottie/notification.json",
-    ctaText: "Allow Notifications",
-    animationType: AnimationType.lottie,
-  ),
-
-  // 8. Final Screen
+  // 7. Final Screen
   OnboardingPageData(
     title: "You're ready to dream with us",
     description: "Start your Lunakraft journey.",

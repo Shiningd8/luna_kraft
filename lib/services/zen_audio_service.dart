@@ -3,6 +3,9 @@ import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
+import '/auth/firebase_auth/auth_util.dart';
+import '/backend/backend.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ZenAudioSound {
   final String name;
@@ -11,6 +14,8 @@ class ZenAudioSound {
   double volume;
   bool isActive;
   AudioPlayer? player;
+  final bool isLocked;
+  final int? unlockPrice;
 
   ZenAudioSound({
     required this.name,
@@ -19,6 +24,8 @@ class ZenAudioSound {
     this.volume = 0.5,
     this.isActive = false,
     this.player,
+    this.isLocked = false,
+    this.unlockPrice,
   });
 
   Map<String, dynamic> toJson() {
@@ -74,6 +81,7 @@ class ZenAudioService extends ChangeNotifier {
   bool _isInitialized = false;
   Timer? _zenTimer;
   int _timerDurationMinutes = 0;
+  List<String> _unlockedSounds = []; // Store unlocked sounds
 
   // Keep track of which sounds were active when paused
   List<String> _activeSoundsBeforePause = [];
@@ -81,12 +89,16 @@ class ZenAudioService extends ChangeNotifier {
   // Debug flag - set to true for verbose logging
   final bool _debug = true;
 
+  // Keys for storing unlocked sounds
+  static const String _unlockedSoundsKey = 'unlocked_zen_sounds';
+
   // Getters
   List<ZenAudioSound> get availableSounds => _availableSounds;
   List<ZenAudioPreset> get presets => _presets;
   bool get isPlaying => _isPlaying;
   bool get isInitialized => _isInitialized;
   int get timerDurationMinutes => _timerDurationMinutes;
+  List<String> get unlockedSounds => _unlockedSounds;
 
   // Singleton constructor
   factory ZenAudioService() {
@@ -95,12 +107,120 @@ class ZenAudioService extends ChangeNotifier {
 
   ZenAudioService._internal() {
     _debugLog('ZenAudioService initialized');
+    _loadUnlockedSounds();
   }
 
   // Helper method for debug logging
   void _debugLog(String message) {
     if (_debug) {
       print('🧘 ZenAudioService: $message');
+    }
+  }
+
+  // Get the current user's unlocked sounds key
+  String get _userUnlockedSoundsKey {
+    final user = currentUserReference;
+    return user != null ? '${_unlockedSoundsKey}_${user.id}' : _unlockedSoundsKey;
+  }
+
+  // Load unlocked sounds from SharedPreferences
+  Future<void> _loadUnlockedSounds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUnlocked = prefs.getStringList(_userUnlockedSoundsKey);
+      
+      if (savedUnlocked != null) {
+        _unlockedSounds = savedUnlocked;
+        _debugLog('Loaded unlocked sounds: $_unlockedSounds');
+      } else {
+        // Default to empty list for new users
+        _unlockedSounds = [];
+        _debugLog('No unlocked sounds found, using empty list');
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      _debugLog('Error loading unlocked sounds: $e');
+    }
+  }
+
+  // Save unlocked sounds to SharedPreferences
+  Future<void> _saveUnlockedSounds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_userUnlockedSoundsKey, _unlockedSounds);
+      _debugLog('Saved unlocked sounds: $_unlockedSounds');
+    } catch (e) {
+      _debugLog('Error saving unlocked sounds: $e');
+    }
+  }
+
+  // Check if a sound is unlocked
+  bool isSoundUnlocked(String soundName) {
+    // Check if it's one of the locked sounds
+    if (soundName == 'Wind' || soundName == 'Birds' || soundName == 'Stream') {
+      return _unlockedSounds.contains(soundName);
+    }
+    
+    // All other sounds are unlocked by default
+    return true;
+  }
+
+  // Get the price for a sound
+  int getSoundPrice(String soundName) {
+    switch (soundName) {
+      case 'Wind':
+        return 120;
+      case 'Birds':
+        return 150;
+      case 'Stream':
+        return 180;
+      default:
+        return 0; // All other sounds are free
+    }
+  }
+
+  // Unlock a sound
+  Future<bool> unlockSound(String soundName) async {
+    if (isSoundUnlocked(soundName)) {
+      return true; // Already unlocked
+    }
+
+    // Get current user
+    final userRef = currentUserReference;
+    if (userRef == null) {
+      return false;
+    }
+
+    try {
+      // Get the price
+      final price = getSoundPrice(soundName);
+      
+      // Get user's current coins
+      final userDoc = await UserRecord.getDocumentOnce(userRef);
+      final currentCoins = userDoc.lunaCoins;
+      
+      // Check if user has enough coins
+      if (currentCoins < price) {
+        return false;
+      }
+      
+      // Deduct coins
+      await userRef.update({
+        'luna_coins': FieldValue.increment(-price),
+      });
+      
+      // Add to unlocked sounds
+      _unlockedSounds.add(soundName);
+      await _saveUnlockedSounds();
+      
+      // Notify listeners
+      notifyListeners();
+      
+      return true;
+    } catch (e) {
+      _debugLog('Error unlocking sound: $e');
+      return false;
     }
   }
 
@@ -189,6 +309,9 @@ class ZenAudioService extends ChangeNotifier {
 
     _debugLog('Initializing zen audio service');
 
+    // Load unlocked sounds first
+    await _loadUnlockedSounds();
+
     // Define available sounds with correct asset paths
     _availableSounds = [
       ZenAudioSound(
@@ -220,16 +343,22 @@ class ZenAudioService extends ChangeNotifier {
         name: 'Wind',
         assetPath: 'assets/audio/zen/wind.mp3',
         iconPath: 'assets/icons/zen/wind.png',
+        isLocked: !_unlockedSounds.contains('Wind'),
+        unlockPrice: 120,
       ),
       ZenAudioSound(
         name: 'Birds',
         assetPath: 'assets/audio/zen/birds.mp3',
         iconPath: 'assets/icons/zen/birds.png',
+        isLocked: !_unlockedSounds.contains('Birds'),
+        unlockPrice: 150,
       ),
       ZenAudioSound(
         name: 'Stream',
         assetPath: 'assets/audio/zen/stream.mp3',
         iconPath: 'assets/icons/zen/stream.png',
+        isLocked: !_unlockedSounds.contains('Stream'),
+        unlockPrice: 180,
       ),
     ];
 
@@ -307,6 +436,12 @@ class ZenAudioService extends ChangeNotifier {
     }
 
     final sound = _availableSounds[soundIndex];
+    
+    // Check if the sound is locked
+    if (sound.isLocked && !isSoundUnlocked(soundName)) {
+      _debugLog('Attempted to toggle locked sound: $soundName');
+      return; // Don't toggle locked sounds
+    }
 
     // Toggle the active state
     sound.isActive = !sound.isActive;
@@ -498,223 +633,282 @@ class ZenAudioService extends ChangeNotifier {
         if (soundIndex >= 0) {
           final sound = _availableSounds[soundIndex];
 
-          // Make sure the sound is marked as active
-          sound.isActive = true;
-
-          // Clean up existing player if any
-          if (sound.player != null) {
-            await _safeDisposePlayer(sound.player, sound.name);
+          // Skip locked sounds
+          if (sound.isLocked && !isSoundUnlocked(soundName)) {
+            _debugLog('Skipping locked sound: $soundName');
+            continue;
           }
 
-          // Create a completely new player
-          sound.player =
-              await _createAndInitializePlayer(sound.assetPath, sound.name);
-
-          if (sound.player != null) {
-            // Set volume before playing
-            await sound.player!.setVolume(sound.volume);
-
-            // Start playing
-            await sound.player!.play();
-            _debugLog('Started playing ${sound.name}');
-          } else {
-            _debugLog('❌ Failed to create player for ${sound.name}');
-            sound.isActive = false;
+          // Only resume sounds that have been previously active
+          if (sound.isActive) {
+            try {
+              // Check if we have a valid player first
+              if (sound.player != null) {
+                // Resume playback
+                await sound.player!.play();
+                _debugLog('Resumed playback for ${sound.name}');
+              } else {
+                // Create a new player if needed
+                _debugLog(
+                    'Creating new player for ${sound.name} because previous player was null');
+                sound.player = await _createAndInitializePlayer(
+                    sound.assetPath, sound.name);
+                if (sound.player != null) {
+                  await sound.player!.setVolume(sound.volume);
+                  await sound.player!.play();
+                  _debugLog('Started playing ${sound.name} with new player');
+                } else {
+                  _debugLog('❌ Failed to create player for ${sound.name}');
+                }
+              }
+            } catch (e) {
+              _debugLog('Error resuming ${sound.name}: $e');
+            }
           }
         }
       }
 
-      // Clear the stored list after resuming
+      // Clear the stored active sounds to avoid duplicating them in future resumes
       _activeSoundsBeforePause = [];
-
-      // Update playing state based on whether any sounds are active
-      _isPlaying = _availableSounds.any((s) => s.isActive && s.player != null);
 
       // Log the current state of all active sounds
       _logActiveSoundsState();
     } catch (e) {
       _debugLog('Error in resumeAllSounds: $e');
-      updatePlayingState();
     }
   }
 
-  // Stop all sounds
+  // Stop all sounds completely
   Future<void> stopAllSounds() async {
-    _debugLog('Stopping all sounds');
+    _debugLog('🛑 STOPPING ALL SOUNDS');
 
     try {
+      // Immediately update the playing state to update UI
       _isPlaying = false;
       notifyListeners();
 
-      for (final sound in _availableSounds) {
+      // Force immediate stop of all sounds - add this first to immediately cut audio
+      for (final sound in _availableSounds.where((s) => s.player != null)) {
+        try {
+          if (sound.player != null && sound.player!.playing) {
+            await sound.player!.stop();
+          }
+        } catch (e) {
+          _debugLog('Error stopping ${sound.name}: $e');
+        }
+      }
+
+      // Stop and dispose all players
+      for (final sound in _availableSounds.where((s) => s.player != null)) {
         try {
           await _safeDisposePlayer(sound.player, sound.name);
           sound.player = null;
           sound.isActive = false;
+          _debugLog('Stopped and reset ${sound.name}');
         } catch (e) {
-          _debugLog('Error stopping sound ${sound.name}: $e');
-          sound.isActive = false;
-          sound.player = null;
+          _debugLog('Error stopping ${sound.name}: $e');
         }
       }
 
-      _activeSoundsBeforePause = [];
-      cancelTimer();
-      notifyListeners();
-    } catch (e) {
-      _debugLog('Error in stopAllSounds: $e');
+      // Ensure all sounds are marked as inactive
       for (final sound in _availableSounds) {
         sound.isActive = false;
-        sound.player = null;
       }
-      _isPlaying = false;
-      notifyListeners();
+
+      // Clear the stored active sounds
+      _activeSoundsBeforePause = [];
+
+      // Force another check to make sure all players are truly disposed
+      for (final sound in _availableSounds) {
+        if (sound.player != null) {
+          try {
+            await sound.player!.stop();
+            await sound.player!.dispose();
+            sound.player = null;
+            _debugLog('Forcefully stopped and disposed ${sound.name}');
+          } catch (e) {
+            _debugLog('Error in final dispose for ${sound.name}: $e');
+          }
+        }
+      }
+
+      // Log the current state
+      _debugLog('All sounds stopped and reset');
+    } catch (e) {
+      _debugLog('Error in stopAllSounds: $e');
     }
+
+    // Force another update to ensure UI is synced
+    notifyListeners();
   }
 
-  // Save current configuration as a preset
+  // Save the current mix as a preset
   Future<void> savePreset(String presetName) async {
-    _debugLog('Saving preset: $presetName');
-
-    // Create a deep copy of current sound states
-    final soundsCopy = _availableSounds
-        .map(
-          (sound) => ZenAudioSound(
+    try {
+      // Create a copy of current sound settings
+      List<ZenAudioSound> presetSounds = [];
+      for (final sound in _availableSounds) {
+        if (sound.isActive) {
+          presetSounds.add(ZenAudioSound(
             name: sound.name,
             assetPath: sound.assetPath,
             iconPath: sound.iconPath,
             volume: sound.volume,
-            isActive: sound.isActive,
-          ),
-        )
-        .toList();
-
-    final preset = ZenAudioPreset(name: presetName, sounds: soundsCopy);
-
-    _presets.add(preset);
-    await savePresets();
-    notifyListeners();
-  }
-
-  // Load a preset
-  Future<void> loadPreset(String presetName) async {
-    _debugLog('Loading preset: $presetName');
-
-    final presetIndex = _presets.indexWhere((p) => p.name == presetName);
-    if (presetIndex == -1) return;
-
-    // First stop all current sounds
-    await stopAllSounds();
-
-    // Apply preset configuration
-    final preset = _presets[presetIndex];
-    for (final presetSound in preset.sounds) {
-      final soundIndex = _availableSounds.indexWhere(
-        (s) => s.name == presetSound.name,
-      );
-      if (soundIndex != -1) {
-        _availableSounds[soundIndex].volume = presetSound.volume;
-        _availableSounds[soundIndex].isActive = presetSound.isActive;
+            isActive: true,
+          ));
+        }
       }
+
+      // Create the preset
+      final preset = ZenAudioPreset(
+        name: presetName,
+        sounds: presetSounds,
+      );
+
+      // Check if a preset with this name already exists
+      final existingIndex =
+          _presets.indexWhere((p) => p.name == presetName);
+      if (existingIndex >= 0) {
+        // Replace existing preset
+        _presets[existingIndex] = preset;
+      } else {
+        // Add new preset
+        _presets.add(preset);
+      }
+
+      // Save to persistent storage
+      await savePresets();
+
+      _debugLog('Saved preset: $presetName with ${presetSounds.length} sounds');
+    } catch (e) {
+      _debugLog('Error saving preset: $e');
     }
 
-    // Play all active sounds from the preset
-    await playAllActiveSounds();
-  }
-
-  // Delete a preset
-  Future<void> deletePreset(String presetName) async {
-    _debugLog('Deleting preset: $presetName');
-
-    _presets.removeWhere((p) => p.name == presetName);
-    await savePresets();
     notifyListeners();
   }
 
-  // Set a timer for auto-stopping sounds
-  void setTimer(int durationMinutes) {
-    _debugLog('Setting timer for $durationMinutes minutes');
-
+  // Load a saved preset
+  Future<void> loadPreset(String presetName) async {
     try {
-      // Cancel any existing timer first
-      cancelTimer();
-
-      if (durationMinutes <= 0) {
-        _debugLog('Timer duration is zero or negative, no timer will be set');
+      // Find the preset
+      final presetIndex = _presets.indexWhere((p) => p.name == presetName);
+      if (presetIndex < 0) {
+        _debugLog('Preset not found: $presetName');
         return;
       }
 
-      _timerDurationMinutes = durationMinutes;
+      final preset = _presets[presetIndex];
 
-      // Use Future.delayed instead of Timer for better error handling
-      _zenTimer = Timer(Duration(minutes: durationMinutes), () {
-        try {
-          _debugLog('Timer completed, stopping all sounds');
-          stopAllSounds();
-          _timerDurationMinutes = 0;
-          notifyListeners();
-        } catch (e) {
-          _debugLog('Error in timer completion callback: $e');
-          // Attempt emergency sound stop with multiple fallbacks
-          try {
-            _isPlaying = false;
-            notifyListeners();
+      // Stop all current sounds
+      await stopAllSounds();
 
-            // First attempt - try to stop each sound individually
-            for (final sound in _availableSounds) {
-              try {
-                sound.isActive = false;
-                if (sound.player != null) {
-                  sound.player!.stop();
-                }
-              } catch (soundError) {
-                _debugLog('Error stopping individual sound: $soundError');
-              }
-            }
+      // Apply the preset settings
+      for (final presetSound in preset.sounds) {
+        // Find matching sound in available sounds
+        final soundIndex = _availableSounds
+            .indexWhere((s) => s.name == presetSound.name);
+        if (soundIndex >= 0) {
+          final sound = _availableSounds[soundIndex];
+          
+          // Skip locked sounds
+          if (sound.isLocked && !isSoundUnlocked(sound.name)) {
+            _debugLog('Skipping locked sound in preset: ${sound.name}');
+            continue;
+          }
+          
+          // Set volume and active state
+          sound.volume = presetSound.volume;
+          sound.isActive = true;
 
-            // Second attempt - reset all state variables
-            _timerDurationMinutes = 0;
-            notifyListeners();
-          } catch (emergencyError) {
-            _debugLog('Emergency error handling failed: $emergencyError');
+          // Create and play the sound
+          sound.player =
+              await _createAndInitializePlayer(sound.assetPath, sound.name);
+          if (sound.player != null) {
+            await sound.player!.setVolume(sound.volume);
+            await sound.player!.play();
           }
         }
-      });
+      }
 
-      notifyListeners();
+      // Update playing state
+      _isPlaying = true;
+
+      _debugLog('Loaded preset: $presetName');
     } catch (e) {
-      _debugLog('Error setting timer: $e');
-      // Reset timer state in case of error
-      _timerDurationMinutes = 0;
-      _zenTimer = null;
-      notifyListeners();
+      _debugLog('Error loading preset: $e');
     }
+
+    notifyListeners();
+  }
+
+  // Delete a saved preset
+  Future<void> deletePreset(String presetName) async {
+    try {
+      // Remove the preset
+      _presets.removeWhere((p) => p.name == presetName);
+
+      // Save to persistent storage
+      await savePresets();
+
+      _debugLog('Deleted preset: $presetName');
+    } catch (e) {
+      _debugLog('Error deleting preset: $e');
+    }
+
+    notifyListeners();
+  }
+
+  // Set a timer to stop sounds after a specified time
+  void setTimer(int minutes) {
+    // Cancel any existing timer
+    if (_zenTimer != null) {
+      _zenTimer!.cancel();
+      _zenTimer = null;
+    }
+
+    if (minutes <= 0) {
+      _timerDurationMinutes = 0;
+      notifyListeners();
+      return;
+    }
+
+    _timerDurationMinutes = minutes;
+    _debugLog('Setting timer for $minutes minutes');
+
+    // Create a new timer
+    _zenTimer = Timer(Duration(minutes: minutes), () {
+      stopAllSounds();
+      _timerDurationMinutes = 0;
+      notifyListeners();
+    });
+
+    notifyListeners();
   }
 
   // Cancel the current timer
   void cancelTimer() {
-    try {
-      if (_zenTimer != null) {
-        _debugLog('Cancelling timer');
-        _zenTimer!.cancel();
-        _zenTimer = null;
-        _timerDurationMinutes = 0;
-      }
-
-      notifyListeners();
-    } catch (e) {
-      _debugLog('Error cancelling timer: $e');
-      // Reset timer variables even if cancellation fails
+    if (_zenTimer != null) {
+      _zenTimer!.cancel();
       _zenTimer = null;
-      _timerDurationMinutes = 0;
-      notifyListeners();
     }
+    _timerDurationMinutes = 0;
+    notifyListeners();
   }
 
-  // Clean up resources
+  // Handle application exit
   Future<void> dispose() async {
-    _debugLog('Disposing zen audio service');
-    await stopAllSounds();
-    cancelTimer();
+    try {
+      // Cancel any timers
+      _zenTimer?.cancel();
+
+      // Stop all sounds
+      for (final sound in _availableSounds.where((s) => s.player != null)) {
+        await _safeDisposePlayer(sound.player, sound.name);
+      }
+
+      _debugLog('Successfully disposed ZenAudioService');
+    } catch (e) {
+      _debugLog('Error disposing ZenAudioService: $e');
+    }
   }
 }

@@ -24,9 +24,33 @@ import '/components/animated_like_button.dart';
 import '/utils/tag_formatter.dart';
 import '/services/comments_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import '../../services/cloud_functions_stub.dart';
 import '/backend/cloud_functions/cloud_functions.dart';
 import 'dart:math';
+import '/flutter_flow/flutter_flow_animations.dart';
+import '/flutter_flow/flutter_flow_icon_button.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
+import '/components/animated_like_button.dart';
+import '/components/save_post_popup.dart';
+import '/components/share_options_dialog.dart';
+import '/utils/share_util.dart';
+import '/utils/tag_formatter.dart';
+import '/widgets/lottie_background.dart';
+import '/widgets/custom_text_form_field.dart';
+import 'dart:math' as math;
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'package:url_launcher/url_launcher.dart';
+
+import '/auth/firebase_auth/auth_util.dart';
 export 'detailedpost_model.dart';
 
 T createModel<T>(BuildContext context, T Function() model) => model();
@@ -67,6 +91,9 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
 
   // Add a comment count refresh notifier
   final ValueNotifier<int> _commentCountRefresh = ValueNotifier<int>(0);
+  
+  // Add flag to track if comment scroll has been performed
+  bool _hasScrolledToComments = false;
 
   // Method to refresh comment count
   void _refreshCommentCount() {
@@ -87,6 +114,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
     if (widget.showComments == true) {
       print(
           'DetailedpostWidget: Will scroll to comments - from widget parameter');
+      _hasScrolledToComments = false;  // Reset flag when explicitly requested
       _scheduleCommentScroll();
     }
   }
@@ -98,13 +126,13 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
       if (!mounted) return;
       // First short delay to let the UI layout complete
       Future.delayed(Duration(milliseconds: 300), () {
-        if (!mounted) return;
+        if (!mounted || _hasScrolledToComments) return;
         print('DetailedpostWidget: First scroll attempt after layout');
         _ensureCommentsVisible();
 
         // Schedule a second attempt with a longer delay to catch cases where data loading takes longer
         Future.delayed(Duration(milliseconds: 800), () {
-          if (!mounted) return;
+          if (!mounted || _hasScrolledToComments) return;
           print('DetailedpostWidget: Second scroll attempt after data loading');
           _ensureCommentsVisible();
         });
@@ -204,8 +232,10 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
   }
 
   void _ensureCommentsVisible() async {
-    if (!mounted) return;
+    if (!mounted || _hasScrolledToComments) return;
     print('DetailedpostWidget: Attempting to scroll to comments section');
+    
+    _hasScrolledToComments = true; // Set flag to prevent duplicate scrolling
 
     // Try multiple times with increasing delays if needed
     for (int i = 0; i < 4; i++) {
@@ -457,23 +487,30 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
             if (post.tags != null && post.tags.isNotEmpty) ...[
               SizedBox(height: 16),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: Colors.white.withOpacity(0.2),
                     width: 1,
                   ),
                 ),
-                child: TagFormatter.buildTagsWidget(
+                child: TagFormatter.buildClickableTagsWidget(
                   context,
-                  post.tags,
+                  post.tags.split(',')
+                      .map((tag) => tag.trim())
+                      .where((tag) => tag.isNotEmpty)
+                      .toList(),
                   style: FlutterFlowTheme.of(context).bodyMedium.override(
                         fontFamily: 'Outfit',
                         color: Colors.white,
                         fontWeight: FontWeight.w500,
                       ),
+                  spacing: 8,
+                  runSpacing: 8,
+                  displayHashtag: true,
                 ),
               ),
             ],
@@ -594,7 +631,8 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                       count: snapshot.data ?? 0,
                       isActive: false,
                       onTap: () {
-                        // Use the new animation method directly
+                        // When comment button is explicitly tapped, allow scrolling again
+                        _hasScrolledToComments = false;
                         _ensureCommentsVisible();
                       },
                     );
@@ -683,7 +721,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
               isActive ? activeIcon : icon,
               color: isActive
                   ? FlutterFlowTheme.of(context).primary
-                  : FlutterFlowTheme.of(context).secondaryText,
+                  : Colors.white,
               size: 28,
             ),
           ),
@@ -692,7 +730,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
             count.toString(),
             style: FlutterFlowTheme.of(context).bodyMedium.override(
                   fontFamily: 'Outfit',
-                  color: FlutterFlowTheme.of(context).secondaryText,
+                  color: Colors.white,
                 ),
           ),
         ],
@@ -774,17 +812,17 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: TextFormField(
+                child: CustomTextFormField(
                   controller: _model.textController,
                   focusNode: _model.textFieldFocusNode,
                   obscureText: false,
+                  hintText: _model.replyingToComment != null
+                      ? 'Write a reply...'
+                      : 'Add a comment...',
                   decoration: InputDecoration(
-                    hintText: _model.replyingToComment != null
-                        ? 'Write a reply...'
-                        : 'Add a comment...',
                     hintStyle: FlutterFlowTheme.of(context).bodyMedium.override(
                           fontFamily: 'Outfit',
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withOpacity(0.6),
                         ),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(
@@ -795,9 +833,7 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: FlutterFlowTheme.of(context)
-                            .primary
-                            .withOpacity(0.5),
+                        color: Colors.transparent,
                         width: 1,
                       ),
                       borderRadius: BorderRadius.circular(8),
@@ -829,8 +865,8 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                   maxLines: 5,
                   minLines: 1,
                   keyboardType: TextInputType.multiline,
-                  validator: (val) =>
-                      _model.textControllerValidator?.call(context, val),
+                  autovalidateMode: AutovalidateMode.disabled,
+                  validator: null,
                 ),
               ),
               SizedBox(width: 8),
@@ -839,8 +875,15 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                   if (_model.textController.text.isEmpty) {
                     return;
                   }
-
-                  await _addComment(_model.textController.text);
+                  
+                  // Store the text before clearing it
+                  final commentText = _model.textController.text;
+                  
+                  // Clear the text field IMMEDIATELY before the async operation starts
+                  _model.textController?.clear();
+                  
+                  // Add the comment using the stored text
+                  await _addComment(commentText);
                 },
                 icon: Icon(
                   Icons.send_rounded,
@@ -1281,6 +1324,41 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
           .get();
       print('Added comment data: ${addedCommentDoc.data()}');
 
+      // Show success snackbar with pill shape
+      if (mounted) {
+        final isReply = _model.replyingToComment != null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  isReply ? 'Reply posted successfully' : 'Comment posted successfully',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(
+              bottom: MediaQuery.of(context).size.height * 0.1,
+              left: MediaQuery.of(context).size.width * 0.2,
+              right: MediaQuery.of(context).size.width * 0.2,
+            ),
+            duration: Duration(seconds: 2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(25.0),
+            ),
+          ),
+        );
+      }
+
       // Determine notification recipient
       if (_model.replyingToComment != null) {
         // If replying to a comment, notify the comment author
@@ -1348,7 +1426,8 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
       }
 
       // Clear input and reset reply state
-      _model.textController?.clear();
+      // Note: We're removing this call since we now clear the text field immediately when the send button is pressed
+      // _model.textController?.clear();
       _model.textFieldFocusNode?.unfocus();
       setState(() {
         _model.replyingToComment = null;
@@ -1390,11 +1469,18 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
         ),
         offset: Offset(0, 8),
         onSelected: (value) {
+          // Prevent focus from changing to text field
+          _model.textFieldFocusNode?.unfocus();
+          
           if (value == 'report') {
             _showReportCommentDialog(comment);
           } else if (value == 'delete') {
             _deleteComment(comment);
           }
+        },
+        onCanceled: () {
+          // Prevent focus from changing to text field when menu is dismissed
+          _model.textFieldFocusNode?.unfocus();
         },
         itemBuilder: (context) {
           final List<PopupMenuItem<String>> items = [];
@@ -1453,6 +1539,9 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
 
   // Method to delete a comment
   Future<void> _deleteComment(CommentsRecord comment) async {
+    // Prevent text field focus
+    _model.textFieldFocusNode?.unfocus();
+    
     try {
       // Show confirmation dialog
       final bool confirmDelete = await showDialog<bool>(
@@ -1525,8 +1614,11 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                           children: [
                             Expanded(
                               child: TextButton(
-                                onPressed: () =>
-                                    Navigator.of(context).pop(false),
+                                onPressed: () {
+                                  Navigator.of(context).pop(false);
+                                  // Prevent focus after dialog closes
+                                  _model.textFieldFocusNode?.unfocus();
+                                },
                                 style: TextButton.styleFrom(
                                   padding: EdgeInsets.symmetric(vertical: 12),
                                   shape: RoundedRectangleBorder(
@@ -1543,8 +1635,11 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                             SizedBox(width: 16),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () =>
-                                    Navigator.of(context).pop(true),
+                                onPressed: () {
+                                  Navigator.of(context).pop(true);
+                                  // Prevent focus after dialog closes
+                                  _model.textFieldFocusNode?.unfocus();
+                                },
                                 style: ElevatedButton.styleFrom(
                                   padding: EdgeInsets.symmetric(vertical: 12),
                                   backgroundColor:
@@ -1567,9 +1662,13 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
             },
           ) ??
           false;
+    
+      // Ensure focus doesn't shift to text field after dialog dismissal
+      _model.textFieldFocusNode?.unfocus();
 
       if (!confirmDelete) return;
 
+      // Rest of your existing code...
       // Show loading indicator
       final scaffoldMessenger = ScaffoldMessenger.of(context);
       scaffoldMessenger.clearSnackBars();
@@ -1707,6 +1806,9 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
 
   // Method to show a dialog for reporting a comment
   Future<void> _showReportCommentDialog(CommentsRecord comment) async {
+    // Ensure text field doesn't get focus when dialog closes
+    _model.textFieldFocusNode?.unfocus();
+    
     return showDialog(
       context: context,
       barrierDismissible: true,
@@ -1772,16 +1874,20 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
                   style: FlutterFlowTheme.of(context).bodyLarge,
                 ),
                 SizedBox(height: 16),
-                _buildReportOption('Inappropriate content'),
-                _buildReportOption('Harassment or bullying'),
-                _buildReportOption('Spam'),
-                _buildReportOption('False information'),
-                _buildReportOption('Other'),
+                _buildReportOption('Inappropriate content', comment),
+                _buildReportOption('Harassment or bullying', comment),
+                _buildReportOption('Spam', comment),
+                _buildReportOption('False information', comment),
+                _buildReportOption('Other', comment),
                 SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      // Prevent focus after dialog closes
+                      _model.textFieldFocusNode?.unfocus();
+                    },
                     style: TextButton.styleFrom(
                       padding:
                           EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1801,11 +1907,13 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
   }
 
   // Helper method to build a report option item
-  Widget _buildReportOption(String reason) {
+  Widget _buildReportOption(String reason, CommentsRecord comment) {
     return InkWell(
       onTap: () {
         Navigator.pop(context);
-        _submitReport(reason);
+        // Prevent focus from changing to text field
+        _model.textFieldFocusNode?.unfocus();
+        _submitReport(reason, comment);
       },
       child: Container(
         width: double.infinity,
@@ -1838,7 +1946,10 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
   }
 
   // Method to handle the report submission
-  Future<void> _submitReport(String reason) async {
+  Future<void> _submitReport(String reason, CommentsRecord comment) async {
+    // Prevent text field focus
+    _model.textFieldFocusNode?.unfocus();
+    
     try {
       // First show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1862,11 +1973,30 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
         ),
       );
 
-      await Future.delayed(Duration(milliseconds: 800));
+      // Get current user email
+      final currentUserDoc = await FirebaseFirestore.instance
+          .collection('User')
+          .doc(currentUserUid)
+          .get();
+      
+      final currentUserEmail = currentUserDoc.data()?['email'] as String? ?? '';
 
-      // In a real app, we would create a report document in Firestore here
-      // For now, just simulate a successful report
+      // Save report to Firestore
+      await FirebaseFirestore.instance.collection('reports').add({
+        'type': 'comment',
+        'reason': reason,
+        'comment_id': comment.reference.id,
+        'post_id': _postReference?.id ?? '',
+        'post_owner_id': _userReference?.id ?? '',
+        'reporter_id': currentUserUid,
+        'reporter_email': currentUserEmail,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'new',
+      });
 
+      // Ensure text field doesn't get focus after snackbar or async operation
+      _model.textFieldFocusNode?.unfocus();
+      
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1897,6 +2027,9 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
       );
     } catch (e) {
       print('Error reporting comment: $e');
+      // Ensure text field doesn't get focus after error
+      _model.textFieldFocusNode?.unfocus();
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error reporting comment: $e'),
@@ -2768,19 +2901,22 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
     return StreamBuilder<PostsRecord>(
       stream: getPostStream(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return Center(
-            child: SizedBox(
-              width: 50,
-              height: 50,
-              child: SpinKitRipple(
-                color: FlutterFlowTheme.of(context).primary,
-                size: 50,
-              ),
-            ),
-          );
+        // Handle error or loading state
+        if (snapshot.hasError) {
+          print('Error loading post: ${snapshot.error}');
+          return _buildErrorScaffold('Error loading post');
         }
+
+        if (!snapshot.hasData) {
+          return _buildLoadingScaffold();
+        }
+
         final post = snapshot.data!;
+        
+        // Check if this is a private post and not from the current user
+        if (post.isPrivate && post.poster != currentUserReference) {
+          return _buildPrivatePostScaffold();
+        }
 
         // Add fallback values for post fields that might be missing
         final postTitle = post.title ?? 'Untitled Dream';
@@ -3042,6 +3178,133 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Add a method to display private post error
+  Widget _buildPrivatePostScaffold() {
+    return Scaffold(
+      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+      appBar: AppBar(
+        backgroundColor: FlutterFlowTheme.of(context).primary,
+        title: Text(
+          'Private Post',
+          style: FlutterFlowTheme.of(context).headlineMedium.override(
+                fontFamily: 'Outfit',
+                color: Colors.white,
+                fontSize: 22,
+              ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+          color: Colors.white,
+        ),
+        centerTitle: true,
+        elevation: 2,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              color: FlutterFlowTheme.of(context).secondaryText,
+              size: 60,
+            ),
+            SizedBox(height: 20),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'This is a private post and can only be viewed by its creator.',
+                style: FlutterFlowTheme.of(context).bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Go Back'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: FlutterFlowTheme.of(context).primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Add a method to display error scaffold
+  Widget _buildErrorScaffold(String errorMessage) {
+    return Scaffold(
+      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+      appBar: AppBar(
+        backgroundColor: FlutterFlowTheme.of(context).primary,
+        title: Text(
+          'Error',
+          style: FlutterFlowTheme.of(context).headlineMedium.override(
+                fontFamily: 'Outfit',
+                color: Colors.white,
+                fontSize: 22,
+              ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+          color: Colors.white,
+        ),
+        centerTitle: true,
+        elevation: 2,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: FlutterFlowTheme.of(context).error,
+              size: 60,
+            ),
+            SizedBox(height: 20),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                errorMessage,
+                style: FlutterFlowTheme.of(context).bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Go Back'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: FlutterFlowTheme.of(context).primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Add a method to display loading scaffold
+  Widget _buildLoadingScaffold() {
+    return Scaffold(
+      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+      body: Center(
+        child: SizedBox(
+          width: 50,
+          height: 50,
+          child: SpinKitRipple(
+            color: FlutterFlowTheme.of(context).primary,
+            size: 50,
+          ),
+        ),
       ),
     );
   }

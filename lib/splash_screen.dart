@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:just_audio/just_audio.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({
@@ -21,6 +22,9 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
+  // Audio player
+  late AudioPlayer _audioPlayer;
+  
   // Animation controllers
   late AnimationController _fadeInController;
   late AnimationController _scaleController;
@@ -48,6 +52,10 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+
+    // Initialize audio player and play splash intro sound
+    _audioPlayer = AudioPlayer();
+    _initAudio();
 
     // Generate stars for background
     final random = math.Random(42);
@@ -215,12 +223,33 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Fade out everything
     _fadeOutController.forward();
+    
+    // Fade out audio as animation completes
+    await _audioPlayer.setVolume(0.0);
+    
     await _fadeOutController.forward().orCancel;
+
+    // Stop audio
+    _audioPlayer.stop();
 
     // Return to normal UI mode and complete
     if (mounted) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       widget.onAnimationComplete();
+    }
+  }
+
+  // Add the _initAudio method to initialize and play the splash intro sound
+  Future<void> _initAudio() async {
+    try {
+      // Load and prepare the audio file
+      await _audioPlayer.setAsset('assets/audio/splashintro.mp3');
+      // Set volume to desired level (0.0 to 1.0)
+      await _audioPlayer.setVolume(0.3);
+      // Play the audio
+      await _audioPlayer.play();
+    } catch (e) {
+      print('Error playing splash audio: $e');
     }
   }
 
@@ -234,6 +263,11 @@ class _SplashScreenState extends State<SplashScreen>
     _starsController.dispose();
     _particleController.dispose();
     _textSlideController.dispose();
+    
+    // Stop and dispose the audio player
+    _audioPlayer.stop();
+    _audioPlayer.dispose();
+    
     super.dispose();
   }
 
@@ -383,7 +417,7 @@ class _SplashScreenState extends State<SplashScreen>
                           },
                         ),
 
-                        SizedBox(height: 24),
+                        SizedBox(height: 10),
 
                         // App name text with animations
                         AnimatedBuilder(

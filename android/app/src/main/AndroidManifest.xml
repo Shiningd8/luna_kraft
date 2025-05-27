@@ -65,6 +65,22 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="lunakraft" android:host="lunakraft.com" />
             </intent-filter>
+            
+            <!-- HTTPS deep linking for profiles -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="lunakraft.com" android:pathPrefix="/profile/" />
+            </intent-filter>
+            
+            <!-- App Links for fallback to Play Store -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="lunakraft.com" android:pathPrefix="/download" />
+            </intent-filter>
 
         </activity>
 
@@ -95,10 +111,6 @@
         <meta-data
             android:name="firebase_analytics_collection_enabled"
             android:value="true" />
-
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
 
         <!-- Notification channel metadata -->
         <meta-data

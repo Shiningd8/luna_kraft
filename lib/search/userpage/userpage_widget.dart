@@ -1424,6 +1424,12 @@ class _UserpageWidgetState extends State<UserpageWidget> {
                                         SizedBox(height: 16),
                                     itemBuilder: (context, index) {
                                       final post = posts[index];
+                                      
+                                      // Skip private posts unless viewing your own profile
+                                      if (post.isPrivate && _profileReference != currentUserReference) {
+                                        return SizedBox.shrink();
+                                      }
+                                      
                                       return Container(
                                         margin:
                                             index == 0 ? EdgeInsets.zero : null,

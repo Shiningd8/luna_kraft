@@ -15,6 +15,9 @@ class ExploreModel extends FlutterFlowModel<ExploreWidget> {
   String? Function(BuildContext, String?)? searchBarTextControllerValidator;
   List<PostsRecord> simpleSearchResults = [];
 
+  // Add a new variable to track first load
+  bool isFirstLoad = true;
+
   @override
   void initState(BuildContext context) {}
 

@@ -15,12 +15,22 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'signin_model.dart';
 import 'dart:async';
 import 'package:luna_kraft/backend/schema/util/record_data.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:go_router/go_router.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+// import 'package:firebase_app_check/firebase_app_check.dart';
+import '../../auth/firebase_auth/firebase_app_check_stub.dart';
 import '/debug_login_helper.dart';
 import '/flutter_flow/nav/nav.dart';
 import '/auth/auth_redirect_handler.dart';
 import '/onboarding/onboarding_manager.dart';
 import '/signreg/forgot_password/forgot_password_widget.dart';
+import '/widgets/custom_text_form_field.dart';
 export 'signin_model.dart';
 
 class SigninWidget extends StatefulWidget {
@@ -850,15 +860,12 @@ class _SigninWidgetState extends State<SigninWidget>
                                                     ),
                                                     child: Container(
                                                       width: double.infinity,
-                                                      child: TextFormField(
+                                                      child: CustomTextFormField(
                                                         controller: _model
                                                             .emailAddressCreateTextController,
                                                         focusNode: _model
                                                             .emailAddressCreateFocusNode,
                                                         autofocus: true,
-                                                        autofillHints: [
-                                                          AutofillHints.email,
-                                                        ],
                                                         obscureText: false,
                                                         decoration:
                                                             InputDecoration(
@@ -964,10 +971,6 @@ class _SigninWidgetState extends State<SigninWidget>
                                                         keyboardType:
                                                             TextInputType
                                                                 .emailAddress,
-                                                        cursorColor:
-                                                            FlutterFlowTheme.of(
-                                                          context,
-                                                        ).primary,
                                                         validator: _model
                                                             .emailAddressCreateTextControllerValidator
                                                             .asValidator(
@@ -2422,7 +2425,8 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                         fontWeight:
                                                                             FontWeight.bold,
                                                                       ),
-                                                              elevation: 0.0,
+                                                              elevation:
+                                                                  0.0,
                                                               borderSide:
                                                                   BorderSide(
                                                                 color:

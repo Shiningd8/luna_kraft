@@ -32,12 +32,48 @@ exports.geminiAI = onCall(
     },
     async (request) => {
         try {
-            console.log(`Making API call for ${request.data["callName"]}`);
+            console.log(`Making API call for ${request.data["callName"]} with data: ${JSON.stringify(request.data).substring(0, 200)}...`);
+            
+            // Validate input
+            if (!request.data || !request.data["callName"]) {
+                console.error("Invalid request: Missing callName");
+                return {
+                    statusCode: 400,
+                    error: "Missing callName in request",
+                };
+            }
+            
             var response = await apiManager.makeApiCall(request, request.data);
             console.log(`Done making API Call! Status: ${response.statusCode}`);
+            
+            // Check if response has expected format
+            if (response.body && response.body.candidates) {
+                console.log(`Response has ${response.body.candidates.length} candidates`);
+                
+                // Extract and add generated text for easier access
+                if (response.body.candidates.length > 0 && 
+                    response.body.candidates[0].content && 
+                    response.body.candidates[0].content.parts && 
+                    response.body.candidates[0].content.parts.length > 0) {
+                    
+                    const generatedText = response.body.candidates[0].content.parts[0].text;
+                    if (generatedText) {
+                        response.generatedText = generatedText;
+                        console.log(`Generated text successfully extracted (first 100 chars): ${generatedText.substring(0, 100)}...`);
+                    } else {
+                        console.error("Generated text was empty or null");
+                    }
+                } else {
+                    console.error("Response structure doesn't contain expected text path");
+                }
+            } else {
+                console.error("Response doesn't have expected structure");
+            }
+            
             return response;
         } catch (err) {
             console.error(`Error performing API call: ${err}`);
+            console.error(`Stack trace: ${err.stack}`);
             return {
                 statusCode: 400,
                 error: `${err}`,

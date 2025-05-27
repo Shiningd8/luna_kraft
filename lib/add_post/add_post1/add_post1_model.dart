@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 class AddPost1Model extends FlutterFlowModel<AddPost1Widget> {
   ///  Local state fields for this page.
 
-  String apiResponse = 'unset';
+  String apiResponse = '';
 
   ///  State fields for stateful widgets in this page.
 
