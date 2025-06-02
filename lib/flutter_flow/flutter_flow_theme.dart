@@ -14,7 +14,7 @@ abstract class FlutterFlowTheme {
   static ThemeMode get themeMode {
     final darkMode = _prefs?.getBool(kThemeModeKey);
     return darkMode == null
-        ? ThemeMode.system
+        ? ThemeMode.dark
         : darkMode
             ? ThemeMode.dark
             : ThemeMode.light;

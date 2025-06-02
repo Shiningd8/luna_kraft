@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth/firebase_auth/auth_util.dart';
 import '../backend/schema/user_record.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class DreamUploadService {
   static const int MAX_FREE_UPLOADS = 3;
@@ -83,11 +84,18 @@ class DreamUploadService {
       return false; // Not enough coins
     }
 
-    // Deduct coins
-    await userRef.update({
-      'luna_coins': FieldValue.increment(-LUNA_COINS_COST),
-    });
-
-    return true; // Payment successful
+    try {
+      // CRITICAL FIX: Use FieldValue.increment to only update this field
+      // This preserves all other fields including unlocked_backgrounds
+      await userRef.update({
+        'luna_coins': FieldValue.increment(-LUNA_COINS_COST),
+        'last_coin_update': FieldValue.serverTimestamp(),
+      });
+      
+      return true; // Payment successful
+    } catch (e) {
+      print('Error charging coins: $e');
+      return false;
+    }
   }
 }

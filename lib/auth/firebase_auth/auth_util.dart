@@ -17,11 +17,15 @@ import 'dart:io';
 
 import '/backend/backend.dart';
 import '/services/app_state.dart';
-import '/flutter_flow/app_state.dart';
+import '/flutter_flow/app_state.dart' as ff_app_state;
 import 'package:stream_transform/stream_transform.dart';
 import 'firebase_auth_manager.dart';
 import 'google_auth.dart';
 import 'firebase_user_provider.dart';
+import 'package:luna_kraft/app_state.dart';
+import 'package:luna_kraft/flutter_flow/flutter_flow_util.dart';
+import 'package:luna_kraft/backend/schema/user_record.dart';
+import 'package:luna_kraft/services/subscription_manager.dart';
 
 export 'firebase_auth_manager.dart';
 
@@ -306,6 +310,15 @@ class AuthUtil {
     try {
       debugPrint('Starting minimal sign-out process');
 
+      // Reset subscription state before signing out
+      try {
+        final subscriptionManager = SubscriptionManager.instance;
+        await subscriptionManager.resetSubscriptionState();
+        debugPrint('Successfully reset subscription state during logout');
+      } catch (e) {
+        debugPrint('Error resetting subscription state: $e');
+      }
+
       // Just sign out from Firebase - nothing else
       await _auth.signOut();
 
@@ -355,7 +368,9 @@ class AuthUtil {
 
       // Clear FFAppState
       try {
-        await FFAppState().initializePersistedState();
+        final appState = ff_app_state.FFAppState();
+        await appState.initializePersistedState();
+        debugPrint('Successfully reset FFAppState');
       } catch (e) {
         debugPrint('Error initializing app state: $e');
       }

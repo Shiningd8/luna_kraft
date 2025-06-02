@@ -120,6 +120,16 @@ class UserRecord extends FirestoreRecord {
   DateTime? get lastUsernameChangeDate => _lastUsernameChangeDate;
   bool hasLastUsernameChangeDate() => _lastUsernameChangeDate != null;
 
+  // "unlocked_backgrounds" field.
+  List<String>? _unlockedBackgrounds;
+  List<String> get unlockedBackgrounds => _unlockedBackgrounds ?? const [];
+  bool hasUnlockedBackgrounds() => _unlockedBackgrounds != null;
+
+  // "unlocked_zen_sounds" field.
+  List<String>? _unlockedZenSounds;
+  List<String> get unlockedZenSounds => _unlockedZenSounds ?? const [];
+  bool hasUnlockedZenSounds() => _unlockedZenSounds != null;
+
   void _initializeFields() {
     _email = snapshotData['email'] as String?;
     _displayName = snapshotData['display_name'] as String?;
@@ -145,6 +155,8 @@ class UserRecord extends FirestoreRecord {
     _lastUploadResetDate = snapshotData['last_upload_reset_date'] as DateTime?;
     _lastUsernameChangeDate =
         snapshotData['last_username_change_date'] as DateTime?;
+    _unlockedBackgrounds = getDataList(snapshotData['unlocked_backgrounds']);
+    _unlockedZenSounds = getDataList(snapshotData['unlocked_zen_sounds']);
   }
 
   static CollectionReference get collection =>
@@ -178,4 +190,61 @@ class UserRecord extends FirestoreRecord {
   bool operator ==(other) =>
       other is UserRecord &&
       reference.path.hashCode == other.reference.path.hashCode;
+
+  // Helper method to access fields by string name
+  dynamic get(String fieldName) {
+    switch (fieldName) {
+      case 'email': return _email;
+      case 'display_name': return _displayName;
+      case 'photo_url': return _photoUrl;
+      case 'uid': return _uid;
+      case 'created_time': return _createdTime;
+      case 'phone_number': return _phoneNumber;
+      case 'user_name': return _userName;
+      case 'following_users': return _followingUsers;
+      case 'users_following_me': return _usersFollowingMe;
+      case 'blocked_users': return _blockedUsers;
+      case 'is_private': return _isPrivate;
+      case 'date_of_birth': return _dateOfBirth;
+      case 'gender': return _gender;
+      case 'luna_coins': return _lunaCoins;
+      case 'pending_follow_requests': return _pendingFollowRequests;
+      case 'pending_follow_requests_paths': return _pendingFollowRequestsPaths;
+      case 'is_2fa_enabled': return _is2FAEnabled;
+      case '2fa_secret_key': return _twoFactorSecretKey;
+      case 'daily_dream_uploads': return _dailyDreamUploads;
+      case 'last_upload_reset_date': return _lastUploadResetDate;
+      case 'last_username_change_date': return _lastUsernameChangeDate;
+      case 'unlocked_backgrounds': return _unlockedBackgrounds;
+      case 'unlocked_zen_sounds': return _unlockedZenSounds;
+      default: {
+        // Try to access directly from snapshotData if available
+        if (snapshotData.containsKey(fieldName)) {
+          return snapshotData[fieldName];
+        }
+        return null;
+      }
+    }
+  }
+}
+
+class UserRecordField {
+  static const String email = 'email';
+  static const String displayName = 'display_name';
+  static const String photoUrl = 'photo_url';
+  static const String uid = 'uid';
+  static const String createdTime = 'created_time';
+  static const String phoneNumber = 'phone_number';
+  static const String isNewUser = 'is_new_user';
+  static const String purchasedProducts = 'purchased_products';
+  static const String referralCode = 'referral_code';
+  static const String lunaCoins = 'luna_coins';
+  static const String streakCount = 'streak_count';
+  static const String lastDayActive = 'last_day_active';
+  static const String backgroundIndex = 'background_index';
+  static const String streakData = 'streak_data';
+  static const String unlockAllBackgrounds = 'unlock_all_backgrounds';
+  static const String userBenefits = 'user_benefits';
+  static const String unlockedBackgrounds = 'unlocked_backgrounds';
+  static const String unlockedZenSounds = 'unlocked_zen_sounds';
 }

@@ -7,11 +7,29 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:luna_kraft/services/purchase_service.dart';
 
 import 'package:luna_kraft/main.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    bool subscriptionServicesInitialized = false;
+
+    // Try to initialize subscription services
+    try {
+      await Purchases.setLogLevel(LogLevel.debug);
+      await Purchases.configure(
+        PurchasesConfiguration('appl_aUbICkbeGteMFoiMsBOJzdjVoTE')
+          ..appUserID = null
+          ..observerMode = true // Use observer mode for tests
+      );
+      await PurchaseService.init();
+      subscriptionServicesInitialized = true;
+    } catch (e) {
+      print('Failed to initialize subscription services in test: $e');
+    }
+
     // Build our app and trigger a frame.
     final testTheme = ThemeData(
       primarySwatch: Colors.blue,
@@ -22,6 +40,9 @@ void main() {
       ),
     );
     
-    await tester.pumpWidget(MyApp(theme: testTheme));
+    await tester.pumpWidget(MyApp(
+      theme: testTheme,
+      subscriptionServicesInitialized: subscriptionServicesInitialized,
+    ));
   });
 }

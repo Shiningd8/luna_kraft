@@ -26,14 +26,7 @@ class ShareUtil {
         user: user,
       );
 
-      // Show preview dialog
-      final bool? shouldShare = await _showSharePreview(context, posterWidget);
-      print("Share dialog result: $shouldShare"); // Debug log
-
-      // If user cancels, exit
-      if (shouldShare != true || !context.mounted) return;
-
-      // Show loading dialog
+      // Skip preview dialog and directly show loading dialog
       _showLoadingDialog(context);
 
       // Wait a moment to make sure the loading dialog is shown and widgets are properly laid out
@@ -77,7 +70,7 @@ class ShareUtil {
         // Create simple image
         final boundary =
             tempKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-        final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+        final ui.Image image = await boundary.toImage(pixelRatio: 3.0); // Increased for better quality
         final ByteData? byteData =
             await image.toByteData(format: ui.ImageByteFormat.png);
 

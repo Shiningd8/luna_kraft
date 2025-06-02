@@ -9,18 +9,36 @@ import 'package:luna_kraft/flutter_flow/flutter_flow_theme.dart';
 import 'package:luna_kraft/main.dart';
 import 'package:luna_kraft/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 import 'package:provider/provider.dart';
 import 'package:luna_kraft/backend/firebase/firebase_config.dart';
 import 'package:luna_kraft/auth/firebase_auth/auth_util.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:luna_kraft/services/purchase_service.dart';
 
 void main() async {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  bool subscriptionServicesInitialized = false;
+
   setUpAll(() async {
     await initFirebase();
     await FlutterFlowTheme.initialize();
+    
+    // Initialize subscription services
+    try {
+      await Purchases.setLogLevel(LogLevel.debug);
+      await Purchases.configure(
+        PurchasesConfiguration('appl_aUbICkbeGteMFoiMsBOJzdjVoTE')
+          ..appUserID = null
+          ..observerMode = true // Use observer mode for tests
+      );
+      await PurchaseService.init();
+      subscriptionServicesInitialized = true;
+    } catch (e) {
+      print('Failed to initialize subscription services in test: $e');
+    }
   });
 
   setUp(() async {
@@ -66,7 +84,10 @@ void main() async {
           providers: [
             ChangeNotifierProvider(create: (context) => FFAppState()),
           ],
-          child: MyApp(theme: testTheme),
+          child: MyApp(
+            theme: testTheme,
+            subscriptionServicesInitialized: subscriptionServicesInitialized,
+          ),
         ),
       ),
     );
@@ -114,6 +135,10 @@ bool _shouldIgnoreError(String error) {
   }
   // Focus related errors in tests
   if (error.contains('FocusNode') || error.contains('unfocus')) {
+    return true;
+  }
+  // RevenueCat related errors in tests
+  if (error.contains('Purchases') || error.contains('RevenueCat')) {
     return true;
   }
 

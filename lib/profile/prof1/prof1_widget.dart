@@ -491,110 +491,6 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                           },
                                                         ),
                                                         SizedBox(height: 12),
-                                                        // Emergency fix button - force unlocks benefits
-                                                        _buildOptionItem(
-                                                          'Emergency Fix',
-                                                          Icons.build_circle,
-                                                          () async {
-                                                            // Confirm before proceeding
-                                                            final confirm = await showDialog<bool>(
-                                                              context: context,
-                                                              builder: (BuildContext context) {
-                                                                return AlertDialog(
-                                                                  title: Text('Emergency Fix'),
-                                                                  content: Text(
-                                                                    'This will force-enable all premium features and add 1000 LunaCoins to your account. '
-                                                                    'Use this only if your purchased subscription is not working.'
-                                                                  ),
-                                                                  actions: [
-                                                                    TextButton(
-                                                                      onPressed: () => Navigator.pop(context, false),
-                                                                      child: Text('Cancel'),
-                                                                    ),
-                                                                    TextButton(
-                                                                      onPressed: () => Navigator.pop(context, true),
-                                                                      child: Text('Proceed'),
-                                                                      style: TextButton.styleFrom(
-                                                                        foregroundColor: Colors.red,
-                                                                      ),
-                                                                    ),
-                                                                  ],
-                                                                );
-                                                              },
-                                                            ) ?? false;
-                                                            
-                                                            if (!confirm) return;
-                                                            
-                                                            // Show loading indicator
-                                                            showDialog(
-                                                              context: context,
-                                                              barrierDismissible: false,
-                                                              builder: (BuildContext context) {
-                                                                return AlertDialog(
-                                                                  content: Column(
-                                                                    mainAxisSize: MainAxisSize.min,
-                                                                    children: [
-                                                                      CircularProgressIndicator(),
-                                                                      SizedBox(height: 16),
-                                                                      Text('Applying emergency fix...'),
-                                                                    ],
-                                                                  ),
-                                                                );
-                                                              },
-                                                            );
-                                                            
-                                                            try {
-                                                              // Use emergency method to force unlock all benefits
-                                                              final result = await PurchaseService.emergencyForceUnlockAllBenefits();
-                                                              
-                                                              // Close loading dialog
-                                                              if (Navigator.canPop(context)) {
-                                                                Navigator.pop(context);
-                                                              }
-                                                              
-                                                              if (result) {
-                                                                // Success - show confirmation
-                                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                                  SnackBar(
-                                                                    content: Text('Emergency fix applied successfully! You now have full premium access.'),
-                                                                    duration: Duration(seconds: 4),
-                                                                    backgroundColor: Colors.green,
-                                                                  ),
-                                                                );
-                                                                
-                                                                // Close the options menu
-                                                                Navigator.pop(context);
-                                                                
-                                                                // Force UI refresh
-                                                                setState(() {});
-                                                              } else {
-                                                                // Failed
-                                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                                  SnackBar(
-                                                                    content: Text('Failed to apply emergency fix.'),
-                                                                    duration: Duration(seconds: 3),
-                                                                    backgroundColor: Colors.red,
-                                                                  ),
-                                                                );
-                                                              }
-                                                            } catch (e) {
-                                                              // Close loading dialog on error
-                                                              if (Navigator.canPop(context)) {
-                                                                Navigator.pop(context);
-                                                              }
-                                                              
-                                                              // Show error
-                                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                                SnackBar(
-                                                                  content: Text('Error applying emergency fix: $e'),
-                                                                  duration: Duration(seconds: 3),
-                                                                  backgroundColor: Colors.red,
-                                                                ),
-                                                              );
-                                                            }
-                                                          },
-                                                        ),
-                                                        SizedBox(height: 12),
                                                         _fixSignOutOption(),
                                                       ],
                                                     ),
@@ -1309,30 +1205,7 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                               ],
                             ),
                             SizedBox(height: 12),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                final isTestMode = SubscriptionUtil.isPremium;
-                                SubscriptionManager.setTestingMode(!isTestMode);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(isTestMode 
-                                      ? 'Testing mode disabled' 
-                                      : 'Testing mode enabled - Full access granted'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                                setState(() {});
-                              },
-                              icon: Icon(Icons.science),
-                              label: Text('Toggle Testing Mode'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: SubscriptionUtil.isPremium 
-                                  ? Colors.redAccent 
-                                  : Colors.green,
-                                foregroundColor: Colors.white,
-                                minimumSize: Size(double.infinity, 40),
-                              ),
-                            ),
+                            // Testing mode button removed for release
                             SizedBox(height: 12),
                             ElevatedButton.icon(
                               onPressed: () async {
@@ -2498,12 +2371,6 @@ class _Prof1WidgetState extends State<Prof1Widget> {
           return AuthUserStreamWidget(
             builder: (context) => Consumer<AppState>(
               builder: (context, appState, _) {
-                // Debug log to check what backgrounds are available
-                print('Available background options in dialog:');
-                for (var bg in appState.backgroundOptions) {
-                  print('Background: ${bg['name']} - ${bg['file']}');
-                }
-
                 // Get sorted background options (unlocked first)
                 final sortedOptions = appState.sortedBackgroundOptions;
 
@@ -2596,21 +2463,58 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                     ),
                                   ),
                                   SizedBox(width: 8),
-                                  Text(
-                                    '${currentUserDocument?.lunaCoins ?? 0} LunaCoins',
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          fontFamily: 'Figtree',
-                                          fontWeight: FontWeight.bold,
-                                          color: Theme.of(context).brightness == Brightness.light
-                                              ? Colors.black
-                                              : FlutterFlowTheme.of(context).warning,
-                                        ),
+                                  AuthUserStreamWidget(
+                                    builder: (context) => Text(
+                                      '${_getLunaCoins()} LunaCoins',
+                                      style: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .override(
+                                            fontFamily: 'Figtree',
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context).brightness == Brightness.light
+                                                ? Colors.black
+                                                : FlutterFlowTheme.of(context).warning,
+                                          ),
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
+                            
+                            // Subscription Status
+                            if (SubscriptionUtil.hasExclusiveThemes)
+                              Container(
+                                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.star,
+                                      color: FlutterFlowTheme.of(context).primary,
+                                      size: 18,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Premium Subscriber - All Backgrounds Available!',
+                                      style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                        fontFamily: 'Figtree',
+                                        color: FlutterFlowTheme.of(context).primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
 
                             // Background Options
                             Flexible(
@@ -2623,8 +2527,11 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                       final isSelected =
                                           appState.selectedBackground ==
                                               bg['file'];
-                                      final isUnlocked = appState.isBackgroundUnlocked(bg['file']!);
+                                      final isUnlocked = appState.isPremiumBackgroundAvailable(bg['file']!);
                                       final price = appState.getBackgroundPrice(bg['file']!);
+                                      
+                                      // For premium users, all backgrounds should be unlocked
+                                      final canUse = isUnlocked;
                                       
                                       return Container(
                                         margin: EdgeInsets.only(bottom: 16),
@@ -2651,9 +2558,14 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                             color: Colors.transparent,
                                             child: InkWell(
                                               onTap: () {
-                                                if (isUnlocked) {
-                                                  // Set as active background if unlocked
+                                                if (canUse) {
+                                                  // Set as active background if unlocked or premium
                                                   appState.setBackground(bg['file']!);
+                                                  
+                                                  // If premium user but not yet in their unlocked list, add it
+                                                  if (SubscriptionUtil.hasExclusiveThemes) {
+                                                    appState.unlockAllBackgroundsForPremium();
+                                                  }
                                                 } else {
                                                   // Show purchase dialog if locked
                                                   _showPurchaseDialog(
@@ -2729,36 +2641,18 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                                               errorBuilder: (context,
                                                                                   error,
                                                                                   stackTrace) {
-                                                                                print(
-                                                                                    'Error loading image in preview: $bgFile - $error');
-                                                                                print(
-                                                                                    'Stack trace: $stackTrace');
-                                                                                print(
-                                                                                    'Attempted to load: assets/images/$bgFile');
-
-                                                                                // Try fallback to a known working image
-                                                                                return Image
-                                                                                    .asset(
-                                                                                  'assets/images/applogo.png',
-                                                                                  fit:
-                                                                                      BoxFit.cover,
-                                                                                  errorBuilder: (context,
-                                                                                      err,
-                                                                                      st) {
-                                                                                    return Center(
-                                                                                      child: Icon(
-                                                                                        Icons.image_not_supported,
-                                                                                        color: FlutterFlowTheme.of(context).secondaryText,
-                                                                                      ),
-                                                                                    );
-                                                                                  },
+                                                                                return Center(
+                                                                                  child: Icon(
+                                                                                    Icons.image_not_supported,
+                                                                                    color: FlutterFlowTheme.of(context).secondaryText,
+                                                                                  ),
                                                                                 );
                                                                               },
                                                                             );
                                                                           } else {
                                                                             return Lottie
                                                                                 .asset(
-                                                                              'assets/jsons/${bg['file']}',
+                                                                              'assets/jsons/$bgFile',
                                                                               fit: BoxFit
                                                                                   .cover,
                                                                               animate:
@@ -2768,8 +2662,6 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                                               errorBuilder: (context,
                                                                                   error,
                                                                                   stackTrace) {
-                                                                                print(
-                                                                                    'Error loading Lottie: ${bg['file']} - $error');
                                                                                 return Center(
                                                                                   child:
                                                                                       Icon(
@@ -2781,8 +2673,6 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                                             );
                                                                           }
                                                                         } catch (e) {
-                                                                          print(
-                                                                              'Exception loading Lottie: ${bg['file']} - $e');
                                                                           return Center(
                                                                             child:
                                                                                 Icon(
@@ -2798,7 +2688,7 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                                   ),
                                                                 ),
                                                                 // Lock overlay for locked backgrounds
-                                                                if (!isUnlocked)
+                                                                if (!canUse)
                                                                   Positioned.fill(
                                                                     child: Container(
                                                                       color: Colors.black.withOpacity(0.5),
@@ -2853,7 +2743,7 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                                         .primary,
                                                                   ),
                                                             )
-                                                          else if (!isUnlocked)
+                                                          else if (!isUnlocked && !SubscriptionUtil.hasExclusiveThemes)
                                                             Text(
                                                               '$price LunaCoins',
                                                               style: FlutterFlowTheme
@@ -2880,7 +2770,7 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                                                                     context)
                                                                 .primary,
                                                       )
-                                                    else if (!isUnlocked)
+                                                    else if (!canUse)
                                                       Icon(
                                                         Icons.lock,
                                                         color: FlutterFlowTheme.of(context).secondaryText,
@@ -2914,6 +2804,13 @@ class _Prof1WidgetState extends State<Prof1Widget> {
 
   // Show purchase dialog for locked backgrounds
   void _showPurchaseDialog(BuildContext context, AppState appState, String backgroundFile, String backgroundName, int price) {
+    // Quick double-check if it's already available to this user
+    if (appState.isPremiumBackgroundAvailable(backgroundFile)) {
+      // If it's already available, just set it and return
+      appState.setBackground(backgroundFile);
+      return;
+    }
+    
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -3073,15 +2970,20 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                               size: 20,
                             ),
                             SizedBox(width: 4),
-                            Text(
-                              '${currentUserDocument?.lunaCoins ?? 0}',
-                              style: FlutterFlowTheme.of(context).bodyLarge.override(
-                                fontFamily: 'Figtree',
-                                fontWeight: FontWeight.bold,
-                                color: (currentUserDocument?.lunaCoins ?? 0) >= price
-                                  ? FlutterFlowTheme.of(context).secondary
-                                  : FlutterFlowTheme.of(context).error,
-                              ),
+                            AuthUserStreamWidget(
+                              builder: (context) {
+                                final lunaCoins = _getLunaCoins();
+                                return Text(
+                                  '$lunaCoins',
+                                  style: FlutterFlowTheme.of(context).bodyLarge.override(
+                                    fontFamily: 'Figtree',
+                                    fontWeight: FontWeight.bold,
+                                    color: lunaCoins >= price
+                                      ? FlutterFlowTheme.of(context).secondary
+                                      : FlutterFlowTheme.of(context).error,
+                                  ),
+                                );
+                              }
                             ),
                           ],
                         ),
@@ -3114,90 +3016,196 @@ class _Prof1WidgetState extends State<Prof1Widget> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    FFButtonWidget(
-                      onPressed: (currentUserDocument?.lunaCoins ?? 0) >= price
-                        ? () async {
-                            // Close purchase dialog
-                            Navigator.pop(dialogContext);
-                            
-                            // Unlock the background
-                            bool success = await appState.unlockBackground(backgroundFile);
-                            
-                            if (success) {
-                              // Show success message
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Successfully unlocked $backgroundName background!',
-                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Figtree',
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  backgroundColor: FlutterFlowTheme.of(context).primary,
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                              
-                              // Apply the background
-                              await appState.setBackground(backgroundFile);
-                              
-                              // Refresh the dialog to show updated state
-                              Navigator.pop(context); // Close the entire collection dialog
-                              _showBackgroundCollectionDialog(context); // Reopen it
-                            } else {
-                              // Show error message
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Failed to unlock background. Please try again.',
-                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                      fontFamily: 'Figtree',
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  backgroundColor: FlutterFlowTheme.of(context).error,
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            }
-                          }
-                        : null,
-                      text: 'Purchase',
-                      options: FFButtonOptions(
-                        width: 120,
-                        height: 50,
-                        color: (currentUserDocument?.lunaCoins ?? 0) >= price
-                          ? FlutterFlowTheme.of(context).primary
-                          : FlutterFlowTheme.of(context).alternate,
-                        textStyle: FlutterFlowTheme.of(context).titleSmall.override(
-                          fontFamily: 'Figtree',
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        elevation: 3,
-                        borderSide: BorderSide(
-                          color: Colors.transparent,
-                          width: 1,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        disabledColor: FlutterFlowTheme.of(context).alternate,
-                        disabledTextColor: FlutterFlowTheme.of(context).secondaryText,
-                      ),
+                    AuthUserStreamWidget(
+                      builder: (context) {
+                        final lunaCoins = _getLunaCoins();
+                        return FFButtonWidget(
+                          onPressed: lunaCoins >= price
+                            ? () async {
+                                try {
+                                  // Close purchase dialog
+                                  Navigator.pop(dialogContext);
+                                  
+                                  // Unlock the background
+                                  bool success = await appState.unlockBackground(backgroundFile);
+                                  
+                                  // Verify context is still mounted
+                                  if (!context.mounted) return;
+                                  
+                                  if (success) {
+                                    // Show success message
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Successfully unlocked $backgroundName background!',
+                                          style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                            fontFamily: 'Figtree',
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        backgroundColor: FlutterFlowTheme.of(context).primary,
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                    
+                                    // Use the synchronous check first to avoid async issues
+                                    if (appState.isPremiumBackgroundAvailable(backgroundFile)) {
+                                      // Apply the background (this is async but we've verified it's available)
+                                      appState.setBackground(backgroundFile);
+                                      
+                                      // Refresh the dialog to show updated state
+                                      Navigator.pop(context); // Close the entire collection dialog
+                                      _showBackgroundCollectionDialog(context); // Reopen it
+                                    }
+                                  } else {
+                                    // Show error message
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to unlock background. Please try again.',
+                                          style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                            fontFamily: 'Figtree',
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        backgroundColor: FlutterFlowTheme.of(context).error,
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  print('Error during background purchase: $e');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('An error occurred. Please try again.'),
+                                        backgroundColor: FlutterFlowTheme.of(context).error,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            : null,
+                          text: 'Purchase',
+                          options: FFButtonOptions(
+                            width: 120,
+                            height: 50,
+                            color: lunaCoins >= price
+                              ? FlutterFlowTheme.of(context).primary
+                              : FlutterFlowTheme.of(context).alternate,
+                            textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                              fontFamily: 'Figtree',
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            elevation: 3,
+                            borderSide: BorderSide(
+                              color: Colors.transparent,
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            disabledColor: FlutterFlowTheme.of(context).alternate,
+                            disabledTextColor: FlutterFlowTheme.of(context).secondaryText,
+                          ),
+                        );
+                      }
                     ),
                   ],
                 ),
                 
                 // Information text
-                if ((currentUserDocument?.lunaCoins ?? 0) < price)
+                AuthUserStreamWidget(
+                  builder: (context) {
+                    final lunaCoins = _getLunaCoins();
+                    if (lunaCoins < price) {
+                      return Padding(
+                        padding: EdgeInsets.only(top: 16),
+                        child: Text(
+                          'Not enough LunaCoins',
+                          style: FlutterFlowTheme.of(context).bodyMedium.override(
+                            fontFamily: 'Figtree',
+                            color: FlutterFlowTheme.of(context).error,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      );
+                    } else {
+                      return SizedBox.shrink();
+                    }
+                  }
+                ),
+                
+                // Premium suggestion
+                if (!SubscriptionUtil.hasExclusiveThemes)
                   Padding(
                     padding: EdgeInsets.only(top: 16),
-                    child: Text(
-                      'Not enough LunaCoins',
-                      style: FlutterFlowTheme.of(context).bodyMedium.override(
-                        fontFamily: 'Figtree',
-                        color: FlutterFlowTheme.of(context).error,
-                        fontStyle: FontStyle.italic,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(dialogContext); // Close purchase dialog
+                        Navigator.pop(context); // Close background dialog
+                        context.pushNamed('MembershipPage'); // Go to membership page
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.star,
+                              color: FlutterFlowTheme.of(context).primary,
+                              size: 16,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Access all backgrounds with Premium',
+                              style: FlutterFlowTheme.of(context).bodyMedium.override(
+                                fontFamily: 'Figtree',
+                                color: FlutterFlowTheme.of(context).primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              size: 12,
+                              color: FlutterFlowTheme.of(context).primary,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                // Additional explanation for premium access
+                if (!SubscriptionUtil.hasExclusiveThemes)
+                  Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: FlutterFlowTheme.of(context).bodySmall.override(
+                          fontFamily: 'Figtree',
+                          color: FlutterFlowTheme.of(context).secondaryText,
+                          fontSize: 10,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'Note: ',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          TextSpan(
+                            text: 'Premium gives temporary access to all themes. Purchased themes are yours forever.',
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -3494,6 +3502,18 @@ class _Prof1WidgetState extends State<Prof1Widget> {
           ],
         ),
       );
+    }
+  }
+
+  // Helper method to get luna_coins with proper field name
+  int _getLunaCoins() {
+    if (currentUserDocument == null) return 0;
+    try {
+      // Access the field directly using the property names as defined in UserRecord
+      return currentUserDocument!.lunaCoins;
+    } catch (e) {
+      print('Error getting luna_coins: $e');
+      return 0;
     }
   }
 }

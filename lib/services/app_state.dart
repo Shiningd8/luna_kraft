@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/backend/backend.dart';
+import '/utils/subscription_util.dart';
 
 class AppState extends ChangeNotifier {
   static final AppState _instance = AppState._internal();
@@ -32,6 +33,11 @@ class AppState extends ChangeNotifier {
       if (user != null) {
         _loadBackgroundPreference();
         _loadUnlockedBackgrounds();
+        
+        // Add a slight delay to ensure subscription data is loaded
+        Future.delayed(Duration(seconds: 1), () {
+          validateBackgroundSelection();
+        });
       }
     });
   }
@@ -46,14 +52,32 @@ class AppState extends ChangeNotifier {
   List<String> get unlockedBackgrounds => _unlockedBackgrounds;
 
   // Check if a background is unlocked
-  bool isBackgroundUnlocked(String backgroundFile) {
-    // Default and gradient backgrounds are always unlocked
-    if (backgroundFile == 'backgroundanimation.json' || 
-        backgroundFile == 'gradient.json') {
+  Future<bool> isBackgroundUnlocked(String backgroundFile) async {
+    // Basic backgrounds are always available
+    if (backgroundFile == 'backgroundanimation.json' || backgroundFile == 'gradient.json') {
       return true;
     }
     
-    return _unlockedBackgrounds.contains(backgroundFile);
+    // First check if user is premium - fast path for subscribers
+    if (SubscriptionUtil.hasExclusiveThemes) {
+      print('User has active subscription - all backgrounds are available');
+      return true;
+    }
+    
+    // For non-subscribers, check if the background is permanently unlocked
+    try {
+      // Load unlocked backgrounds first to ensure we have the latest data
+      await _loadUnlockedBackgrounds();
+      
+      // Check if the background is in unlocked list
+      final isUnlocked = _unlockedBackgrounds.contains(backgroundFile);
+      
+      print('Background $backgroundFile unlocked status: $isUnlocked (non-subscriber)');
+      return isUnlocked;
+    } catch (e) {
+      print('Error checking if background is unlocked: $e');
+      return false;
+    }
   }
 
   // Get the price for a background (progressively increasing)
@@ -72,19 +96,22 @@ class AppState extends ChangeNotifier {
     return basePrice + ((index - 2) * 20);
   }
 
-  // Unlock a background
+  // Unlock a background and store in Firestore
   Future<bool> unlockBackground(String backgroundFile) async {
-    if (isBackgroundUnlocked(backgroundFile)) {
+    // Check if already unlocked first
+    final alreadyUnlocked = await isBackgroundUnlocked(backgroundFile);
+    if (alreadyUnlocked) {
       return true; // Already unlocked
     }
-
-    // Get current user
-    final userRef = currentUserReference;
-    if (userRef == null) {
-      return false;
-    }
-
+    
+    // If not already unlocked, continue with purchase...
     try {
+      // Get current user
+      final userRef = currentUserReference;
+      if (userRef == null) {
+        return false;
+      }
+
       // Get the price
       final price = getBackgroundPrice(backgroundFile);
       
@@ -97,14 +124,14 @@ class AppState extends ChangeNotifier {
         return false;
       }
       
-      // Deduct coins
+      // Add to unlocked backgrounds in memory
+      _unlockedBackgrounds.add(backgroundFile);
+      
+      // Update Firestore with unlocked background and deduct coins
       await userRef.update({
         'luna_coins': FieldValue.increment(-price),
+        'unlocked_backgrounds': FieldValue.arrayUnion([backgroundFile]),
       });
-      
-      // Add to unlocked backgrounds
-      _unlockedBackgrounds.add(backgroundFile);
-      await _saveUnlockedBackgrounds();
       
       // Notify listeners
       notifyListeners();
@@ -135,11 +162,11 @@ class AppState extends ChangeNotifier {
   // Get sorted background options - unlocked first, then locked
   List<Map<String, String>> get sortedBackgroundOptions {
     final unlocked = backgroundOptions
-        .where((bg) => isBackgroundUnlocked(bg['file']!))
+        .where((bg) => isPremiumBackgroundAvailable(bg['file']!))
         .toList();
     
     final locked = backgroundOptions
-        .where((bg) => !isBackgroundUnlocked(bg['file']!))
+        .where((bg) => !isPremiumBackgroundAvailable(bg['file']!))
         .toList();
     
     return [...unlocked, ...locked];
@@ -172,87 +199,109 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  // Load unlocked backgrounds from SharedPreferences
+  // Load unlocked backgrounds from Firestore
   Future<void> _loadUnlockedBackgrounds() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedUnlocked = prefs.getStringList(_userUnlockedBackgroundsKey);
+      if (currentUserReference == null) return;
       
-      if (savedUnlocked != null) {
-        _unlockedBackgrounds = savedUnlocked;
+      // Fetch user document from Firestore
+      final userDoc = await currentUserReference!.get();
+      if (!userDoc.exists) return;
+      
+      final userData = userDoc.data() as Map<String, dynamic>?;
+      if (userData == null) return;
+      
+      // Get unlocked backgrounds
+      final unlockedBgs = userData['unlocked_backgrounds'] as List<dynamic>?;
+      
+      if (unlockedBgs != null) {
+        _unlockedBackgrounds = unlockedBgs.cast<String>();
       } else {
-        // Default to empty list for new users
+        // If field doesn't exist yet, initialize as empty list
         _unlockedBackgrounds = [];
       }
       
       notifyListeners();
+      print('Loaded ${_unlockedBackgrounds.length} unlocked backgrounds from Firestore');
     } catch (e) {
-      print('Error loading unlocked backgrounds: $e');
+      print('Error loading unlocked backgrounds from Firestore: $e');
     }
   }
 
-  // Save unlocked backgrounds to SharedPreferences
-  Future<void> _saveUnlockedBackgrounds() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_userUnlockedBackgroundsKey, _unlockedBackgrounds);
-    } catch (e) {
-      print('Error saving unlocked backgrounds: $e');
-    }
-  }
-
-  // Load background preference from SharedPreferences
+  // Load background preference from Firestore (fall back to SharedPreferences)
   Future<void> _loadBackgroundPreference() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedBackground =
-          prefs.getString(_userBackgroundKey) ?? 'backgroundanimation.json';
-
-      // Migrate users from removed backgrounds to default
-      if (savedBackground == 'valley.json' ||
-          savedBackground == 'windmill.json') {
-        _selectedBackground = 'backgroundanimation.json';
-        // Save the updated preference
-        await prefs.setString(_userBackgroundKey, _selectedBackground);
-        print('Migrated user from removed background to default');
-      }
-      // Migrate from old file names to new ones
-      else if (savedBackground == 'night_hill.json') {
-        _selectedBackground = 'nighthill.json';
-        await prefs.setString(_userBackgroundKey, _selectedBackground);
-        print('Migrated user from night_hill.json to nighthill.json');
-      } else if (savedBackground == 'night_lake.json') {
-        _selectedBackground = 'nightlake.json';
-        await prefs.setString(_userBackgroundKey, _selectedBackground);
-        print('Migrated user from night_lake.json to nightlake.json');
-      } else {
+      if (currentUserReference == null) {
+        // Fall back to SharedPreferences if not signed in
+        final prefs = await SharedPreferences.getInstance();
+        final savedBackground = prefs.getString(_backgroundSelectionKey) ?? 'backgroundanimation.json';
         _selectedBackground = savedBackground;
+        return;
       }
-
+      
+      // First try to get from Firestore
+      final userDoc = await currentUserReference!.get();
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>?;
+        if (userData != null && userData.containsKey('selected_background')) {
+          _selectedBackground = userData['selected_background'] as String? ?? 'backgroundanimation.json';
+          notifyListeners();
+          return;
+        }
+      }
+      
+      // Fall back to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final savedBackground = prefs.getString(_backgroundSelectionKey) ?? 'backgroundanimation.json';
+      _selectedBackground = savedBackground;
+      
+      // Save to Firestore for future use
+      if (currentUserReference != null) {
+        await currentUserReference!.update({
+          'selected_background': _selectedBackground,
+        });
+      }
+      
       notifyListeners();
     } catch (e) {
       print('Error loading background preference: $e');
+      
+      // Final fallback to default
+      _selectedBackground = 'backgroundanimation.json';
     }
   }
 
-  // Set background and persist the setting
+  // Set background and persist to Firestore
   Future<void> setBackground(String backgroundFile) async {
-    if (_selectedBackground == backgroundFile) return;
-
-    // Check if this background is unlocked
-    if (!isBackgroundUnlocked(backgroundFile)) {
-      print('Background is locked: $backgroundFile');
-      return;
-    }
-
-    _selectedBackground = backgroundFile;
-    notifyListeners();
-
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_userBackgroundKey, backgroundFile);
+      // Check if this background is unlocked
+      final isUnlocked = await isBackgroundUnlocked(backgroundFile);
+      if (!isUnlocked) {
+        print('Background is locked: $backgroundFile');
+        return;
+      }
+
+      if (_selectedBackground == backgroundFile) return;
+
+      _selectedBackground = backgroundFile;
+      notifyListeners();
+
+      try {
+        // Save to Firestore if logged in
+        if (currentUserReference != null) {
+          await currentUserReference!.update({
+            'selected_background': backgroundFile,
+          });
+        }
+        
+        // Also save to SharedPreferences as backup
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_backgroundSelectionKey, backgroundFile);
+      } catch (e) {
+        print('Error saving background preference: $e');
+      }
     } catch (e) {
-      print('Error saving background preference: $e');
+      print('Error setting background: $e');
     }
   }
 
@@ -271,6 +320,37 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // Helper method to unlock all backgrounds for premium users
+  Future<void> unlockAllBackgroundsForPremium() async {
+    try {
+      if (!SubscriptionUtil.hasExclusiveThemes || currentUserReference == null) {
+        return; // Only for premium users
+      }
+      
+      // Get all background files except default ones
+      // NOTE: We no longer permanently unlock backgrounds for premium users
+      // Premium users get access during active subscription only
+      final backgroundFiles = backgroundOptions
+          .where((bg) => 
+              bg['file'] != 'backgroundanimation.json' && 
+              bg['file'] != 'gradient.json')
+          .map((bg) => bg['file']!)
+          .toList();
+      
+      // No need to update Firestore with permanently unlocked backgrounds
+      // Premium users will only temporarily have access based on their subscription status
+      
+      // Update local state to show backgrounds as available in the UI
+      _unlockedBackgrounds = [..._unlockedBackgrounds]; // Keep existing purchases
+      
+      // Force UI update to show all backgrounds as available
+      notifyListeners();
+      print('Premium backgrounds available for subscription user');
+    } catch (e) {
+      print('Error making premium backgrounds available: $e');
+    }
+  }
+
   // Initialize app state services
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -280,6 +360,12 @@ class AppState extends ChangeNotifier {
       await _loadPerformancePreference();
       await _loadBackgroundPreference();
       await _loadUnlockedBackgrounds();
+      
+      // Check if user is premium and unlock all backgrounds if needed
+      if (SubscriptionUtil.hasExclusiveThemes) {
+        await unlockAllBackgroundsForPremium();
+      }
+      
       _isInitialized = true;
       notifyListeners();
     } catch (e) {
@@ -300,10 +386,97 @@ class AppState extends ChangeNotifier {
     try {
       await _loadBackgroundPreference();
       await _loadUnlockedBackgrounds();
+      
+      // Validate background selection after reloading data
+      await validateBackgroundSelection();
+      
+      // Check if user is premium and unlock all backgrounds if needed
+      if (SubscriptionUtil.hasExclusiveThemes) {
+        await unlockAllBackgroundsForPremium();
+      }
+      
       notifyListeners();
       print('AppState reinitialized');
     } catch (e) {
       print('Error reinitializing AppState: $e');
+      
+      // If there's an error, default to the basic background
+      try {
+        await setBackground('backgroundanimation.json');
+      } catch (setError) {
+        print('Error setting default background: $setError');
+      }
     }
+  }
+
+  // Add new method to validate the current background selection
+  Future<void> validateBackgroundSelection() async {
+    print('Validating background selection...');
+    try {
+      // Get current background
+      final currentBackground = _selectedBackground;
+      
+      // If it's a default background, no need to validate
+      if (currentBackground == 'backgroundanimation.json' || 
+          currentBackground == 'gradient.json') {
+        print('Using default background, no validation needed');
+        return;
+      }
+      
+      // First check with immediate validation (for speed)
+      final isImmediatelyAvailable = isPremiumBackgroundAvailable(currentBackground);
+      
+      if (isImmediatelyAvailable) {
+        print('Selected background ($currentBackground) is available to this user');
+        return;
+      }
+      
+      // Double-check with the full async check in case we missed something
+      final isAvailable = await isBackgroundUnlocked(currentBackground);
+      
+      // If not available, reset to default
+      if (!isAvailable) {
+        print('Selected background ($currentBackground) is not available to this user, resetting to default');
+        await setBackground('backgroundanimation.json');
+        
+        // Show a debug message
+        print('Background reset to default due to unavailability');
+      } else {
+        print('Selected background ($currentBackground) is available to this user');
+      }
+    } catch (e) {
+      print('Error validating background selection: $e');
+      // Reset to default in case of error
+      await setBackground('backgroundanimation.json');
+    }
+  }
+
+  // Check if a premium background is available now (based on current subscription status)
+  bool isPremiumBackgroundAvailable(String backgroundFile) {
+    // Default and gradient backgrounds are always available
+    if (backgroundFile == 'backgroundanimation.json' || 
+        backgroundFile == 'gradient.json') {
+      return true;
+    }
+    
+    // Check if user has premium benefits through subscription
+    if (SubscriptionUtil.hasExclusiveThemes) {
+      return true; // Premium users get all backgrounds while their subscription is active
+    }
+    
+    // Check in user's unlocked backgrounds list - these are purchased permanently
+    if (_unlockedBackgrounds.contains(backgroundFile)) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Helper method to be used in filters for premium backgrounds
+  bool filterAvailableBackgrounds(dynamic background) {
+    final file = background['file'] as String?;
+    if (file == null) return false;
+    
+    return isPremiumBackgroundAvailable(file);
   }
 }

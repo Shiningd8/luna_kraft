@@ -3,6 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import 'dart:async';
+import '/services/purchase_service.dart';
+import '/services/app_state.dart';
+import '/backend/schema/user_record.dart';
+import '/services/zen_audio_service.dart';
 
 /// Service to manage user subscription status and verification
 class SubscriptionManager {
@@ -35,6 +39,7 @@ class SubscriptionManager {
       'exclusive_themes',
       'bonus_coins_150',
       'ad_free',
+      // Note: 'zen_mode' is intentionally excluded from weekly tier
     ],
     'monthly': [
       'dream_analysis',
@@ -53,81 +58,16 @@ class SubscriptionManager {
     ],
   };
 
-  // Add a testing mode flag for development and testing
-  static bool _testingMode = false; // Set to false by default, especially for release mode
-  
-  // Method to enable/disable testing mode
-  static void setTestingMode(bool enabled) {
-    _testingMode = enabled;
-    instance._updateSubscriptionStatusForTestingMode();
-  }
-  
-  // Force enable testing mode even in release builds (for emergency fixes)
-  static void forceEnableTestingMode() {
-    setTestingMode(true); // Force enable testing mode
-    print('⚠️ EMERGENCY: Testing mode forcibly enabled for subscription access');
-    // Add bonus coins for emergency cases
-    if (currentUserReference != null) {
-      FirebaseFirestore.instance.doc(currentUserReference!.path).get().then((doc) {
-        if (doc.exists) {
-          final userData = doc.data() as Map<String, dynamic>?;
-          final currentCoins = userData?['lunaCoins'] as int? ?? 0;
-          FirebaseFirestore.instance.doc(currentUserReference!.path).update({
-            'lunaCoins': currentCoins + 1000,
-          }).then((_) {
-            print('💰 EMERGENCY: Added 1000 bonus coins');
-          }).catchError((e) {
-            print('❌ Failed to add emergency coins: $e');
-          });
-        }
-      }).catchError((e) {
-        print('❌ Error getting user document for emergency coins: $e');
-      });
-    }
-  }
-  
-  // Provide a testing subscription for development
-  void _updateSubscriptionStatusForTestingMode() {
-    if (_testingMode) {
-      // Create a test subscription with all benefits
-      _updateSubscriptionStatus(SubscriptionStatus(
-        isSubscribed: true,
-        subscriptionTier: 'yearly', // Use yearly to get all benefits
-        expiryDate: DateTime.now().add(Duration(days: 365)),
-        benefits: _subscriptionBenefits['yearly'] ?? [],
-      ));
-      print('🧪 TESTING MODE: Simulated yearly subscription activated');
-      
-      // In testing mode, also add bonus coins if needed
-      Future.microtask(() => _addBonusCoinsForSubscription('yearly'));
-    } else if (_cachedStatus?.isSubscribed == true && _cachedStatus?.subscriptionTier == 'yearly') {
-      // Only reset if we previously set a test subscription
-      _startListeningToSubscriptionChanges();
-      print('🧪 TESTING MODE: Disabled, reverted to actual subscription status');
-    }
-  }
-
   // Initialize subscription manager
   Future<void> initialize() async {
     // Clean up any existing subscriptions
     await dispose();
 
-    // Enable testing mode in debug mode
-    if (kDebugMode) {
-      setTestingMode(true);
-      print('🧪 Debug build detected - Testing mode enabled automatically');
-    }
-    
     // Start listening for auth state changes
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (user != null) {
-        if (_testingMode) {
-          // If in testing mode, use simulated subscription
-          _updateSubscriptionStatusForTestingMode();
-        } else {
-          // Otherwise use real subscription data
-          _startListeningToSubscriptionChanges();
-        }
+        // Use real subscription data
+        _startListeningToSubscriptionChanges();
       } else {
         _stopListeningToSubscriptionChanges();
         _updateSubscriptionStatus(SubscriptionStatus(
@@ -143,6 +83,15 @@ class SubscriptionManager {
   // Start listening to Firestore for subscription changes
   void _startListeningToSubscriptionChanges() {
     if (currentUserReference == null) return;
+
+    print('🔄 Starting to listen for subscription changes for user: ${currentUserReference!.id}');
+    
+    // First, trigger an immediate RevenueCat refresh to ensure data is synced
+    PurchaseService.refreshSubscriptionStatus().then((hasSubscription) {
+      print('Initial RevenueCat refresh completed: hasSubscription=$hasSubscription');
+    }).catchError((e) {
+      print('❌ Error during initial RevenueCat refresh: $e');
+    });
 
     _firestoreSubscription = FirebaseFirestore.instance
         .doc(currentUserReference!.path)
@@ -257,27 +206,39 @@ class SubscriptionManager {
     _subscriptionStatusController.add(status);
   }
 
+  // Reset all subscription state - call this during logout
+  Future<void> resetSubscriptionState() async {
+    print('🔄 Resetting subscription state during logout');
+    // Clear the cached status
+    _cachedStatus = SubscriptionStatus(
+      isSubscribed: false,
+      subscriptionTier: null,
+      expiryDate: null,
+      benefits: [],
+    );
+    
+    // Notify listeners
+    _subscriptionStatusController.add(_cachedStatus!);
+    
+    // Stop listening for changes
+    _stopListeningToSubscriptionChanges();
+    
+    print('✅ Subscription state reset complete');
+  }
+
   // Check if user has an active subscription
-  bool get isSubscribed => _testingMode || _cachedStatus?.isSubscribed == true;
+  bool get isSubscribed => _cachedStatus?.isSubscribed == true;
 
   // Get subscription tier
-  String? get subscriptionTier => _testingMode ? 'yearly' : _cachedStatus?.subscriptionTier;
+  String? get subscriptionTier => _cachedStatus?.subscriptionTier;
 
   // Check if user has a specific benefit
   bool hasBenefit(String benefit) {
-    if (_testingMode) {
-      // In testing mode, provide access to all benefits
-      return _subscriptionBenefits['yearly']?.contains(benefit) ?? false;
-    }
     return _cachedStatus?.benefits.contains(benefit) ?? false;
   }
 
   // Get current user's benefits
   List<String> get benefits {
-    if (_testingMode) {
-      return _subscriptionBenefits['yearly'] ?? [];
-    }
-    
     if (!isSubscribed || _cachedStatus == null) {
       return [];
     }
@@ -338,12 +299,26 @@ class SubscriptionManager {
 
   // Add bonus coins to user account based on subscription tier
   Future<void> _addBonusCoinsForSubscription(String productId) async {
-    if (currentUserReference == null) return;
-    
+    // Current user reference is required
+    if (currentUserReference == null) {
+      print('⚠️ Cannot add bonus coins: No current user');
+      return;
+    }
+
     try {
-      int bonusCoins = 0;
+      final userDoc = await FirebaseFirestore.instance.doc(currentUserReference!.path).get();
+
+      // First check if bonus coins were already applied
+      final subscriptionData = userDoc.data()?['subscription'] as Map<String, dynamic>?;
+      final bonusCoinsAlreadyApplied = subscriptionData?['bonusCoinsApplied'] as bool? ?? false;
       
-      // Determine bonus coins based on subscription tier
+      if (bonusCoinsAlreadyApplied) {
+        print('ℹ️ Bonus coins were already applied for this subscription');
+        return;
+      }
+
+      // Determine bonus coin amount based on tier
+      int bonusCoins = 0;
       if (productId.contains('weekly')) {
         bonusCoins = 150;
       } else if (productId.contains('monthly')) {
@@ -351,31 +326,85 @@ class SubscriptionManager {
       } else if (productId.contains('yearly')) {
         bonusCoins = 1000;
       }
-      
+
       if (bonusCoins > 0) {
-        print('💰 Adding $bonusCoins bonus coins for subscription: $productId');
-        
-        // Get current user data
-        final userDoc = await FirebaseFirestore.instance.doc(currentUserReference!.path).get();
-        if (!userDoc.exists) return;
-        
-        final userData = userDoc.data() as Map<String, dynamic>?;
-        if (userData == null) return;
-        
-        // Calculate new coin balance
-        final currentCoins = userData['lunaCoins'] as int? ?? 0;
-        final newCoins = currentCoins + bonusCoins;
-        
-        // Update user document with new coin balance and mark coins as applied
-        await FirebaseFirestore.instance.doc(currentUserReference!.path).update({
-          'lunaCoins': newCoins,
-          'subscription.bonusCoinsApplied': true,
+        // Use a transaction to ensure atomic update
+        await FirebaseFirestore.instance.runTransaction((transaction) async {
+          // Get the latest user data within transaction
+          final latestUserDoc = await transaction.get(currentUserReference!);
+          final userData = latestUserDoc.data() as Map<String, dynamic>?;
+          
+          if (userData == null) return;
+          
+          // Get current coin balance
+          final currentCoins = userData['luna_coins'] as int? ?? 0;
+          
+          // Update both coins and mark as applied in one transaction
+          transaction.update(currentUserReference!, {
+            'luna_coins': currentCoins + bonusCoins,
+            'subscription.bonusCoinsApplied': true,
+          });
         });
-        
-        print('✅ Successfully added $bonusCoins coins. New balance: $newCoins');
+
+        print('💰 Added $bonusCoins bonus coins for subscription tier: $productId');
       }
+      
+      // Unlock all backgrounds for premium users
+      await _unlockAllBackgroundsForPremium();
+      
     } catch (e) {
       print('❌ Error adding bonus coins: $e');
+    }
+  }
+  
+  // Unlock all backgrounds for premium subscribers
+  Future<void> _unlockAllBackgroundsForPremium() async {
+    if (currentUserReference == null) return;
+    
+    try {
+      // Get all backgrounds from AppState (excluding default ones)
+      final appState = AppState();
+      final backgroundOptions = appState.backgroundOptions;
+      
+      final backgroundFiles = backgroundOptions
+          .where((bg) => 
+              bg['file'] != 'backgroundanimation.json' && 
+              bg['file'] != 'gradient.json')
+          .map((bg) => bg['file']!)
+          .toList();
+      
+      // We no longer permanently unlock backgrounds in Firestore
+      // Instead, access is granted based on subscription status
+      
+      // Force refresh the AppState to update the UI
+      appState.forceReinitialize();
+      
+      // Also make premium zen sounds available during subscription
+      await _makePremiumZenSoundsAvailable();
+      
+      print('🔓 Premium backgrounds made available during subscription');
+    } catch (e) {
+      print('❌ Error making premium backgrounds available: $e');
+    }
+  }
+  
+  // Make premium zen sounds available during subscription
+  Future<void> _makePremiumZenSoundsAvailable() async {
+    try {
+      // Refresh the Zen audio service to update sound availability
+      final zenService = ZenAudioService();
+      
+      // Check if the service is already initialized before refreshing
+      if (zenService.isInitialized) {
+        // Use the public method to refresh sound lock status
+        zenService.refreshSoundLockStatus();
+        print('🔊 Premium zen sounds made available during subscription');
+      } else {
+        // The service will initialize with correct states when needed
+        print('ℹ️ Zen service not yet initialized, sound status will update on init');
+      }
+    } catch (e) {
+      print('❌ Error making premium zen sounds available: $e');
     }
   }
 
@@ -416,13 +445,13 @@ class SubscriptionManager {
       }
       
       if (bonusCoins > 0) {
-        // Calculate new coin balance
-        final currentCoins = userData['lunaCoins'] as int? ?? 0;
+        // Calculate new coin balance - use the correct field name
+        final currentCoins = userData['luna_coins'] as int? ?? 0;
         final newCoins = currentCoins + bonusCoins;
         
         // Update user document with new coin balance and mark coins as applied
         await FirebaseFirestore.instance.doc(currentUserReference!.path).update({
-          'lunaCoins': newCoins,
+          'luna_coins': newCoins,
           'subscription.bonusCoinsApplied': true,
         });
         
@@ -443,12 +472,6 @@ class SubscriptionManager {
   Future<void> refreshSubscriptionStatus() async {
     try {
       if (currentUserReference == null) return;
-      
-      // Temporarily disable testing mode to get real status
-      final wasInTestingMode = _testingMode;
-      if (wasInTestingMode) {
-        _testingMode = false;
-      }
       
       // Re-fetch user data from Firestore
       final userDoc = await FirebaseFirestore.instance.doc(currentUserReference!.path).get();
@@ -482,20 +505,90 @@ class SubscriptionManager {
             expiryDate: expiryDate,
             benefits: _parseBenefits(subscription['benefits']),
           ));
+          
+          // Also check if we need to apply any bonus benefits that weren't applied
+          if (productId.contains('premium') || 
+              productId.contains('weekly') || 
+              productId.contains('monthly') || 
+              productId.contains('yearly')) {
+            
+            final bonusApplied = subscription['bonusCoinsApplied'] as bool? ?? false;
+            if (!bonusApplied) {
+              print('💰 Applying missing bonus coins for subscription...');
+              await _addBonusCoinsForSubscription(productId);
+            }
+          }
         } else {
           print('❌ Subscription found but it is expired or inactive');
+          
+          // Update subscription status in memory to indicate no active subscription
+          _updateSubscriptionStatus(SubscriptionStatus(
+            isSubscribed: false,
+            subscriptionTier: null,
+            expiryDate: null,
+            benefits: [],
+          ));
         }
       } else {
         print('❌ No valid subscription data found');
-      }
-      
-      // Restore testing mode if it was enabled
-      if (wasInTestingMode) {
-        _testingMode = true;
-        _updateSubscriptionStatusForTestingMode();
+        
+        // Try to check with RevenueCat as a fallback
+        try {
+          // Directly call PurchaseService
+          print('🔄 Attempting to refresh subscription from RevenueCat...');
+          final success = await PurchaseService.refreshSubscriptionStatus();
+          if (success) {
+            print('✅ Successfully refreshed subscription from RevenueCat');
+            // Wait a moment for the Firestore data to update
+            await Future.delayed(Duration(seconds: 2));
+            // Call this method again to read the updated Firestore data
+            await refreshSubscriptionStatus();
+            return;
+          }
+        } catch (e) {
+          print('❌ Error refreshing from RevenueCat: $e');
+        }
+        
+        // If we get here, no subscription was found
+        _updateSubscriptionStatus(SubscriptionStatus(
+          isSubscribed: false,
+          subscriptionTier: null,
+          expiryDate: null,
+          benefits: [],
+        ));
       }
     } catch (e) {
       print('❌ Error refreshing subscription status: $e');
+    }
+  }
+  
+  // Force a complete refresh of subscription status from both RevenueCat and Firestore
+  Future<bool> forceCompleteRefresh() async {
+    try {
+      print('🔄 Performing complete subscription refresh...');
+      
+      // First try to refresh from RevenueCat
+      try {
+        print('🔄 Refreshing subscription data from RevenueCat...');
+        
+        // Directly call PurchaseService
+        await PurchaseService.refreshSubscriptionStatus();
+        print('✅ RevenueCat refresh completed');
+      } catch (e) {
+        print('⚠️ Error during RevenueCat refresh: $e');
+      }
+      
+      // Then refresh from Firestore
+      await refreshSubscriptionStatus();
+      
+      // Finally, check if we were able to find an active subscription
+      final hasActiveSubscription = isSubscribed;
+      
+      print('🔍 Complete refresh result: hasActiveSubscription=$hasActiveSubscription');
+      return hasActiveSubscription;
+    } catch (e) {
+      print('❌ Error during complete subscription refresh: $e');
+      return false;
     }
   }
 }

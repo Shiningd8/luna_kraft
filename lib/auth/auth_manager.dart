@@ -57,10 +57,6 @@ mixin PhoneSignInManager on AuthManager {
   });
 }
 
-mixin FacebookSignInManager on AuthManager {
-  Future<BaseAuthUser?> signInWithFacebook(BuildContext context);
-}
-
 mixin MicrosoftSignInManager on AuthManager {
   Future<BaseAuthUser?> signInWithMicrosoft(
     BuildContext context,

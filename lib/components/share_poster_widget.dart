@@ -35,31 +35,31 @@ class _SharePosterWidgetState extends State<SharePosterWidget> {
     // Dynamic font size calculation based on text length
     final length = text.length;
 
-    // More gradual size reduction for longer texts
-    if (length > 1500) return 10.0;
-    if (length > 1200) return 11.0;
-    if (length > 900) return 12.0;
-    if (length > 700) return 13.0;
-    if (length > 500) return 14.0;
-    if (length > 300) return 15.0;
-    if (length > 150) return 16.0;
+    // More gradual size reduction for longer texts with increased sizes
+    if (length > 1500) return 14.0;
+    if (length > 1200) return 15.0;
+    if (length > 900) return 16.0;
+    if (length > 700) return 17.0;
+    if (length > 500) return 18.0;
+    if (length > 300) return 19.0;
+    if (length > 150) return 20.0;
 
     // Default size for short texts
-    return 17.0;
+    return 21.0;
   }
 
   @override
   Widget build(BuildContext context) {
     final contentFontSize = _calculateFontSize(widget.post.dream);
 
-    // Calculate title font size based on length
+    // Calculate title font size based on length with increased sizes
     final titleLength = widget.post.title.length;
     final double titleFontSize =
-        titleLength > 30 ? 28.0 : (titleLength > 20 ? 30.0 : 32.0);
+        titleLength > 30 ? 36.0 : (titleLength > 20 ? 40.0 : 44.0);
 
     // Calculate username font size based on length
     final usernameLength = (widget.user.displayName ?? '').length;
-    final double usernameFontSize = usernameLength > 15 ? 18.0 : 20.0;
+    final double usernameFontSize = usernameLength > 15 ? 24.0 : 26.0;
 
     return RepaintBoundary(
       key: widget.boundaryKey,
@@ -286,12 +286,14 @@ class _SharePosterWidgetState extends State<SharePosterWidget> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Logo without glow effect
-                        Container(
+                        // Logo with fixed dimensions to prevent stretching
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
                           child: Image.asset(
                             'assets/images/lunamoon.png',
                             width: 24,
                             height: 24,
+                            fit: BoxFit.contain,
                             color: Colors.amber[300],
                             errorBuilder: (context, error, stackTrace) {
                               return Icon(
@@ -302,12 +304,12 @@ class _SharePosterWidgetState extends State<SharePosterWidget> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 4), // Reduced spacing
+                        const SizedBox(width: 4), // Reduced spacing for better appearance
                         Text(
                           'LunaKraft',
                           style: GoogleFonts.figtree(
                             color: Colors.amber[300],
-                            fontSize: 20,
+                            fontSize: 24,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.5,
                             shadows: [
@@ -427,8 +429,8 @@ class _SharePosterWidgetState extends State<SharePosterWidget> {
         throw Exception('Failed to capture widget: Render boundary not found');
       }
 
-      // Use a higher pixel ratio for better quality but not too high to cause memory issues
-      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+      // Use a higher pixel ratio for better quality and proper font rendering
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       final ByteData? byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
 

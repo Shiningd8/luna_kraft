@@ -4,8 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 import '/auth/firebase_auth/auth_util.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '/backend/backend.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '/utils/subscription_util.dart';
 
 class ZenAudioSound {
   final String name;
@@ -108,6 +110,13 @@ class ZenAudioService extends ChangeNotifier {
   ZenAudioService._internal() {
     _debugLog('ZenAudioService initialized');
     _loadUnlockedSounds();
+    
+    // Listen for auth state changes
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) {
+        _loadUnlockedSounds();
+      }
+    });
   }
 
   // Helper method for debug logging
@@ -117,25 +126,54 @@ class ZenAudioService extends ChangeNotifier {
     }
   }
 
-  // Get the current user's unlocked sounds key
+  // Get the current user's unlocked sounds key for SharedPreferences (fallback)
   String get _userUnlockedSoundsKey {
     final user = currentUserReference;
     return user != null ? '${_unlockedSoundsKey}_${user.id}' : _unlockedSoundsKey;
   }
 
-  // Load unlocked sounds from SharedPreferences
+  // Load unlocked sounds from Firestore (and fallback to SharedPreferences)
   Future<void> _loadUnlockedSounds() async {
     try {
+      // First try to load from Firestore if user is logged in
+      if (currentUserReference != null) {
+        final userDoc = await currentUserReference!.get();
+        
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>?;
+          
+          if (userData != null && userData.containsKey('unlocked_zen_sounds')) {
+            final unlockedSoundsList = userData['unlocked_zen_sounds'] as List<dynamic>?;
+            
+            if (unlockedSoundsList != null) {
+              _unlockedSounds = unlockedSoundsList.cast<String>();
+              _debugLog('Loaded unlocked sounds from Firestore: $_unlockedSounds');
+              notifyListeners();
+              return;
+            }
+          }
+        }
+      }
+      
+      // Fallback to SharedPreferences if Firestore failed or user is not logged in
       final prefs = await SharedPreferences.getInstance();
       final savedUnlocked = prefs.getStringList(_userUnlockedSoundsKey);
       
       if (savedUnlocked != null) {
         _unlockedSounds = savedUnlocked;
-        _debugLog('Loaded unlocked sounds: $_unlockedSounds');
+        _debugLog('Loaded unlocked sounds from SharedPreferences: $_unlockedSounds');
       } else {
         // Default to empty list for new users
         _unlockedSounds = [];
         _debugLog('No unlocked sounds found, using empty list');
+      }
+      
+      // If user is logged in, sync the unlocked sounds to Firestore
+      if (currentUserReference != null && _unlockedSounds.isNotEmpty) {
+        await currentUserReference!.update({
+          'unlocked_zen_sounds': _unlockedSounds,
+        });
+        _debugLog('Synced unlocked sounds to Firestore');
       }
       
       notifyListeners();
@@ -144,12 +182,21 @@ class ZenAudioService extends ChangeNotifier {
     }
   }
 
-  // Save unlocked sounds to SharedPreferences
+  // Save unlocked sounds to both Firestore and SharedPreferences
   Future<void> _saveUnlockedSounds() async {
     try {
+      // Save to Firestore if user is logged in
+      if (currentUserReference != null) {
+        await currentUserReference!.update({
+          'unlocked_zen_sounds': _unlockedSounds,
+        });
+        _debugLog('Saved unlocked sounds to Firestore: $_unlockedSounds');
+      }
+      
+      // Always save to SharedPreferences as a backup
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList(_userUnlockedSoundsKey, _unlockedSounds);
-      _debugLog('Saved unlocked sounds: $_unlockedSounds');
+      _debugLog('Saved unlocked sounds to SharedPreferences: $_unlockedSounds');
     } catch (e) {
       _debugLog('Error saving unlocked sounds: $e');
     }
@@ -157,13 +204,37 @@ class ZenAudioService extends ChangeNotifier {
 
   // Check if a sound is unlocked
   bool isSoundUnlocked(String soundName) {
-    // Check if it's one of the locked sounds
-    if (soundName == 'Wind' || soundName == 'Birds' || soundName == 'Stream') {
-      return _unlockedSounds.contains(soundName);
+    // First check if user has directly purchased this sound (permanent)
+    if (_unlockedSounds.contains(soundName)) {
+      _debugLog('Sound $soundName is permanently unlocked');
+      return true;
     }
     
-    // All other sounds are unlocked by default
-    return true;
+    // Then check if it's one of the premium sounds and user has premium subscription
+    if ((soundName == 'Wind' || 
+         soundName == 'Birds' || 
+         soundName == 'Stream' || 
+         soundName == 'Calm Night' || 
+         soundName == 'Tranquil Horizons' || 
+         soundName == 'Whisper of Snowfall') && 
+        SubscriptionUtil.hasZenMode) {
+      _debugLog('Sound $soundName is temporarily unlocked via premium subscription');
+      return true; // Premium subscribers get temporary access to all sounds
+    }
+    
+    // For non-premium sounds, they're unlocked by default
+    if (soundName != 'Wind' && 
+        soundName != 'Birds' && 
+        soundName != 'Stream' && 
+        soundName != 'Calm Night' && 
+        soundName != 'Tranquil Horizons' && 
+        soundName != 'Whisper of Snowfall') {
+      _debugLog('Sound $soundName is a free sound (unlocked by default)');
+      return true;
+    }
+    
+    _debugLog('Sound $soundName is locked - requires purchase or subscription');
+    return false;
   }
 
   // Get the price for a sound
@@ -175,15 +246,21 @@ class ZenAudioService extends ChangeNotifier {
         return 150;
       case 'Stream':
         return 180;
+      case 'Calm Night':
+        return 200;
+      case 'Tranquil Horizons':
+        return 230;
+      case 'Whisper of Snowfall':
+        return 260;
       default:
         return 0; // All other sounds are free
     }
   }
 
-  // Unlock a sound
+  // Unlock a sound permanently (purchase with LunaCoins)
   Future<bool> unlockSound(String soundName) async {
-    if (isSoundUnlocked(soundName)) {
-      return true; // Already unlocked
+    if (_unlockedSounds.contains(soundName)) {
+      return true; // Already unlocked permanently
     }
 
     // Get current user
@@ -205,14 +282,19 @@ class ZenAudioService extends ChangeNotifier {
         return false;
       }
       
-      // Deduct coins
+      // Deduct coins using the correct field name
       await userRef.update({
         'luna_coins': FieldValue.increment(-price),
       });
       
-      // Add to unlocked sounds
+      // Add to unlocked sounds in memory
       _unlockedSounds.add(soundName);
+      
+      // Save to both Firestore and SharedPreferences
       await _saveUnlockedSounds();
+      
+      // Update available sounds to reflect new unlock status
+      _updateLockedSoundStatus();
       
       // Notify listeners
       notifyListeners();
@@ -222,6 +304,35 @@ class ZenAudioService extends ChangeNotifier {
       _debugLog('Error unlocking sound: $e');
       return false;
     }
+  }
+
+  // Update the locked status of all sounds
+  void _updateLockedSoundStatus() {
+    for (final sound in _availableSounds) {
+      // Only update premium sounds
+      if (['Wind', 'Birds', 'Stream', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(sound.name)) {
+        // A sound is unlocked if purchased with coins or user has premium
+        bool isUnlocked = _unlockedSounds.contains(sound.name) || 
+                         SubscriptionUtil.hasZenMode;
+        
+        // Since isLocked is final, we need to use reflection to modify it
+        // This is a workaround for the immutable field
+        try {
+          final instance = sound as dynamic;
+          instance.isLocked = !isUnlocked;
+          _debugLog('Updated lock status for ${sound.name}: locked=${!isUnlocked}');
+        } catch (e) {
+          _debugLog('Error updating lock status for ${sound.name}: $e');
+        }
+      }
+    }
+  }
+
+  // Public method to refresh sound lock status based on subscription changes
+  void refreshSoundLockStatus() {
+    _updateLockedSoundStatus();
+    notifyListeners();
+    _debugLog('Sound lock status refreshed based on subscription changes');
   }
 
   // For debugging purposes - force the playing state
@@ -343,24 +454,57 @@ class ZenAudioService extends ChangeNotifier {
         name: 'Wind',
         assetPath: 'assets/audio/zen/wind.mp3',
         iconPath: 'assets/icons/zen/wind.png',
-        isLocked: !_unlockedSounds.contains('Wind'),
+        isLocked: !isSoundUnlocked('Wind'),
         unlockPrice: 120,
       ),
       ZenAudioSound(
         name: 'Birds',
         assetPath: 'assets/audio/zen/birds.mp3',
         iconPath: 'assets/icons/zen/birds.png',
-        isLocked: !_unlockedSounds.contains('Birds'),
+        isLocked: !isSoundUnlocked('Birds'),
         unlockPrice: 150,
       ),
       ZenAudioSound(
         name: 'Stream',
         assetPath: 'assets/audio/zen/stream.mp3',
         iconPath: 'assets/icons/zen/stream.png',
-        isLocked: !_unlockedSounds.contains('Stream'),
+        isLocked: !isSoundUnlocked('Stream'),
         unlockPrice: 180,
       ),
+      ZenAudioSound(
+        name: 'Whispering Zen',
+        assetPath: 'assets/audio/zen/music_whispering_zen.mp3',
+        iconPath: 'assets/icons/zen/rain.png', // Using an existing icon
+      ),
+      ZenAudioSound(
+        name: 'Calm Night',
+        assetPath: 'assets/audio/zen/music_calm_night.mp3',
+        iconPath: 'assets/icons/zen/ocean.png', // Using an existing icon
+        isLocked: !isSoundUnlocked('Calm Night'),
+        unlockPrice: 200,
+      ),
+      ZenAudioSound(
+        name: 'Tranquil Horizons',
+        assetPath: 'assets/audio/zen/music_tranquil_horizons.mp3',
+        iconPath: 'assets/icons/zen/forest.png', // Using an existing icon
+        isLocked: !isSoundUnlocked('Tranquil Horizons'),
+        unlockPrice: 230,
+      ),
+      ZenAudioSound(
+        name: 'Whisper of Snowfall',
+        assetPath: 'assets/audio/zen/music_whisper_of_snowfall.mp3',
+        iconPath: 'assets/icons/zen/wind.png', // Using an existing icon
+        isLocked: !isSoundUnlocked('Whisper of Snowfall'),
+        unlockPrice: 260,
+      ),
     ];
+    
+    _debugLog('Sounds initialized with proper lock states:');
+    for (final sound in _availableSounds) {
+      if (['Wind', 'Birds', 'Stream', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(sound.name)) {
+        _debugLog('${sound.name}: isLocked=${sound.isLocked}, unlockPrice=${sound.unlockPrice}');
+      }
+    }
 
     // Load saved presets
     await loadPresets();
@@ -460,7 +604,7 @@ class ZenAudioService extends ChangeNotifier {
 
         // Create a completely new player for this sound
         sound.player =
-            await _createAndInitializePlayer(sound.assetPath, soundName);
+            await _createAndInitializePlayer(sound.assetPath, sound.name);
 
         if (sound.player != null) {
           // Set volume before playing

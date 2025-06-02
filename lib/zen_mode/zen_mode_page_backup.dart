@@ -816,9 +816,7 @@ class _ZenModePageState extends State<ZenModePage>
   }
 
   // Toggle a specific sound
-  void _toggleSound(String soundName) {
-    print('TOGGLING SOUND: $soundName');
-    
+  void _processNormalToggle(String soundName) {
     final soundIndex = zenAudioService.availableSounds.indexWhere((s) => s.name == soundName);
     if (soundIndex == -1) return;
     
@@ -830,6 +828,16 @@ class _ZenModePageState extends State<ZenModePage>
       _showPurchaseSoundDialog(context, soundName);
       return;
     }
+    
+    // Check if sound is locked (premium sound)
+    final isPremiumSound = ['Wind', 'Birds', 'Stream', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(soundName);
+    if (isPremiumSound && !zenAudioService.isSoundUnlocked(soundName)) {
+      // Show purchase dialog for locked sounds
+      _showPurchaseSoundDialog(context, soundName);
+      return;
+    }
+    
+    // Removed check for playing multiple sounds - this should not be a premium feature
 
     // Set loading state to give immediate feedback
     if (mounted && !_isDisposed) {
@@ -839,10 +847,6 @@ class _ZenModePageState extends State<ZenModePage>
     // Toggle this sound's state and update background
     zenAudioService.toggleSound(soundName).then((_) {
       if (mounted && !_isDisposed) {
-        print(
-          'TOGGLED SOUND: $soundName, isPlaying=${zenAudioService.isPlaying}',
-        );
-
         // Force a full UI update
         setState(() {
           _isPlaying = zenAudioService.isPlaying;
@@ -1113,6 +1117,44 @@ class _ZenModePageState extends State<ZenModePage>
                             color: FlutterFlowTheme.of(context).error,
                             fontStyle: FontStyle.italic,
                           ),
+                        ),
+                      ),
+
+                    // Information text and premium button
+                    if (userData.lunaCoins < soundPrice)
+                      Padding(
+                        padding: EdgeInsets.only(top: 16),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Not enough coins?',
+                              style: FlutterFlowTheme.of(context).bodyMedium,
+                            ),
+                            SizedBox(height: 8),
+                            FFButtonWidget(
+                              onPressed: () {
+                                Navigator.pop(dialogContext);
+                                // Navigate to membership page
+                                Navigator.pushNamed(context, 'MembershipPage');
+                              },
+                              text: 'Get Premium Membership',
+                              options: FFButtonOptions(
+                                width: 220,
+                                height: 40,
+                                color: FlutterFlowTheme.of(context).secondaryBackground,
+                                textStyle: FlutterFlowTheme.of(context).bodyMedium.override(
+                                  fontFamily: 'Figtree',
+                                  color: FlutterFlowTheme.of(context).primary,
+                                ),
+                                elevation: 0,
+                                borderSide: BorderSide(
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  width: 1,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],
@@ -2212,7 +2254,7 @@ class _ZenModePageState extends State<ZenModePage>
                                         ),
                                         SizedBox(width: 8),
                                         GestureDetector(
-                                          onTap: () => _toggleSound(sound.name),
+                                          onTap: () => _processNormalToggle(sound.name),
                                           child: Icon(
                                             Icons.close,
                                             color: Colors.white,
@@ -2249,14 +2291,14 @@ class _ZenModePageState extends State<ZenModePage>
                           itemBuilder: (context, index) {
                             final dynamic sound = sounds[index];
                             final bool isActive = sound.isActive as bool;
-                            final bool isLocked = sound.isLocked as bool && 
+                            final bool isLocked = ['Wind', 'Birds', 'Stream', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(sound.name) &&
                                 !zenAudioService.isSoundUnlocked(sound.name as String);
                                 
                             return GestureDetector(
                               onTap: () {
                                 // Add a visual indicator of the tap before action completes
                                 HapticFeedback.lightImpact();
-                                _toggleSound(sound.name as String);
+                                _processNormalToggle(sound.name as String);
                               },
                               child: AnimatedContainer(
                                 duration: Duration(milliseconds: 300),

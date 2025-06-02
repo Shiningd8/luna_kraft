@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '/services/notification_service.dart';
 import '/services/app_state_tracker.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class NotificationHandler extends StatefulWidget {
   final Widget child;
@@ -36,6 +39,9 @@ class _NotificationHandlerState extends State<NotificationHandler>
     // Update app state
     if (_isAppActive) {
       AppStateTracker().setForeground();
+      
+      // Clear badge count when app starts
+      _clearIOSBadgeCount();
     } else {
       AppStateTracker().setBackground();
     }
@@ -69,8 +75,14 @@ class _NotificationHandlerState extends State<NotificationHandler>
           type: MaterialType.transparency,
           child: InkWell(
             onTap: () {
-              // Trigger a test notification
-              NotificationService().manualTestNotification();
+              // Show an in-app notification instead
+              NotificationService().showInAppNotification(
+                NotificationPayload(
+                  title: 'Debug Notification',
+                  body: 'This is a test notification',
+                  type: 'test',
+                ),
+              );
             },
             child: Container(
               width: 56,
@@ -105,6 +117,9 @@ class _NotificationHandlerState extends State<NotificationHandler>
     if (_isAppActive) {
       // App became active
       AppStateTracker().setForeground();
+      
+      // Clear badge count when app becomes active
+      _clearIOSBadgeCount();
       
       // App became active, we can listen to notifications
       _setupNotificationListener();
@@ -189,5 +204,56 @@ class _NotificationHandlerState extends State<NotificationHandler>
         ),
       ),
     );
+  }
+
+  // Method to clear iOS badge count
+  Future<void> _clearIOSBadgeCount() async {
+    if (Platform.isIOS) {
+      try {
+        // Clear the badge using Flutter Local Notifications plugin
+        final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
+            FlutterLocalNotificationsPlugin();
+            
+        // Clear iOS badge count by setting it to 0
+        final iOSDetails = await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+            
+        if (iOSDetails != null) {
+          // Request permissions and clear badge
+          await iOSDetails.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+        }
+        
+        // Set badge to 0 on notification plugin
+        await flutterLocalNotificationsPlugin.initialize(
+          InitializationSettings(
+            iOS: DarwinInitializationSettings(
+              requestAlertPermission: false,
+              requestBadgePermission: false,
+              requestSoundPermission: false,
+              defaultPresentBadge: false,
+            ),
+            android: AndroidInitializationSettings('@drawable/notification_icon'),
+          ),
+          onDidReceiveNotificationResponse: (details) async {},
+        );
+        
+        // Also try using Firebase Messaging
+        try {
+          await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+            badge: false,
+          );
+        } catch (e) {
+          print('Error configuring Firebase Messaging: $e');
+        }
+        
+        print('iOS badge count cleared successfully');
+      } catch (e) {
+        print('Error clearing iOS badge count: $e');
+      }
+    }
   }
 }

@@ -1,101 +1,90 @@
 import '/services/subscription_manager.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 /// Utility class for checking subscription status and features
 class SubscriptionUtil {
-  /// Check if the user has any active subscription
+  /// Check if the user has an active subscription
   static bool get isPremium {
-    // Primary check - use the subscription manager
-    if (SubscriptionManager.instance.isSubscribed) {
-      return true;
-    }
-    
-    // Secondary check - look directly at Firestore data if available
-    if (currentUserDocument != null) {
-      try {
-        // Access the document data as a Map
-        final userData = FirebaseFirestore.instance
-            .doc(currentUserReference!.path)
-            .get()
-            .then((doc) => doc.data() as Map<String, dynamic>?);
-            
-        // Since userData is a Future, we can't directly use it here
-        // Just rely on the subscription manager in this case
-      } catch (e) {
-        // Ignore errors and fall back to subscription manager
-      }
-    }
-    
-    return false;
+    return SubscriptionManager.instance.isSubscribed;
   }
 
   /// Check if user has weekly subscription
   static bool get isWeeklyPremium {
+    // First check subscription manager
     final tier = SubscriptionManager.instance.subscriptionTier;
-    return tier != null && tier.contains('weekly');
+    if (tier != null && tier.contains('weekly')) {
+      return true;
+    }
+    
+    // Check through subscription tier getter as fallback
+    return subscriptionTier?.contains('weekly') ?? false;
   }
 
   /// Check if user has monthly subscription
   static bool get isMonthlyPremium {
+    // First check subscription manager
     final tier = SubscriptionManager.instance.subscriptionTier;
-    return tier != null && tier.contains('monthly');
+    if (tier != null && tier.contains('monthly')) {
+      return true;
+    }
+    
+    // Check through subscription tier getter as fallback
+    return subscriptionTier?.contains('monthly') ?? false;
   }
 
   /// Check if user has yearly subscription
   static bool get isYearlyPremium {
+    // First check subscription manager
     final tier = SubscriptionManager.instance.subscriptionTier;
-    return tier != null && tier.contains('yearly');
+    if (tier != null && tier.contains('yearly')) {
+      return true;
+    }
+    
+    // Check through subscription tier getter as fallback
+    return subscriptionTier?.contains('yearly') ?? false;
   }
 
-  /// Check if user has access to dream analysis
+  /// Get subscription tier (null if not subscribed)
+  static String? get subscriptionTier {
+    return SubscriptionManager.instance.subscriptionTier;
+  }
+
+  /// Get days left in the subscription (0 if not subscribed)
+  static int get daysLeft {
+    return SubscriptionManager.instance.daysLeft;
+  }
+
+  /// Check if user has dream analysis benefit
   static bool get hasDreamAnalysis {
-    if (SubscriptionManager.instance.hasBenefit('dream_analysis')) {
-      return true;
-    }
-    
-    // Check if user has any valid subscription (as all should include dream analysis)
-    return isPremium;
+    return SubscriptionManager.instance.hasBenefit('dream_analysis');
   }
 
-  /// Check if user has access to exclusive themes
+  /// Check if user has exclusive themes benefit
+  /// This controls temporary access to premium backgrounds
   static bool get hasExclusiveThemes {
-    if (SubscriptionManager.instance.hasBenefit('exclusive_themes')) {
-      return true;
-    }
-    
-    // Check if user has any valid subscription
-    return isPremium;
+    return SubscriptionManager.instance.hasBenefit('exclusive_themes');
   }
 
-  /// Check if user has ad-free experience
-  static bool get isAdFree {
-    if (SubscriptionManager.instance.hasBenefit('ad_free')) {
-      return true;
-    }
-    
-    // Check if user has any valid subscription
-    return isPremium;
+  /// Check if user has ad-free benefit
+  static bool get hasAdFree {
+    return SubscriptionManager.instance.hasBenefit('ad_free');
   }
 
-  /// Check if user has access to zen mode
+  /// Check if user has zen mode benefit
   static bool get hasZenMode {
-    if (SubscriptionManager.instance.hasBenefit('zen_mode')) {
-      return true;
-    }
-    
-    // Check if user has monthly or yearly subscription
-    return isMonthlyPremium || isYearlyPremium;
+    return SubscriptionManager.instance.hasBenefit('zen_mode');
   }
 
-  /// Check if user has priority support
+  /// Check if user has priority support benefit
   static bool get hasPrioritySupport {
-    if (SubscriptionManager.instance.hasBenefit('priority_support')) {
-      return true;
-    }
-    
-    // Only yearly gets priority support
-    return isYearlyPremium;
+    return SubscriptionManager.instance.hasBenefit('priority_support');
+  }
+
+  /// Get all active benefits
+  static List<String> get benefits {
+    return SubscriptionManager.instance.benefits;
   }
 
   /// Get the number of bonus coins the user has access to
@@ -144,28 +133,5 @@ class SubscriptionUtil {
     }
     
     return false;
-  }
-
-  /// Get the days left in the subscription
-  static int get daysLeft {
-    // First try subscription manager
-    final managerDaysLeft = SubscriptionManager.instance.daysLeft;
-    if (managerDaysLeft > 0) {
-      return managerDaysLeft;
-    }
-    
-    return 0;
-  }
-
-  /// Get the subscription tier name
-  static String? get subscriptionTier {
-    // Try subscription manager first
-    final managerTier = SubscriptionManager.instance.subscriptionTier;
-    if (managerTier != null) {
-      return managerTier;
-    }
-    
-    // Fall back to default tier
-    return null;
   }
 }

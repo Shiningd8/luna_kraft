@@ -226,64 +226,7 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
                 ),
           ),
           actions: [
-            // Debug button
-            IconButton(
-              icon: Icon(
-                Icons.bug_report,
-                color: Colors.white,
-                size: 20,
-              ),
-              onPressed: () async {
-                // Show a loading dialog
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => Center(
-                    child: Container(
-                      padding: EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Running notification debug...',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-
-                // Run the debug
-                await NotificationService().debugNotificationSystem();
-
-                // Close the loading dialog
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-
-                // Show results in a snackbar
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content:
-                          Text('Debug complete! Check console for details.'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                }
-              },
-            ),
+            // Debug button removed
           ],
         ),
         body: SafeArea(
@@ -390,24 +333,16 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
             final currentUserID = currentUserReference?.id ?? '';
             if (currentUserID.isEmpty) return false;
 
-            // Debug the notification
-            print('Processing notification: ${notification.reference.id}');
-            print('Raw made_to value: ${notification.snapshotData['made_to']}');
-            print(
-                'Runtime type: ${notification.snapshotData['made_to']?.runtimeType}');
-
             // Handle mixed types in madeTo field safely
             String? notificationMadeTo;
 
             // Get madeTo as String - check the schema's getter first
             notificationMadeTo = notification.madeTo;
-            print('notification.madeTo getter result: $notificationMadeTo');
 
             // If that's null, try to extract from the raw data
             if (notificationMadeTo == null &&
                 notification.snapshotData.containsKey('made_to')) {
               final rawMadeTo = notification.snapshotData['made_to'];
-              print('Raw madeTo value: $rawMadeTo (${rawMadeTo?.runtimeType})');
 
               if (rawMadeTo is String) {
                 notificationMadeTo = rawMadeTo;
@@ -418,7 +353,7 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
                 try {
                   notificationMadeTo = rawMadeTo.toString();
                 } catch (e) {
-                  print('Error converting madeTo to string: $e');
+                  // Error handling
                 }
               }
             }
@@ -426,18 +361,13 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
             // Now compare the IDs
             if (notificationMadeTo != null) {
               // Compare directly or check if one contains the other
-              final isMatch = notificationMadeTo == currentUserID ||
+              return notificationMadeTo == currentUserID ||
                   notificationMadeTo.contains(currentUserID) ||
                   currentUserID.contains(notificationMadeTo);
-              print('Notification match result: $isMatch');
-              return isMatch;
             }
 
-            print('No madeTo value found, skipping notification');
             return false;
           } catch (e) {
-            print('Error filtering notification: $e');
-            print('Stack trace: ${StackTrace.current}');
             // Skip this notification if it can't be processed
             return false;
           }
@@ -482,19 +412,6 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
           }).toList();
         }
 
-        // Print debug information
-        print('Total notifications found: ${userNotifications.length}');
-        print(
-            'Filtered notifications for tab "$type": ${notifications.length}');
-        for (var i = 0; i < notifications.length && i < 5; i++) {
-          print('Notification ${i + 1}: ${notifications[i].reference.id}');
-          print('  - isLike: ${notifications[i].isALike}');
-          print('  - isFollow: ${notifications[i].isFollowRequest}');
-          print('  - madeBy: ${notifications[i].madeBy}');
-          print('  - madeTo: ${notifications[i].madeTo}');
-          print('  - date: ${notifications[i].date}');
-        }
-
         if (notifications.isEmpty) {
           return _buildEmptyState();
         }
@@ -533,79 +450,22 @@ class _NotificationPageWidgetState extends State<NotificationPageWidget>
             ),
             SizedBox(height: 16),
             Text(
-              'No notifications found for ${_selectedTab} tab',
+              'No notifications found',
               style: FlutterFlowTheme.of(context).titleMedium.override(
                     fontFamily: 'Figtree',
                     color: Colors.white.withOpacity(0.7),
                   ),
             ),
-            SizedBox(height: 8),
-            Text(
-              'Current user ID: ${currentUserReference?.id ?? 'Not logged in'}',
-              style: FlutterFlowTheme.of(context).bodySmall.override(
-                    fontFamily: 'Figtree',
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 12,
-                  ),
-            ),
             SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () async {
-                // Show a diagnostic popup with debugging information
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text('Notification Diagnostics'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                            'Current User ID: ${currentUserReference?.id ?? 'None'}'),
-                        SizedBox(height: 8),
-                        Text('Current Tab: $_selectedTab'),
-                        SizedBox(height: 16),
-                        FutureBuilder<QuerySnapshot>(
-                          future: NotificationsRecord.collection.get(),
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) {
-                              return CircularProgressIndicator();
-                            }
-
-                            final notifications = snapshot.data!.docs;
-                            return Text(
-                                'Total Notifications in DB: ${notifications.length}');
-                          },
-                        ),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        child: Text('Close'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey.shade800,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Diagnostics'),
-            ),
-            SizedBox(height: 12),
             ElevatedButton(
               onPressed: () {
                 setState(() {});
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: FlutterFlowTheme.of(context).primary,
                 foregroundColor: Colors.white,
               ),
-              child: Text('Retry'),
+              child: Text('Refresh'),
             ),
           ],
         ),

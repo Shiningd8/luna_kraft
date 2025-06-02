@@ -57,11 +57,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      print('Firebase initialized in background handler');
+      // print('Firebase initialized in background handler');
     }
     
-    print('Handling a background message: ${message.messageId}');
-    print('Background message data: ${message.data}');
+    // print('Handling a background message: ${message.messageId}');
+    // print('Background message data: ${message.data}');
 
     // Create notification plugin instance for background notifications
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -137,7 +137,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       payload: message.data.isNotEmpty ? json.encode(message.data) : null,
     );
 
-    print('Background notification displayed successfully');
+    // print('Background notification displayed successfully');
   } catch (e) {
     print('Error in background message handler: $e');
   }
@@ -159,159 +159,74 @@ Future<void> main() async {
   // Initialize log filtering
   LoggingConfig.initialize();
 
-  // Initialize Firebase properly with options first - before any Firebase usage
+  bool subscriptionServicesInitialized = false;
+
   try {
-    // This ensures Firebase is initialized once
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      print('Firebase initialized successfully - first initialization');
-    } else {
-      print('Firebase was already initialized');
-    }
-  } catch (e) {
-    print('Error initializing Firebase: $e');
-  }
-
-  // Initialize dynamic links handler
-  try {
-    await DeepLinkHelper.initDynamicLinks();
-    print('Dynamic links handler initialized');
-  } catch (e) {
-    print('Error initializing dynamic links handler: $e');
-  }
-  
-  // Register background handler after Firebase initialization
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // Initialize notification service early
-  await NotificationService().initialize();
-  
-  // Initialize app state tracker
-  AppStateTracker().initialize();
-
-  // Configure Firebase App Check safely
-  await _configureFirebaseAppCheck();
-
-  // Request permission for notifications early
-  try {
-    FirebaseMessaging messaging = FirebaseMessaging.instance;
-    NotificationSettings settings = await messaging.requestPermission(
-      alert: true,
-      announcement: false,
-      badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-      sound: true,
+    // Initialize Firebase first, before any other Firebase-dependent services
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    print(
-        'User notification permission status: ${settings.authorizationStatus}');
+    // Configure Firebase App Check after core initialization
+    await _configureFirebaseAppCheck();
 
-    // Print FCM token for debugging
-    final token = await FirebaseMessaging.instance.getToken();
-    print(
-        'FCM Token: ${token != null ? token.substring(0, 10) + '...' : 'null'}');
-  } catch (e) {
-    print('Error requesting notification permissions: $e');
-  }
+    // Initialize Firebase Messaging
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      if (kDebugMode) {
+        final token = await messaging.getToken();
+        print('FCM Token: ${token != null ? token.substring(0, 10) + '...' : 'null'}');
+      }
+    } catch (e) {
+      print('Error initializing Firebase Messaging: $e');
+    }
 
-  // Initialize NetworkService for better Firebase connectivity handling
-  try {
-    // Initialize NetworkService singleton
-    final networkService = NetworkService();
+    // Initialize core services sequentially
+    await FlutterFlowTheme.initialize();
+    await DeepLinkHelper.initDynamicLinks();
+    
+    // Initialize AppStateTracker (void return type)
+    AppStateTracker().initialize();
+    
+    // Initialize NotificationService last, after Firebase Messaging is ready
+    await NotificationService().initialize();
 
-    // Set up initial connectivity check
-    final connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult != ConnectivityResult.none) {
-      // Only try to verify Firestore if we have connectivity
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        try {
-          await FirebaseFirestore.instance
-              .collection('User')
-              .doc(user.uid)
-              .get()
-              .timeout(Duration(seconds: 5));
-          print('Initial Firestore connection verified');
-        } catch (e) {
-          print('Initial Firestore verification failed: $e');
+    // Initialize subscription services with retry logic
+    for (int i = 0; i < 3; i++) {
+      try {
+        await _initializeSubscriptionServices();
+        subscriptionServicesInitialized = true;
+        print('✅ Subscription services initialized successfully');
+        break;
+      } catch (e) {
+        print('Attempt ${i + 1} to initialize subscription services failed: $e');
+        if (i < 2) {
+          // Wait before retrying
+          await Future.delayed(Duration(seconds: 2 * (i + 1)));
         }
       }
     }
 
-    print('Network service initialized successfully');
-  } catch (e) {
-    print('Error initializing network service: $e');
-  }
-
-  // Preload onboarding status
-  try {
-    await OnboardingManager.hasCompletedOnboarding();
-    print('Onboarding status preloaded');
-  } catch (e) {
-    print('Error preloading onboarding status: $e');
-  }
-
-  // Initialize subscription service
-  try {
-    print('Starting RevenueCat initialization...');
-    
-    // First configure RevenueCat
-    await Purchases.setLogLevel(LogLevel.debug);
-    await Purchases.configure(PurchasesConfiguration('appl_aUbICkbeGteMFoiMsBOJzdjVoTE'));
-    
-    // Wait to ensure RevenueCat is fully initialized
-    await Future.delayed(Duration(seconds: 1));
-    
-    // Now call our PurchaseService init which handles caching and other setup
-    await PurchaseService.init();
-    
-    print('RevenueCat configuration complete');
-    
-    if (kDebugMode) {
-      print('Subscription service initialized in DEBUG MODE - Using mock purchases');
-    } else {
-      print('Subscription service initialized successfully');
+    if (!subscriptionServicesInitialized) {
+      print('⚠️ Warning: Failed to initialize subscription services after 3 attempts');
     }
-    
-    // Explicitly verify initialization is successful
-    try {
-      final customerInfo = await Purchases.getCustomerInfo();
-      print('✅ RevenueCat customer info successfully retrieved: ${customerInfo.originalAppUserId}');
-    } catch (verifyError) {
-      print('⚠️ RevenueCat verification check failed, but continuing: $verifyError');
-    }
-  } catch (e) {
-    print('Error initializing subscription service: $e');
-    
-    // Fallback approach - try direct configuration 
-    try {
-      print('Attempting fallback initialization of RevenueCat...');
-      await Purchases.configure(PurchasesConfiguration('appl_aUbICkbeGteMFoiMsBOJzdjVoTE'));
-      print('Fallback initialization completed');
-    } catch (fallbackError) {
-      print('Fallback initialization also failed: $fallbackError');
-    }
-  }
 
-  // Initialize subscription manager
-  try {
-    await SubscriptionManager.instance.initialize();
-    print('Subscription manager initialized successfully');
-  } catch (e) {
-    print('Error initializing subscription manager: $e');
+  } catch (e, stack) {
+    print('Error during initialization: $e');
+    print('Stack trace: $stack');
   }
-
-  await FlutterFlowTheme.initialize();
 
   final appState = FFAppState(); // Initialize FFAppState
   await appState.initializePersistedState();
 
   // Initialize our custom AppState for music
   final musicAppState = custom_app_state.AppState();
+
+  // Store subscription initialization status
+  appState.update(() {
+    // You'll need to add this property to your FFAppState class
+    // appState.subscriptionServicesInitialized = subscriptionServicesInitialized;
+  });
 
   // Customize text selection controls to prevent large grey box
   final ThemeData theme = ThemeData(
@@ -378,12 +293,20 @@ Future<void> main() async {
       ChangeNotifierProvider(create: (context) => appState),
       ChangeNotifierProvider(create: (context) => musicAppState),
     ],
-    child: MyApp(theme: theme),
+    child: MyApp(
+      theme: theme,
+      subscriptionServicesInitialized: subscriptionServicesInitialized,
+    ),
   ));
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key, this.entryPage, required this.theme});
+  const MyApp({
+    super.key, 
+    this.entryPage, 
+    required this.theme,
+    required this.subscriptionServicesInitialized,
+  });
 
   // This widget is the root of your application.
   @override
@@ -394,9 +317,10 @@ class MyApp extends StatefulWidget {
 
   final Widget? entryPage;
   final ThemeData theme;
+  final bool subscriptionServicesInitialized;
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   ThemeMode _themeMode = FlutterFlowTheme.themeMode;
 
   late AppStateNotifier _appStateNotifier;
@@ -412,70 +336,65 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _initializeApp();
     
+    // Set default theme to dark mode
+    _themeMode = ThemeMode.dark;
+    FlutterFlowTheme.saveThemeMode(ThemeMode.dark);
+    
     // Set app state to foreground when app starts
     AppStateTracker().setForeground();
+    
+    // Register for lifecycle events
+    WidgetsBinding.instance.addObserver(this);
+    
+    // Reset notification badge on iOS
+    _resetIOSBadgeCount();
   }
 
   Future<void> _initializeApp() async {
     try {
-      print('Starting app initialization...');
-
       // Initialize FlutterFlow theme
-      print('Initializing FlutterFlow theme...');
       await FlutterFlowTheme.initialize();
-      print('FlutterFlow theme initialized');
 
       // Setup app state and router
-      print('Setting up app state and router...');
       _appStateNotifier = AppStateNotifier.instance;
       _router = createRouter(_appStateNotifier, widget.entryPage);
-      print('App state and router setup complete');
 
-      print('Setting up user stream...');
+      // Setup user stream
       userStream = lunaKraftFirebaseUserStream()
         ..listen((user) {
-          print('AUTH STATE CHANGED: User logged in: ${user.loggedIn}');
           if (user.loggedIn) {
-            print('Authenticated user: ${user.email}');
-          } else {
-            print('User logged out or not authenticated');
+            // If subscription services failed to initialize, try to initialize them again
+            if (!widget.subscriptionServicesInitialized) {
+              _retrySubscriptionServices();
+            }
           }
           _appStateNotifier.update(user);
         });
-      print('User stream setup complete');
 
       // Add debug logging for JWT token changes
       jwtTokenStream.listen((jwt) {
-        print(
-            'JWT token refreshed: ${jwt != null ? 'Token present' : 'No token'}');
+        // print('JWT token refreshed: ${jwt != null ? 'Token present' : 'No token'}');
       });
 
-      print('Stopping splash image...');
       _appStateNotifier.stopShowingSplashImage();
-      print('Splash image stopped');
 
       if (mounted) {
-        print('Setting initialized state...');
         setState(() {
           _initialized = true;
         });
-        print('App initialization complete');
       }
 
       // Auto-hide splash screen after a timeout (as a fallback)
       Timer(Duration(seconds: 5), () {
         if (mounted) {
-          print('Auto-hiding splash screen...');
           setState(() {
             _showSplashScreen = false;
           });
-          print('Splash screen hidden');
         }
       });
     } catch (e, stackTrace) {
       print('Error initializing app: $e');
       print('Stack trace: $stackTrace');
-      // Show error state if initialization fails
       if (mounted) {
         setState(() {
           _initialized = true;
@@ -485,13 +404,22 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  // Helper method to retry subscription services initialization
+  Future<void> _retrySubscriptionServices() async {
+    try {
+      await _initializeSubscriptionServices();
+      print('✅ Successfully reinitialized subscription services');
+    } catch (e) {
+      print('❌ Failed to reinitialize subscription services: $e');
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     authUserSub.cancel();
     _router.dispose();
     _showSplashScreen = true;
-
-    // Clean up app state tracker
     AppStateTracker().dispose();
 
     if (mounted) {
@@ -577,6 +505,65 @@ class _MyAppState extends State<MyApp> {
         },
       ),
     );
+  }
+
+  // Add method to reset iOS badge count
+  Future<void> _resetIOSBadgeCount() async {
+    if (Platform.isIOS) {
+      try {
+        // Reset badge count to zero using FlutterLocalNotificationsPlugin
+        final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
+            FlutterLocalNotificationsPlugin();
+        
+        // Initialize if needed (minimal initialization)
+        const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: true,
+          requestSoundPermission: false,
+        );
+        await flutterLocalNotificationsPlugin.initialize(
+          const InitializationSettings(iOS: iosSettings),
+        );
+        
+        // Request permissions and clear all notifications which also clears the badge
+        final iOSImplementation = flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>();
+                
+        if (iOSImplementation != null) {
+          await iOSImplementation.requestPermissions(
+            alert: false,
+            badge: true,
+            sound: false,
+          );
+          
+          // Cancel all notifications which clears the badge
+          await iOSImplementation.cancelAll();
+        }
+            
+        // Also try to clear using Firebase Messaging
+        try {
+          await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+            badge: false,
+          );
+        } catch (e) {
+          print('Error updating Firebase Messaging options: $e');
+        }
+        
+        print('iOS badge count reset successfully');
+      } catch (e) {
+        print('Error resetting iOS badge count: $e');
+      }
+    }
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Handle app lifecycle changes
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground - reset badge count
+      _resetIOSBadgeCount();
+    }
   }
 }
 
@@ -745,5 +732,60 @@ class _ImprovedConnectivityBannerState
       key: _scaffoldMessengerKey,
       child: widget.child,
     );
+  }
+}
+
+// Helper function to initialize subscription-related services
+Future<void> _initializeSubscriptionServices() async {
+  try {
+    // Configure RevenueCat with debug logging
+    await Purchases.setLogLevel(LogLevel.debug);
+    
+    // Configure RevenueCat with your API key based on platform
+    if (Platform.isIOS) {
+      await Purchases.configure(
+        PurchasesConfiguration('appl_aUbICkbeGteMFoiMsBOJzdjVoTE')
+          ..appUserID = null // Let RevenueCat generate a stable ID
+          ..observerMode = false // Enable real purchases
+          ..usesStoreKit2IfAvailable = true // Use StoreKit 2 on iOS 15+
+      );
+    } else if (Platform.isAndroid) {
+      await Purchases.configure(
+        PurchasesConfiguration('goog_YOUR_GOOGLE_API_KEY') // Replace with your Android key
+          ..appUserID = null
+          ..observerMode = false
+      );
+    }
+    
+    // Verify configuration was successful
+    final configuredAppUserID = await Purchases.appUserID;
+    print('RevenueCat configured successfully with app user ID: $configuredAppUserID');
+    
+    // Initialize PurchaseService
+    await PurchaseService.init();
+    
+    // Initialize other subscription-related services
+    await Future.wait([
+      SubscriptionManager.instance.initialize(),
+    ]);
+    
+    // Verify offerings are available
+    try {
+      final offerings = await Purchases.getOfferings();
+      if (offerings.current != null) {
+        print('RevenueCat offerings loaded successfully');
+      } else {
+        print('Warning: No current offering available');
+      }
+    } catch (e) {
+      print('Warning: Failed to load initial offerings: $e');
+      // Don't throw here - the app can still function without initial offerings
+    }
+    
+  } catch (e, stack) {
+    print('Error initializing subscription services: $e');
+    print('Stack trace: $stack');
+    // Rethrow to let the app handle the error appropriately
+    rethrow;
   }
 }

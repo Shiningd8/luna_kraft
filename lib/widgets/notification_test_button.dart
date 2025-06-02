@@ -19,8 +19,14 @@ class NotificationTestButton extends StatelessWidget {
       icon: Icon(Icons.notifications),
       label: Text('Debug Notification'),
       onPressed: () async {
-        // Use the simplified manual test notification method
-        await NotificationService().manualTestNotification();
+        // Show an in-app notification instead
+        NotificationService().showInAppNotification(
+          NotificationPayload(
+            title: 'Debug Notification',
+            body: 'This is a test notification',
+            type: 'test',
+          ),
+        );
 
         // Print FCM token for debugging
         await NotificationService().debugPrintFCMToken();

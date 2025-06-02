@@ -30,6 +30,19 @@ class DreamFacts {
     "The scientific study of dreams is called oneirology.",
     "Certain medications can suppress REM sleep, reducing dream recall or dream intensity.",
     "Sharing a bed with someone can influence your dream content, sometimes incorporating their movements or sounds.",
+    "You can't read books or check the time in dreams. Your brain just can't process text or clocks properly while dreaming.",
+    "You forget 90% of your dreams within 10 minutes of waking. Unless you write them down, they vanish fast!",
+    "Your dog is probably dreaming of chasing cats while it sleeps!",
+    "Frankenstein, the periodic table, and the sewing machine all came from dreams.",
+    "People who grew up with black & white TV often dream in black & white.",
+    "Recurring dreams often mean your mind is stuck on something emotional.",
+    "Some people dream so vividly, they eat, cry, or even feel burning.",
+    "A five-minute dream can feel like an entire movie or lifetime.",
+    "Ancient civilizations treated dreams as sacred. In Egypt and Greece, people slept in 'dream temples' hoping to receive healing messages from gods or ancestors during sleep.",
+    "Time works differently in dreams. You can live out what feels like hours, days, or even years in a dream that lasts just a few minutes in real life.",
+    "Dreams can be contagious in close relationships. Couples and close friends often report having similar dream themes or appearing in each other's dreams more frequently.",
+    "It's possible to train your mind to continue a dream from where you left off. With enough practice, visualization, and intent, some people can re-enter a dream even after waking up from it.",
+    "In some cultures, dreams are considered a parallel reality - not just imagination, but a separate spiritual world you visit each night.",
   ];
 
   static String getRandomFact() {

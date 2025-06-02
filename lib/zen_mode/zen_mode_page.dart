@@ -372,6 +372,14 @@ class _ZenModePageState extends State<ZenModePage>
         return Icons.flutter_dash;
       case 'stream':
         return Icons.waves;
+      case 'whispering zen':
+        return Icons.spa; // Changed from music_note to spa
+      case 'calm night':
+        return Icons.nights_stay; // Changed from nightlight_round to nights_stay
+      case 'tranquil horizons':
+        return Icons.terrain; // Changed from landscape to terrain
+      case 'whisper of snowfall':
+        return Icons.snowing; // Changed from ac_unit to snowing
       default:
         return Icons.music_note;
     }
@@ -857,8 +865,48 @@ class _ZenModePageState extends State<ZenModePage>
 
   // Toggle a specific sound
   void _toggleSound(String soundName) {
-    print('TOGGLING SOUND: $soundName');
+    // First check if this is one of the music sounds
+    final bool isMusicSound = [
+      'Whispering Zen', 
+      'Calm Night', 
+      'Tranquil Horizons', 
+      'Whisper of Snowfall'
+    ].contains(soundName);
     
+    // If this is a music sound being turned on, first turn off any other active music sound
+    if (isMusicSound) {
+      final List<String> musicSounds = [
+        'Whispering Zen', 
+        'Calm Night', 
+        'Tranquil Horizons', 
+        'Whisper of Snowfall'
+      ];
+      
+      // If we're activating a music sound, deactivate any other active music sounds
+      if (!zenAudioService.availableSounds.firstWhere((s) => s.name == soundName).isActive) {
+        // Find any active music sounds
+        for (final ZenAudioSound sound in zenAudioService.availableSounds) {
+          if (musicSounds.contains(sound.name) && sound.name != soundName && sound.isActive) {
+            // Deactivate this sound first before activating the new one
+            zenAudioService.toggleSound(sound.name).then((_) {
+              // Wait a tiny bit to ensure proper audio handling
+              Future.delayed(Duration(milliseconds: 50), () {
+                // Continue with the normal toggle flow after deactivation
+                _processNormalToggle(soundName);
+              });
+            });
+            return; // Exit early since we'll call _processNormalToggle after deactivation
+          }
+        }
+      }
+    }
+    
+    // If not a music sound or no other music sound is active, proceed normally
+    _processNormalToggle(soundName);
+  }
+  
+  // Process normal sound toggling (extracted from the original _toggleSound)
+  void _processNormalToggle(String soundName) {
     final soundIndex = zenAudioService.availableSounds.indexWhere((s) => s.name == soundName);
     if (soundIndex == -1) return;
     
@@ -871,6 +919,14 @@ class _ZenModePageState extends State<ZenModePage>
       return;
     }
 
+    // Check if sound is locked (premium sound)
+    final isPremiumSound = ['Wind', 'Birds', 'Stream', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(soundName);
+    if (isPremiumSound && !zenAudioService.isSoundUnlocked(soundName)) {
+      // Show purchase dialog for locked sounds
+      _showPurchaseSoundDialog(context, soundName);
+      return;
+    }
+    
     // Set loading state to give immediate feedback
     if (mounted && !_isDisposed) {
       setState(() {});
@@ -879,10 +935,6 @@ class _ZenModePageState extends State<ZenModePage>
     // Toggle this sound's state and update background
     zenAudioService.toggleSound(soundName).then((_) {
       if (mounted && !_isDisposed) {
-        print(
-          'TOGGLED SOUND: $soundName, isPlaying=${zenAudioService.isPlaying}',
-        );
-
         // Force a full UI update
         setState(() {
           _isPlaying = zenAudioService.isPlaying;
@@ -2050,15 +2102,18 @@ class _ZenModePageState extends State<ZenModePage>
       return true;
     }
     
-    // Non-locked sounds are always available
-    if (!sound.isLocked) {
+    // Check if this is a premium sound
+    final isPremiumSound = ['Wind', 'Birds', 'Stream', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(sound.name);
+    
+    // Non-premium sounds are always available
+    if (!isPremiumSound) {
       return true;
     }
     
-    // For locked sounds, check if user has already unlocked it
+    // For premium sounds, check if user has already unlocked it
     return zenAudioService.isSoundUnlocked(sound.name);
   }
-  
+
   // Method to handle sound selection with subscription checks
   void _handleSoundSelection(ZenAudioSound sound) {
     if (_isSoundAvailable(sound)) {
@@ -2068,6 +2123,121 @@ class _ZenModePageState extends State<ZenModePage>
       // Instead of showing premium required dialog, show purchase option
       _showPurchaseSoundDialog(context, sound.name);
     }
+  }
+
+  // Show dialog for premium features requiring subscription
+  void _showSubscribeRequiredDialog(String featureName, String featureDescription) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: 350,
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: FlutterFlowTheme.of(context).secondaryBackground.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Text(
+                  'Premium Feature',
+                  style: FlutterFlowTheme.of(context).titleLarge.override(
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 20),
+                
+                // Feature icon
+                Icon(
+                  Icons.workspace_premium,
+                  color: FlutterFlowTheme.of(context).primary,
+                  size: 50,
+                ),
+                SizedBox(height: 16),
+                
+                // Feature name
+                Text(
+                  featureName,
+                  style: FlutterFlowTheme.of(context).titleMedium.override(
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.bold,
+                    color: FlutterFlowTheme.of(context).primary,
+                  ),
+                ),
+                SizedBox(height: 8),
+                
+                // Description text
+                Text(
+                  'This feature requires an active subscription. Upgrade to continue enjoying $featureDescription.',
+                  textAlign: TextAlign.center,
+                  style: FlutterFlowTheme.of(context).bodyMedium,
+                ),
+                SizedBox(height: 24),
+                
+                // Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(dialogContext);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: FlutterFlowTheme.of(context).secondaryText,
+                        elevation: 0,
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
+                            color: FlutterFlowTheme.of(context).secondaryText.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Text('Not Now'),
+                    ),
+                    SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(dialogContext);
+                        // Navigate to membership page
+                        context.pushNamed('MembershipPage');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: FlutterFlowTheme.of(context).primary,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: Text('Upgrade'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -2096,15 +2266,26 @@ class _ZenModePageState extends State<ZenModePage>
             extendBodyBehindAppBar: true,
             appBar: AppBar(
               backgroundColor: Colors.transparent,
-              elevation: 0,
-              automaticallyImplyLeading: false, // Disable default back button
-              leading: IconButton(
-                icon: Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () {
-                  _showExitConfirmationDialog();
+              automaticallyImplyLeading: false,
+              leading: InkWell(
+                splashColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                onTap: () async {
+                  if (mounted) {
+                    if (_isPlaying) {
+                      await zenAudioService.pauseAllSounds();
+                    }
+                    context.pop();
+                  }
                 },
+                child: Icon(
+                  Icons.arrow_back_ios_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
-              iconTheme: IconThemeData(color: Colors.white),
               title: AnimatedBuilder(
                 animation: _titleFadeController,
                 builder: (context, child) {
@@ -2118,7 +2299,7 @@ class _ZenModePageState extends State<ZenModePage>
                             return LinearGradient(
                               colors: [
                                 Colors.white,
-                                Colors.white.withOpacity(0.5),
+                                Colors.white.withOpacity(0.6),
                                 Colors.white,
                               ],
                               stops: [0.0, _titleShimmerController.value, 1.0],
@@ -2127,7 +2308,7 @@ class _ZenModePageState extends State<ZenModePage>
                           child: Text(
                             'Zen Mode',
                             style: TextStyle(
-                              fontSize: 24.0,
+                              fontSize: 28.0,
                               fontFamily: 'Montserrat',
                               fontWeight: FontWeight.w300,
                               color: Colors.white,
@@ -2141,83 +2322,113 @@ class _ZenModePageState extends State<ZenModePage>
                 },
               ),
               centerTitle: true,
+              elevation: 0,
               actions: [
-                if (_timerDisplay.isNotEmpty)
-                  GestureDetector(
-                    onTap: _stopTimer,
+                // Night Garden mode toggle
+                Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(0, 0, 8, 0),
+                  child: InkWell(
+                    splashColor: Colors.transparent,
+                    focusColor: Colors.transparent,
+                    hoverColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    onTap: _toggleNightGardenMode,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: _isNightGardenMode 
+                            ? FlutterFlowTheme.of(context).primary.withOpacity(0.3)
+                            : Colors.white.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _isNightGardenMode
+                              ? FlutterFlowTheme.of(context).primary.withOpacity(0.5)
+                              : Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        _isNightGardenMode ? Icons.brightness_3 : Icons.dark_mode,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Timer button with improved design
+                Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(0, 0, 16, 0),
+                  child: InkWell(
+                    splashColor: Colors.transparent,
+                    focusColor: Colors.transparent,
+                    hoverColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    onTap: () {
+                      // Use existing method
+                      _showTimerBottomSheet(context);
+                    },
                     child: AnimatedBuilder(
                       animation: _timerPulseController,
                       builder: (context, child) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 12.0),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
+                        return Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.3),
+                              width: 1,
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(
-                                0.3 + (_timerPulseController.value * 0.2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _timerDisplay.isNotEmpty
+                                    ? FlutterFlowTheme.of(context)
+                                        .primary
+                                        .withOpacity(0.4 * _timerPulseController.value)
+                                    : Colors.transparent,
+                                blurRadius: 12 * _timerPulseController.value,
+                                spreadRadius: 2 * _timerPulseController.value,
                               ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(
-                                  0.5 + (_timerPulseController.value * 0.3),
-                                ),
-                                width: 1.0,
+                            ],
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Icon(
+                                Icons.timer_outlined,
+                                color: Colors.white,
+                                size: 22,
                               ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.timer,
-                                  color: Colors.white.withOpacity(
-                                    0.7 + (_timerPulseController.value * 0.3),
-                                  ),
-                                  size: 18,
-                                ),
-                                SizedBox(width: 5),
-                                Text(
-                                  _timerDisplay,
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(
-                                      0.8 + (_timerPulseController.value * 0.2),
+                              if (_timerDisplay.isNotEmpty)
+                                Positioned(
+                                  right: 9,
+                                  top: 9,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: FlutterFlowTheme.of(context).primary,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: FlutterFlowTheme.of(context)
+                                              .primary
+                                              .withOpacity(0.5),
+                                          blurRadius: 4,
+                                          spreadRadius: 0,
+                                        ),
+                                      ],
                                     ),
-                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                SizedBox(width: 5),
-                                Icon(
-                                  Icons.close,
-                                  color: Colors.white.withOpacity(0.7),
-                                  size: 16,
-                                ),
-                              ],
-                            ),
+                            ],
                           ),
                         );
                       },
                     ),
-                  ),
-                // Night Garden mode toggle
-                Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(0, 0, 12, 0),
-                  child: IconButton(
-                    icon: Icon(
-                        _isNightGardenMode ? Icons.brightness_3 : Icons.dark_mode,
-                        color: Colors.white),
-                    onPressed: _toggleNightGardenMode,
-                    tooltip: 'Night Garden Mode',
-                  ),
-                ),
-                // Timer button
-                Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(0, 0, 12, 0),
-                  child: IconButton(
-                    icon: Icon(Icons.timer, color: Colors.white),
-                    onPressed: () => _showTimerBottomSheet(context),
-                    tooltip: 'Set Timer',
                   ),
                 ),
               ],
@@ -2266,83 +2477,185 @@ class _ZenModePageState extends State<ZenModePage>
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
                       // Space at the top for app bar
-                      SizedBox(height: 100),
+                      SizedBox(height: 110),
 
-                      // Active sound chips at the top
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.max,
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: sounds
-                              .where(
-                                (dynamic sound) => sound.isActive as bool,
-                              )
-                              .map<Widget>(
-                                (dynamic sound) => Padding(
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                    8,
-                                    0,
-                                    8,
-                                    0,
+                      // Timer display when active
+                      if (_timerDisplay.isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 16),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(
+                                color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  spreadRadius: 0,
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.timer_outlined,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  _timerDisplay,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 16,
                                   ),
+                                ),
+                                SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: _stopTimer,
                                   child: Container(
+                                    padding: EdgeInsets.all(4),
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .primary
-                                          .withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(24),
-                                      border: Border.all(
-                                        color:
-                                            FlutterFlowTheme.of(context).primary,
-                                        width: 1,
-                                      ),
+                                      color: Colors.white.withOpacity(0.2),
+                                      shape: BoxShape.circle,
                                     ),
-                                    child: Padding(
-                                      padding: EdgeInsetsDirectional.fromSTEB(
-                                        12,
-                                        8,
-                                        12,
-                                        8,
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            _getSoundIcon(sound.name),
-                                            size: 24,
-                                            color: Colors.white,
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            sound.name,
-                                            style: FlutterFlowTheme.of(context)
-                                                .bodyMedium
-                                                .override(
-                                                  fontFamily: 'Readex Pro',
-                                                  color: Colors.white,
-                                                ),
-                                          ),
-                                          SizedBox(width: 8),
-                                          GestureDetector(
-                                            onTap: () => _handleSoundSelection(sound),
-                                            child: Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 16,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                    child: Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 14,
                                     ),
                                   ),
                                 ),
-                              )
-                              .toList(),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      // Active sound chips at the top with modern design
+                      Container(
+                        margin: EdgeInsets.only(bottom: 16, top: _timerDisplay.isNotEmpty ? 0 : 20),
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.max,
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: sounds
+                                .where(
+                                  (dynamic sound) => sound.isActive as bool,
+                                )
+                                .map<Widget>(
+                                  (dynamic sound) => Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 8),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: FlutterFlowTheme.of(context)
+                                            .primary
+                                            .withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(24),
+                                        border: Border.all(
+                                          color:
+                                              FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                                          width: 1,
+                                        ),
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                                            FlutterFlowTheme.of(context).primary.withOpacity(0.05),
+                                          ],
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                                            blurRadius: 8,
+                                            spreadRadius: 0,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 28,
+                                              height: 28,
+                                              decoration: BoxDecoration(
+                                                color: ['Whispering Zen', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(sound.name)
+                                                  ? Color(0xFF3D2A54).withOpacity(0.4)
+                                                  : Colors.white.withOpacity(0.1),
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: ['Whispering Zen', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(sound.name)
+                                                    ? Color(0xFF9E77ED).withOpacity(0.5)
+                                                    : Colors.white.withOpacity(0.2),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Center(
+                                                child: Icon(
+                                                  _getSoundIcon(sound.name),
+                                                  size: 16,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              sound.name,
+                                              style: FlutterFlowTheme.of(context)
+                                                  .bodyMedium
+                                                  .override(
+                                                    fontFamily: 'Readex Pro',
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            GestureDetector(
+                                              onTap: () => _toggleSound(sound.name),
+                                              child: Container(
+                                                width: 20,
+                                                height: 20,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.1),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Center(
+                                                  child: Icon(
+                                                    Icons.close,
+                                                    color: Colors.white,
+                                                    size: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
                         ),
                       ),
 
-                      // Sound tile grid
+                      // Sound tile grid with modern design
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.all(16),
@@ -2362,7 +2675,7 @@ class _ZenModePageState extends State<ZenModePage>
                             itemBuilder: (context, index) {
                               final dynamic sound = sounds[index];
                               final bool isActive = sound.isActive as bool;
-                              final bool isLocked = sound.isLocked as bool && 
+                              final bool isLocked = ['Wind', 'Birds', 'Stream', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(sound.name) && 
                                   !zenAudioService.isSoundUnlocked(sound.name as String);
                                   
                               return GestureDetector(
@@ -2379,185 +2692,277 @@ class _ZenModePageState extends State<ZenModePage>
                                             .primary
                                             .withOpacity(0.3)
                                         : Colors.black.withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(20), // Increased from 16
                                     border: Border.all(
                                       color: isActive
                                           ? FlutterFlowTheme.of(context).primary
                                           : Colors.white.withOpacity(0.2),
                                       width: isActive ? 2 : 1,
                                     ),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: isActive
+                                          ? [
+                                              FlutterFlowTheme.of(context).primary.withOpacity(0.7),
+                                              FlutterFlowTheme.of(context).primary.withOpacity(0.4),
+                                            ]
+                                          : ['Whispering Zen', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(sound.name)
+                                              ? [
+                                                  Color(0xFF3D2A54).withOpacity(0.7),
+                                                  Color(0xFF1E1E2E).withOpacity(0.4),
+                                                ]
+                                              : [
+                                                  Colors.black.withOpacity(0.5),
+                                                  Colors.black.withOpacity(0.3),
+                                                ],
+                                    ),
                                     boxShadow: isActive
                                         ? [
                                             BoxShadow(
                                               color: FlutterFlowTheme.of(context)
                                                   .primary
-                                                  .withOpacity(0.3),
-                                              blurRadius: 10,
-                                              spreadRadius: 1,
+                                                  .withOpacity(0.4),
+                                              blurRadius: 15,
+                                              spreadRadius: 2,
                                             ),
                                           ]
-                                        : null,
+                                        : [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.2),
+                                              blurRadius: 8,
+                                              spreadRadius: 0,
+                                              offset: Offset(0, 2),
+                                            ),
+                                          ],
                                   ),
-                                  child: Stack(
-                                    children: [
-                                      Column(
-                                        mainAxisSize: MainAxisSize.max,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            _getSoundIcon(sound.name),
-                                            size: 48,
-                                            color: Colors.white,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Stack(
+                                      children: [
+                                        // Particle effect for active sounds
+                                        if (isActive)
+                                          Positioned.fill(
+                                            child: Opacity(
+                                              opacity: 0.15,
+                                              child: Image.asset(
+                                                'assets/images/particles.png',
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
                                           ),
-                                          SizedBox(height: 12),
-                                          Text(
-                                            sound.name,
-                                            style: FlutterFlowTheme.of(context)
-                                                .bodyMedium
-                                                .override(
-                                                  fontFamily: 'Readex Pro',
+                                        Column(
+                                          mainAxisSize: MainAxisSize.max,
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Stack(
+                                              alignment: Alignment.center,
+                                              children: [
+                                                // For music sounds, add a decorative circle behind the icon
+                                                if (['Whispering Zen', 'Calm Night', 'Tranquil Horizons', 'Whisper of Snowfall'].contains(sound.name))
+                                                  Container(
+                                                    width: 70,
+                                                    height: 70,
+                                                    decoration: BoxDecoration(
+                                                      shape: BoxShape.circle,
+                                                      gradient: RadialGradient(
+                                                        colors: isActive
+                                                            ? [
+                                                                FlutterFlowTheme.of(context).primary.withOpacity(0.5),
+                                                                FlutterFlowTheme.of(context).primary.withOpacity(0.1),
+                                                              ]
+                                                            : [
+                                                                Color(0xFF6941C6).withOpacity(0.4),
+                                                                Color(0xFF3D2A54).withOpacity(0.1),
+                                                              ],
+                                                        radius: 0.8,
+                                                      ),
+                                                      border: Border.all(
+                                                        color: isActive
+                                                            ? FlutterFlowTheme.of(context).primary.withOpacity(0.6)
+                                                            : Color(0xFF9E77ED).withOpacity(0.4),
+                                                        width: 1.5,
+                                                      ),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: isActive
+                                                              ? FlutterFlowTheme.of(context).primary.withOpacity(0.3)
+                                                              : Colors.black.withOpacity(0.2),
+                                                          blurRadius: 10,
+                                                          spreadRadius: 0,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                
+                                                // Sound icon
+                                                Icon(
+                                                  _getSoundIcon(sound.name),
+                                                  size: 50,
                                                   color: Colors.white,
                                                 ),
-                                          ),
-                                          if (isLocked)
-                                            Padding(
-                                              padding: EdgeInsets.only(top: 4),
-                                              child: Row(
+                                              ],
+                                            ),
+                                            SizedBox(height: 15),
+                                            // Sound name with a more modern text style
+                                            Container(
+                                              padding: EdgeInsets.symmetric(horizontal: 8),
+                                              child: Text(
+                                                sound.name,
+                                                style: FlutterFlowTheme.of(context)
+                                                    .bodyMedium
+                                                    .override(
+                                                      fontFamily: 'Readex Pro',
+                                                      color: Colors.white,
+                                                      fontSize: 16,
+                                                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                                                      letterSpacing: 0.5,
+                                                    ),
+                                                textAlign: TextAlign.center,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (isLocked)
+                                              Padding(
+                                                padding: EdgeInsets.only(top: 4),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Text(
+                                                      'Premium Sound',
+                                                      style: FlutterFlowTheme.of(context)
+                                                          .bodySmall
+                                                          .override(
+                                                            fontFamily: 'Readex Pro',
+                                                            color: Colors.white70,
+                                                            fontSize: 12,
+                                                          ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            AnimatedContainer(
+                                              duration: Duration(milliseconds: 300),
+                                              height: isActive ? 40 : 0,
+                                              child: AnimatedOpacity(
+                                                opacity: isActive ? 1.0 : 0.0,
+                                                duration: Duration(milliseconds: 300),
+                                                child: Padding(
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal: 12.0, // Increased from 8
+                                                    vertical: 4.0,
+                                                  ),
+                                                  child: SliderTheme(
+                                                    data: SliderThemeData(
+                                                      trackHeight: 4,
+                                                      thumbShape: RoundSliderThumbShape(
+                                                        enabledThumbRadius: 8, // Increased from 6
+                                                      ),
+                                                      overlayShape:
+                                                          RoundSliderOverlayShape(
+                                                        overlayRadius: 16, // Increased from 14
+                                                      ),
+                                                      thumbColor: Colors.white,
+                                                      activeTrackColor:
+                                                          Colors.white.withOpacity(0.8), // Increased from 0.7
+                                                      inactiveTrackColor:
+                                                          Colors.white.withOpacity(0.3),
+                                                    ),
+                                                    child: Slider(
+                                                      value: sound.volume as double,
+                                                      min: 0.0,
+                                                      max: 1.0,
+                                                      onChanged: (value) {
+                                                        setState(() {
+                                                          sound.volume = value;
+                                                        });
+                                                        zenAudioService.setSoundVolume(
+                                                            sound.name as String, value);
+                                                      },
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (isLocked)
+                                          Positioned.fill(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(0.4),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Column(
                                                 mainAxisAlignment: MainAxisAlignment.center,
                                                 children: [
-                                                  Text(
-                                                    'Premium Sound',
-                                                    style: FlutterFlowTheme.of(context)
-                                                        .bodySmall
-                                                        .override(
-                                                          fontFamily: 'Readex Pro',
-                                                          color: Colors.white70,
-                                                          fontSize: 12,
+                                                  Icon(
+                                                    Icons.lock_open,
+                                                    color: Colors.white,
+                                                    size: 32,
+                                                  ),
+                                                  SizedBox(height: 8),
+                                                  Container(
+                                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                    decoration: BoxDecoration(
+                                                      color: FlutterFlowTheme.of(context).warning.withOpacity(0.9),
+                                                      borderRadius: BorderRadius.circular(20),
+                                                      border: Border.all(
+                                                        color: Colors.white.withOpacity(0.3),
+                                                        width: 1,
+                                                      ),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: Colors.black.withOpacity(0.2),
+                                                          blurRadius: 4,
+                                                          spreadRadius: 0,
                                                         ),
+                                                      ],
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Container(
+                                                          width: 20,
+                                                          height: 20,
+                                                          margin: EdgeInsets.only(right: 6),
+                                                          decoration: BoxDecoration(
+                                                            shape: BoxShape.circle,
+                                                            color: Colors.white.withOpacity(0.2),
+                                                            border: Border.all(
+                                                              color: Colors.white.withOpacity(0.3),
+                                                              width: 1,
+                                                            ),
+                                                          ),
+                                                          child: ClipRRect(
+                                                            borderRadius: BorderRadius.circular(10),
+                                                            child: Image.asset(
+                                                              'assets/images/lunacoin.png',
+                                                              fit: BoxFit.cover,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          '${zenAudioService.getSoundPrice(sound.name as String)}',
+                                                          style: FlutterFlowTheme.of(context)
+                                                              .bodyMedium
+                                                              .override(
+                                                                fontFamily: 'Readex Pro',
+                                                                color: Colors.white,
+                                                                fontWeight: FontWeight.bold,
+                                                                fontSize: 15,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                          AnimatedContainer(
-                                            duration: Duration(milliseconds: 300),
-                                            height: isActive ? 40 : 0,
-                                            child: AnimatedOpacity(
-                                              opacity: isActive ? 1.0 : 0.0,
-                                              duration: Duration(milliseconds: 300),
-                                              child: Padding(
-                                                padding: EdgeInsets.symmetric(
-                                                  horizontal: 8.0,
-                                                  vertical: 4.0,
-                                                ),
-                                                child: SliderTheme(
-                                                  data: SliderThemeData(
-                                                    trackHeight: 4,
-                                                    thumbShape: RoundSliderThumbShape(
-                                                      enabledThumbRadius: 6,
-                                                    ),
-                                                    overlayShape:
-                                                        RoundSliderOverlayShape(
-                                                      overlayRadius: 14,
-                                                    ),
-                                                    thumbColor: Colors.white,
-                                                    activeTrackColor:
-                                                        Colors.white.withOpacity(0.7),
-                                                    inactiveTrackColor:
-                                                        Colors.white.withOpacity(0.3),
-                                                  ),
-                                                  child: Slider(
-                                                    value: sound.volume as double,
-                                                    min: 0.0,
-                                                    max: 1.0,
-                                                    onChanged: (value) {
-                                                      setState(() {
-                                                        sound.volume = value;
-                                                      });
-                                                      zenAudioService.setSoundVolume(
-                                                          sound.name as String, value);
-                                                    },
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
                                           ),
-                                        ],
-                                      ),
-                                      if (isLocked)
-                                        Positioned.fill(
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(0.4),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  Icons.lock_open,
-                                                  color: Colors.white,
-                                                  size: 32,
-                                                ),
-                                                SizedBox(height: 8),
-                                                Container(
-                                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                  decoration: BoxDecoration(
-                                                    color: FlutterFlowTheme.of(context).warning.withOpacity(0.9),
-                                                    borderRadius: BorderRadius.circular(20),
-                                                    border: Border.all(
-                                                      color: Colors.white.withOpacity(0.3),
-                                                      width: 1,
-                                                    ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: Colors.black.withOpacity(0.2),
-                                                        blurRadius: 4,
-                                                        spreadRadius: 0,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Container(
-                                                        width: 20,
-                                                        height: 20,
-                                                        margin: EdgeInsets.only(right: 6),
-                                                        decoration: BoxDecoration(
-                                                          shape: BoxShape.circle,
-                                                          color: Colors.white.withOpacity(0.2),
-                                                          border: Border.all(
-                                                            color: Colors.white.withOpacity(0.3),
-                                                            width: 1,
-                                                          ),
-                                                        ),
-                                                        child: ClipRRect(
-                                                          borderRadius: BorderRadius.circular(10),
-                                                          child: Image.asset(
-                                                            'assets/images/lunacoin.png',
-                                                            fit: BoxFit.cover,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      Text(
-                                                        '${zenAudioService.getSoundPrice(sound.name as String)}',
-                                                        style: FlutterFlowTheme.of(context)
-                                                            .bodyMedium
-                                                            .override(
-                                                              fontFamily: 'Readex Pro',
-                                                              color: Colors.white,
-                                                              fontWeight: FontWeight.bold,
-                                                              fontSize: 15,
-                                                            ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
@@ -2586,65 +2991,86 @@ class _ZenModePageState extends State<ZenModePage>
                                   return SizedBox();
                                 }
 
-                                // Show a modern stop button
-                                return AnimatedBuilder(
-                                  animation: _pulseController,
-                                  builder: (context, child) {
-                                    final double scale =
-                                        1.0 + (_pulseController.value * 0.05);
-
-                                    return GestureDetector(
-                                      onTap: _stopAllSounds,
-                                      child: Transform.scale(
-                                        scale: scale,
-                                        child: Container(
-                                          width: 64,
-                                          height: 64,
-                                          decoration: BoxDecoration(
-                                            color: FlutterFlowTheme.of(context)
-                                                .primary
-                                                .withOpacity(0.2),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: FlutterFlowTheme.of(context)
-                                                  .primary
-                                                  .withOpacity(0.5 +
-                                                      (_pulseController.value *
-                                                          0.5)),
-                                              width: 2,
-                                            ),
-                                            // Add subtle gradient for modern look
-                                            gradient: RadialGradient(
-                                              colors: [
-                                                FlutterFlowTheme.of(context)
-                                                    .primary
-                                                    .withOpacity(0.6),
-                                                FlutterFlowTheme.of(context)
-                                                    .primary
-                                                    .withOpacity(0.2),
-                                              ],
-                                              radius: 0.8,
-                                            ),
-                                            // Add subtle shadow
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color:
-                                                    FlutterFlowTheme.of(context)
+                                // Show an enhanced glassmorphic stop button with animation
+                                return TweenAnimationBuilder<double>(
+                                  tween: Tween<double>(begin: 0.0, end: 1.0),
+                                  duration: Duration(milliseconds: 500),
+                                  curve: Curves.elasticOut,
+                                  builder: (context, value, child) {
+                                    return Transform.translate(
+                                      offset: Offset(0, 50 * (1 - value)),
+                                      child: Opacity(
+                                        opacity: value,
+                                        child: GestureDetector(
+                                          onTap: _stopAllSounds,
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(30),
+                                            child: BackdropFilter(
+                                              filter: ImageFilter.blur(
+                                                sigmaX: 10,
+                                                sigmaY: 10,
+                                              ),
+                                              child: Container(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: 24,
+                                                  vertical: 16,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: FlutterFlowTheme.of(context)
+                                                      .primary
+                                                      .withOpacity(0.2),
+                                                  borderRadius: BorderRadius.circular(30),
+                                                  border: Border.all(
+                                                    color: FlutterFlowTheme.of(context)
                                                         .primary
-                                                        .withOpacity(0.1 +
-                                                            (_pulseController
-                                                                    .value *
-                                                                0.2)),
-                                                blurRadius: 12,
-                                                spreadRadius: 2,
-                                              )
-                                            ],
-                                          ),
-                                          child: Center(
-                                            child: Icon(
-                                              Icons.stop_rounded,
-                                              color: Colors.white,
-                                              size: 32,
+                                                        .withOpacity(0.5),
+                                                    width: 1.5,
+                                                  ),
+                                                  gradient: LinearGradient(
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                    colors: [
+                                                      FlutterFlowTheme.of(context)
+                                                          .primary
+                                                          .withOpacity(0.6),
+                                                      FlutterFlowTheme.of(context)
+                                                          .primary
+                                                          .withOpacity(0.2),
+                                                    ],
+                                                  ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: FlutterFlowTheme.of(context)
+                                                          .primary
+                                                          .withOpacity(0.2),
+                                                      blurRadius: 15,
+                                                      spreadRadius: 2,
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.stop_rounded,
+                                                      color: Colors.white,
+                                                      size: 24,
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Text(
+                                                      'Stop All Sounds',
+                                                      style: FlutterFlowTheme.of(context)
+                                                          .bodyMedium
+                                                          .override(
+                                                            fontFamily: 'Readex Pro',
+                                                            color: Colors.white,
+                                                            fontWeight: FontWeight.w500,
+                                                            fontSize: 16,
+                                                          ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -3424,6 +3850,14 @@ class SoundCard extends StatelessWidget {
         return Icons.flutter_dash;
       case 'stream':
         return Icons.waves;
+      case 'whispering zen':
+        return Icons.spa; // Changed from music_note to spa
+      case 'calm night':
+        return Icons.nights_stay; // Changed from nightlight_round to nights_stay
+      case 'tranquil horizons':
+        return Icons.terrain; // Changed from landscape to terrain
+      case 'whisper of snowfall':
+        return Icons.snowing; // Changed from ac_unit to snowing
       default:
         return Icons.music_note;
     }

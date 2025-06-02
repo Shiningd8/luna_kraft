@@ -15,7 +15,7 @@
   ],
   "products" : [
     {
-      "displayPrice" : "1.99",
+      "displayPrice" : "2.99",
       "familyShareable" : false,
       "internalID" : "6745802970",
       "localizations" : [
@@ -64,7 +64,7 @@
     "_applicationInternalID" : "6745803045",
     "_developerTeamID" : "3V7HYZPA3V",
     "_failTransactionsEnabled" : false,
-    "_lastSynchronizedDate" : 768867883.93466794,
+    "_lastSynchronizedDate" : 769498858.86947894,
     "_locale" : "en_US",
     "_storefront" : "USA",
     "_storeKitErrors" : [
@@ -193,8 +193,8 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Get access to Premium features for a year",
-              "displayName" : "Yearly Premium",
+              "description" : "Get access to Premium features for a week",
+              "displayName" : "Weekly Premium",
               "locale" : "en_GB"
             }
           ],

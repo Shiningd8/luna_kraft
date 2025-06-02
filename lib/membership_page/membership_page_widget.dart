@@ -16,7 +16,7 @@ import 'package:flutter/material.dart';
 // import 'package:flutter/services.dart'; // Unnecessary - provided by material.dart
 // import 'package:lottie/lottie.dart'; // Unused import
 import 'membership_page_model.dart';
-// import 'dart:ui'; // Unnecessary - provided by material.dart
+import 'dart:ui'; // Needed for ImageFilter.blur
 import '/services/paywall_manager.dart';
 import '/services/models/subscription_product.dart';
 import '/services/models/coin_product.dart';
@@ -634,6 +634,19 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
   Widget _buildDetailedSubscriptionCard(
       SubscriptionProduct product, BuildContext context,
       {Key? key}) {
+    // Check if this is the current subscription
+    final isCurrentPlan = isCurrentSubscription(product.id);
+    
+    // Get subscription expiry date if this is the current plan
+    String expiryDate = '';
+    if (isCurrentPlan) {
+      final daysLeft = SubscriptionUtil.daysLeft;
+      if (daysLeft > 0) {
+        final expiryDateTime = DateTime.now().add(Duration(days: daysLeft));
+        expiryDate = '${expiryDateTime.day}/${expiryDateTime.month}/${expiryDateTime.year}';
+      }
+    }
+    
     // Get features for this plan
     List<String> features = [];
     if (product.id.contains('weekly') || product.id == 'ios.premium_weekly_sub') {
@@ -663,21 +676,27 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
         duration: Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
         transform: Matrix4.identity()
-          ..scale(_hoverStates[_currentMembershipPackIndex] ? 1.03 : 1.0),
+          ..scale(
+              (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex]) ? 1.03 : 1.0),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: isCurrentPlan
+              ? Colors.green.withOpacity(0.15)
+              : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: _hoverStates[_currentMembershipPackIndex]
-                ? FlutterFlowTheme.of(context).primary.withOpacity(0.5)
-                : Colors.white.withOpacity(0.1),
-            width: _hoverStates[_currentMembershipPackIndex] ? 1.5 : 1,
+            color: isCurrentPlan
+                ? Colors.green.withOpacity(0.5)
+                : _hoverStates[_currentMembershipPackIndex]
+                    ? FlutterFlowTheme.of(context).primary.withOpacity(0.5)
+                    : Colors.white.withOpacity(0.1),
+            width: (isCurrentPlan || _hoverStates[_currentMembershipPackIndex]) ? 1.5 : 1,
           ),
-          boxShadow: _hoverStates[_currentMembershipPackIndex]
+          boxShadow: (isCurrentPlan || _hoverStates[_currentMembershipPackIndex])
               ? [
                   BoxShadow(
-                    color:
-                        FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                    color: isCurrentPlan
+                        ? Colors.green.withOpacity(0.2)
+                        : FlutterFlowTheme.of(context).primary.withOpacity(0.2),
                     blurRadius: 15,
                     spreadRadius: 0,
                     offset: Offset(0, 8),
@@ -689,280 +708,363 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
           borderRadius: BorderRadius.circular(16),
           child: Material(
             color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _purchaseMembership(product),
-              onHover: (isHovering) {
-                setState(() {
-                  _hoverStates[_currentMembershipPackIndex] = isHovering;
-                });
-              },
-              splashColor: Colors.white.withOpacity(0.05),
-              highlightColor: Colors.white.withOpacity(0.05),
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Price section
-                    AnimatedContainer(
-                      duration: Duration(milliseconds: 200),
-                      transform: Matrix4.identity()
-                        ..translate(
-                          0.0,
-                          _hoverStates[_currentMembershipPackIndex]
-                              ? -5.0
-                              : 0.0,
-                          0.0,
-                        ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            _formatPrice(product).replaceAll(',', '.'),
-                            style: FlutterFlowTheme.of(context)
-                                .displaySmall
-                                .override(
-                                  fontFamily: 'Outfit',
-                                  color: Colors.white,
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.w600,
+            child: Stack(
+              children: [
+                // Main content
+                InkWell(
+                  onTap: isCurrentPlan ? null : () => _purchaseMembership(product),
+                  onHover: isCurrentPlan 
+                      ? null
+                      : (isHovering) {
+                          setState(() {
+                            _hoverStates[_currentMembershipPackIndex] = isHovering;
+                          });
+                        },
+                  splashColor: isCurrentPlan ? Colors.transparent : Colors.white.withOpacity(0.05),
+                  highlightColor: isCurrentPlan ? Colors.transparent : Colors.white.withOpacity(0.05),
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Current plan badge if applicable
+                        if (isCurrentPlan)
+                          Container(
+                            margin: EdgeInsets.only(bottom: 12),
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.green.withOpacity(0.5),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                  size: 14,
                                 ),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              _getSubscriptionDuration(product.id),
-                              style: FlutterFlowTheme.of(context)
-                                  .bodySmall
-                                  .override(
-                                    fontFamily: 'Figtree',
-                                    color: Colors.white.withOpacity(0.6),
-                                    fontSize: 13,
+                                SizedBox(width: 4),
+                                Text(
+                                  'Current Plan',
+                                  style: FlutterFlowTheme.of(context).bodySmall.copyWith(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
                                   ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Badge if applicable
-                    if (badge.isNotEmpty)
-                      AnimatedContainer(
-                        duration: Duration(milliseconds: 200),
-                        transform: Matrix4.identity()
-                          ..translate(
-                            0.0,
-                            _hoverStates[_currentMembershipPackIndex]
-                                ? -3.0
-                                : 0.0,
-                            0.0,
-                          ),
-                        padding: EdgeInsets.only(top: 6),
-                        child: Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                FlutterFlowTheme.of(context)
-                                    .primary
-                                    .withOpacity(_hoverStates[
-                                            _currentMembershipPackIndex]
-                                        ? 0.7
-                                        : 0.5),
-                                FlutterFlowTheme.of(context)
-                                    .secondary
-                                    .withOpacity(_hoverStates[
-                                            _currentMembershipPackIndex]
-                                        ? 0.7
-                                        : 0.5),
+                                ),
                               ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(
-                            badge,
-                            style:
-                                FlutterFlowTheme.of(context).bodySmall.override(
-                                      fontFamily: 'Outfit',
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          
+                        // Expiry date if applicable  
+                        if (isCurrentPlan && expiryDate.isNotEmpty)
+                          Container(
+                            margin: EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              'Expires: $expiryDate',
+                              style: FlutterFlowTheme.of(context).bodySmall.copyWith(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 11,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
 
-                    SizedBox(height: 20),
-
-                    // Feature divider
-                    AnimatedContainer(
-                      duration: Duration(milliseconds: 200),
-                      width:
-                          _hoverStates[_currentMembershipPackIndex] ? 50 : 35,
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: _hoverStates[_currentMembershipPackIndex]
-                            ? FlutterFlowTheme.of(context)
-                                .primary
-                                .withOpacity(0.3)
-                            : Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-
-                    SizedBox(height: 20),
-
-                    // Features grid with animations
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 10,
-                      alignment: WrapAlignment.center,
-                      children: features.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final feature = entry.value;
-
-                        return AnimatedContainer(
-                          duration: Duration(milliseconds: 200 + (index * 50)),
+                        // Price section
+                        AnimatedContainer(
+                          duration: Duration(milliseconds: 200),
                           transform: Matrix4.identity()
                             ..translate(
                               0.0,
-                              _hoverStates[_currentMembershipPackIndex]
-                                  ? -2.0
+                              (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                  ? -5.0
                                   : 0.0,
                               0.0,
                             ),
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: _hoverStates[_currentMembershipPackIndex]
-                                ? Colors.white.withOpacity(0.08)
-                                : Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _hoverStates[_currentMembershipPackIndex]
-                                  ? FlutterFlowTheme.of(context)
-                                      .primary
-                                      .withOpacity(0.3)
-                                  : Colors.white.withOpacity(0.08),
-                              width: 1,
-                            ),
-                          ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              AnimatedContainer(
-                                duration: Duration(milliseconds: 200),
-                                child: Icon(
-                                  Icons.check_rounded,
-                                  color:
-                                      _hoverStates[_currentMembershipPackIndex]
-                                          ? FlutterFlowTheme.of(context).primary
-                                          : FlutterFlowTheme.of(context)
-                                              .primary
-                                              .withOpacity(0.8),
-                                  size:
-                                      _hoverStates[_currentMembershipPackIndex]
-                                          ? 14
-                                          : 12,
-                                ),
-                              ),
-                              SizedBox(width: 6),
                               Text(
-                                feature,
+                                _formatPrice(product).replaceAll(',', '.'),
                                 style: FlutterFlowTheme.of(context)
-                                    .bodySmall
+                                    .displaySmall
                                     .override(
-                                      fontFamily: 'Figtree',
-                                      color: _hoverStates[
-                                              _currentMembershipPackIndex]
-                                          ? Colors.white
-                                          : Colors.white.withOpacity(0.9),
-                                      fontSize: _hoverStates[
-                                              _currentMembershipPackIndex]
-                                          ? 11
-                                          : 10,
+                                      fontFamily: 'Outfit',
+                                      color: isCurrentPlan ? Colors.green : Colors.white,
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w600,
                                     ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.only(bottom: 6),
+                                child: Text(
+                                  _getSubscriptionDuration(product.id),
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodySmall
+                                      .override(
+                                        fontFamily: 'Figtree',
+                                        color: isCurrentPlan 
+                                            ? Colors.green.withOpacity(0.7)
+                                            : Colors.white.withOpacity(0.6),
+                                        fontSize: 13,
+                                      ),
+                                ),
                               ),
                             ],
                           ),
-                        );
-                      }).toList(),
-                    ),
-
-                    SizedBox(height: 20),
-
-                    // Subscribe button with animation
-                    AnimatedContainer(
-                      duration: Duration(milliseconds: 200),
-                      width: double.infinity,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            FlutterFlowTheme.of(context).primary,
-                            FlutterFlowTheme.of(context).secondary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: FlutterFlowTheme.of(context)
-                                .primary
-                                .withOpacity(
-                                    _hoverStates[_currentMembershipPackIndex]
-                                        ? 0.4
-                                        : 0.25),
-                            blurRadius:
-                                _hoverStates[_currentMembershipPackIndex]
-                                    ? 25
-                                    : 20,
-                            spreadRadius:
-                                _hoverStates[_currentMembershipPackIndex]
-                                    ? -2
-                                    : -5,
-                            offset: Offset(
-                                0,
-                                _hoverStates[_currentMembershipPackIndex]
-                                    ? 8
-                                    : 5),
+
+                        // Badge if applicable
+                        if (badge.isNotEmpty)
+                          AnimatedContainer(
+                            duration: Duration(milliseconds: 200),
+                            transform: Matrix4.identity()
+                              ..translate(
+                                0.0,
+                                (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                    ? -3.0
+                                    : 0.0,
+                                0.0,
+                              ),
+                            padding: EdgeInsets.only(top: 6),
+                            child: Container(
+                              padding:
+                                  EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    FlutterFlowTheme.of(context)
+                                        .primary
+                                        .withOpacity((!isCurrentPlan && _hoverStates[_currentMembershipPackIndex]) ? 0.7 : 0.5),
+                                    FlutterFlowTheme.of(context)
+                                        .secondary
+                                        .withOpacity((!isCurrentPlan && _hoverStates[_currentMembershipPackIndex]) ? 0.7 : 0.5),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                badge,
+                                style:
+                                    FlutterFlowTheme.of(context).bodySmall.override(
+                                          fontFamily: 'Outfit',
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => _purchaseMembership(product),
-                          borderRadius: BorderRadius.circular(22),
-                          splashColor: Colors.white.withOpacity(0.1),
-                          child: Center(
-                            child: AnimatedDefaultTextStyle(
-                              duration: Duration(milliseconds: 200),
-                              style: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .override(
-                                    fontFamily: 'Outfit',
-                                    color: Colors.white,
-                                    fontSize: _hoverStates[
-                                            _currentMembershipPackIndex]
-                                        ? 15
-                                        : 14,
-                                    fontWeight: FontWeight.bold,
+
+                        SizedBox(height: 20),
+
+                        // Feature divider
+                        AnimatedContainer(
+                          duration: Duration(milliseconds: 200),
+                          width:
+                              (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex]) ? 50 : 35,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                ? FlutterFlowTheme.of(context)
+                                    .primary
+                                    .withOpacity(0.3)
+                                : Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+
+                        SizedBox(height: 20),
+
+                        // Features grid with animations
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 10,
+                          alignment: WrapAlignment.center,
+                          children: features.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final feature = entry.value;
+
+                            return AnimatedContainer(
+                              duration: Duration(milliseconds: 200 + (index * 50)),
+                              transform: Matrix4.identity()
+                                ..translate(
+                                  0.0,
+                                  (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                      ? -2.0
+                                      : 0.0,
+                                  0.0,
+                                ),
+                              padding:
+                                  EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                    ? Colors.white.withOpacity(0.08)
+                                    : Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                      ? FlutterFlowTheme.of(context)
+                                          .primary
+                                          .withOpacity(0.3)
+                                      : Colors.white.withOpacity(0.08),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  AnimatedContainer(
+                                    duration: Duration(milliseconds: 200),
+                                    child: Icon(
+                                      Icons.check_rounded,
+                                      color:
+                                          (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                              ? FlutterFlowTheme.of(context).primary
+                                              : FlutterFlowTheme.of(context)
+                                                  .primary
+                                                  .withOpacity(0.8),
+                                      size:
+                                          (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                              ? 14
+                                              : 12,
+                                    ),
                                   ),
-                              child: Text('Subscribe'),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    feature,
+                                    style: FlutterFlowTheme.of(context)
+                                        .bodySmall
+                                        .override(
+                                          fontFamily: 'Figtree',
+                                          color: (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                              ? Colors.white
+                                              : Colors.white.withOpacity(0.9),
+                                          fontSize: (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                              ? 11
+                                              : 10,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+
+                        SizedBox(height: 20),
+
+                        // Subscribe button with animation
+                        AnimatedContainer(
+                          duration: Duration(milliseconds: 200),
+                          height: 50,
+                          width: double.infinity,
+                          margin: EdgeInsets.only(top: 10),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: isCurrentPlan
+                                ? [
+                                    Colors.green.withOpacity(0.7),
+                                    Colors.green.withOpacity(0.6),
+                                  ]
+                                : [
+                                    FlutterFlowTheme.of(context)
+                                        .primary
+                                        .withOpacity(
+                                            (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                                ? 0.9
+                                                : 0.8),
+                                    FlutterFlowTheme.of(context)
+                                        .secondary
+                                        .withOpacity(
+                                            (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                                ? 0.9
+                                                : 0.8),
+                                  ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(25),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isCurrentPlan
+                                    ? Colors.green.withOpacity(0.3)
+                                    : FlutterFlowTheme.of(context)
+                                        .primary
+                                        .withOpacity(
+                                            (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                                ? 0.4
+                                                : 0.25),
+                                blurRadius:
+                                    (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                        ? 25
+                                        : 20,
+                                spreadRadius:
+                                    (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                        ? -2
+                                        : -5,
+                                offset: Offset(
+                                    0,
+                                    (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                        ? 8
+                                        : 5),
+                              ),
+                            ],
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: isCurrentPlan ? null : () => _purchaseMembership(product),
+                                borderRadius: BorderRadius.circular(22),
+                                splashColor: Colors.white.withOpacity(0.1),
+                                child: Center(
+                                  child: AnimatedDefaultTextStyle(
+                                    duration: Duration(milliseconds: 200),
+                                    style: FlutterFlowTheme.of(context)
+                                        .titleSmall
+                                        .override(
+                                          fontFamily: 'Outfit',
+                                          color: Colors.white,
+                                          fontSize: (!isCurrentPlan && _hoverStates[_currentMembershipPackIndex])
+                                              ? 15
+                                              : 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        if (isCurrentPlan)
+                                          Icon(
+                                            Icons.check_circle,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        if (isCurrentPlan)
+                                          SizedBox(width: 6),
+                                        Text(isCurrentPlan ? 'Current Plan' : 'Subscribe'),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -1478,26 +1580,35 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
                   // Add coins to the user's account after successful ad view
                   int coins = 5; // Changed from 10 to 5 coins
                   
-                  // Add coins using secure server-side method (Firestore transaction)
+                  // Add coins using secure server-side method (Firestore FieldValue.increment)
                   final currentUser = currentUserReference;
                   if (currentUser != null) {
-                    await FirebaseFirestore.instance.runTransaction((transaction) async {
-                      final userDoc = await transaction.get(currentUser);
-                      if (userDoc.exists) {
-                        final currentCoins = (userDoc.data() as Map<String, dynamic>)['luna_coins'] ?? 0;
-                        transaction.update(currentUser, {
-                          'luna_coins': currentCoins + coins,
-                        });
+                    try {
+                      // CRITICAL FIX: Use FieldValue.increment to ONLY modify luna_coins
+                      // This ensures we don't affect other fields like unlocked_backgrounds
+                      await FirebaseFirestore.instance.doc(currentUser.path).update({
+                        'luna_coins': FieldValue.increment(coins),
+                        'last_coin_update': FieldValue.serverTimestamp(),
+                      });
+                      
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('You earned $coins Luna Coins!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
                       }
-                    });
-                    
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('You earned $coins Luna Coins!'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                    } catch (e) {
+                      print('Error adding coins: $e');
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error adding coins. Please try again.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     }
                   }
                 } else {
@@ -2105,24 +2216,60 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
   Widget build(BuildContext context) {
     return Scaffold(
       key: scaffoldKey,
-      backgroundColor: Colors.black,
+      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          'Shop',
-          style: FlutterFlowTheme.of(context).headlineMedium.override(
-                fontFamily: 'Outfit',
-                color: Colors.white,
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight),
+        child: ClipRRect(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(20),
+          ),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: AppBar(
+              backgroundColor: Colors.transparent,
+              automaticallyImplyLeading: true,
+              elevation: 0,
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(context).brightness == Brightness.light
+                          ? Colors.transparent
+                          : Colors.white.withOpacity(0.05),
+                      Colors.transparent,
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 0.5,
+                    ),
+                  ),
+                ),
               ),
+              title: Text(
+                'NightMarket',
+                style: FlutterFlowTheme.of(context).headlineMedium.override(
+                      fontFamily: 'Outfit',
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              centerTitle: false,
+              titleSpacing: 16.0,
+              actions: [
+                Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(0, 0, 12, 0),
+                  child: LunaCoinDisplay(),
+                ),
+              ],
+            ),
+          ),
         ),
-        actions: [
-          LunaCoinDisplay(),
-        ],
       ),
       body: Stack(
         children: [
@@ -2141,9 +2288,11 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xFF1A1A2E).withOpacity(0.4),
-                  Color(0xFF0F0F1B).withOpacity(0.6),
+                  Color(0xFF1A1A2E).withOpacity(0.2), // More transparent at top to match appbar
+                  Color(0xFF0F0F1B).withOpacity(0.7),
+                  Color(0xFF0F0F1B).withOpacity(0.9),
                 ],
+                stops: [0.0, 0.5, 1.0],
               ),
             ),
           ),
@@ -2159,7 +2308,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
                   DelayedAnimation(
                     delay: Duration(milliseconds: 200),
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      padding: EdgeInsets.fromLTRB(16, 24, 16, 0),
                       child: Text(
                         'Buy Luna Coins',
                         style: FlutterFlowTheme.of(context).titleLarge.override(

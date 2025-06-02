@@ -127,7 +127,10 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
                     size: 24.0,
                   ),
                   onPressed: () async {
-                    context.pushNamed(SigninWidget.routeName);
+                    // Try to pop first, if that fails, navigate to sign in
+                    if (!await Navigator.maybePop(context)) {
+                      context.goNamed('Signin');
+                    }
                   },
                 ),
                 title: Text(
@@ -362,6 +365,11 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
           return;
         }
 
+        // Create a reference to the user document
+        final userDocRef = FirebaseFirestore.instance
+            .collection('User')
+            .doc(currentUser.uid);
+
         // Check if username is already taken with retry mechanism
         final username = _model.userIDTextController.text.toLowerCase();
         bool usernameTaken = false;
@@ -512,7 +520,7 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
           }
         }
 
-        // Update the user's profile in Firestore with retry mechanism
+        // Create or update the user's profile in Firestore with retry mechanism
         bool profileUpdateSuccess = false;
         retryCount = 0;
 
@@ -524,51 +532,30 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
               photoURL: photoUrl,
             );
 
-            // Then update the Firestore document
-            if (currentUserReference != null) {
-              final updateData = {
-                'display_name': _model.displayNameTextController.text,
-                'user_name': _model.userIDTextController.text.toLowerCase(),
-                'last_updated': getCurrentTimestamp,
-                'date_of_birth': _model.datePicked,
-                'gender': _model.selectedGender,
-              };
+            // Create the base user data
+            final userData = {
+              'display_name': _model.displayNameTextController.text,
+              'user_name': _model.userIDTextController.text.toLowerCase(),
+              'email': currentUser.email,
+              'created_time': getCurrentTimestamp,
+              'last_updated': getCurrentTimestamp,
+              'date_of_birth': _model.datePicked,
+              'gender': _model.selectedGender,
+              'uid': currentUser.uid,
+              'phone_number': currentUser.phoneNumber,
+              'is_profile_complete': true,
+            };
 
-              // Only add photo_url if we have one
-              if (photoUrl != null) {
-                updateData['photo_url'] = photoUrl;
-              }
-
-              await currentUserReference!
-                  .update(updateData)
-                  .timeout(Duration(seconds: 10));
-            } else {
-              // If the currentUserReference is null, create a new document
-              final userDocRef = FirebaseFirestore.instance
-                  .collection('User')
-                  .doc(currentUser.uid);
-
-              final userData = {
-                'display_name': _model.displayNameTextController.text,
-                'user_name': _model.userIDTextController.text.toLowerCase(),
-                'email': currentUser.email,
-                'created_time': getCurrentTimestamp,
-                'last_updated': getCurrentTimestamp,
-                'date_of_birth': _model.datePicked,
-                'gender': _model.selectedGender,
-                'uid': currentUser.uid,
-                'phone_number': currentUser.phoneNumber,
-              };
-
-              // Only add photo_url if we have one
-              if (photoUrl != null) {
-                userData['photo_url'] = photoUrl;
-              }
-
-              await userDocRef.set(userData).timeout(Duration(seconds: 10));
+            // Add photo_url if we have one
+            if (photoUrl != null) {
+              userData['photo_url'] = photoUrl;
             }
 
-            print('Successfully updated user profile with photo: $photoUrl');
+            // Create or update the user document
+            await userDocRef.set(userData, SetOptions(merge: true))
+                .timeout(Duration(seconds: 10));
+
+            print('Successfully created/updated user profile');
             profileUpdateSuccess = true;
 
             // Create username record with retry mechanism
@@ -576,25 +563,20 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
               bool usernameCreationSuccess = false;
               int usernameRetryCount = 0;
 
-              while (
-                  usernameRetryCount < maxRetries && !usernameCreationSuccess) {
+              while (usernameRetryCount < maxRetries && !usernameCreationSuccess) {
                 try {
                   await FirebaseFirestore.instance
                       .collection('usernames')
                       .doc(_model.userIDTextController.text.toLowerCase())
                       .set({
-                    'userId': currentUserReference ??
-                        FirebaseFirestore.instance
-                            .collection('User')
-                            .doc(currentUser.uid),
+                    'userId': userDocRef,
                     'username': _model.userIDTextController.text.toLowerCase(),
                     'created_time': getCurrentTimestamp,
                   }).timeout(Duration(seconds: 10));
 
                   usernameCreationSuccess = true;
                 } catch (e) {
-                  print(
-                      'Error creating username record (attempt ${usernameRetryCount + 1}): $e');
+                  print('Error creating username record (attempt ${usernameRetryCount + 1}): $e');
                   usernameRetryCount++;
                   if (e.toString().contains('App Check') ||
                       e.toString().contains('permission-denied') ||
@@ -611,17 +593,14 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
               // Continue even if username record creation fails
             }
           } catch (e) {
-            print(
-                'Error updating user profile (attempt ${retryCount + 1}): $e');
+            print('Error updating user profile (attempt ${retryCount + 1}): $e');
             retryCount++;
             if (e.toString().contains('App Check') ||
                 e.toString().contains('permission-denied') ||
                 e.toString().contains('network') ||
                 e is TimeoutException) {
-              // App Check or network error, retry after delay
               await Future.delayed(Duration(seconds: 2));
             } else {
-              // Other error type, stop retrying
               throw e;
             }
           }
@@ -638,8 +617,7 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
 
           // First check if the user is new and needs onboarding
           final isNewUser = await OnboardingManager.isNewUser();
-          final hasCompletedOnboarding =
-              await OnboardingManager.hasCompletedOnboarding();
+          final hasCompletedOnboarding = await OnboardingManager.hasCompletedOnboarding();
 
           // Now mark profile setup as complete
           await OnboardingManager.markProfileSetupComplete();
@@ -651,8 +629,7 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
             context.go('/show-onboarding');
           } else {
             // User is not new or has completed onboarding
-            print(
-                'Profile setup complete. User already has onboarding. Going to home...');
+            print('Profile setup complete. User already has onboarding. Going to home...');
 
             // Make sure the user is marked as not new
             await OnboardingManager.markUserAsNotNew();

@@ -22,99 +22,36 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  // Audio player
+  // Add back audio player
   late AudioPlayer _audioPlayer;
   
   // Animation controllers
   late AnimationController _fadeInController;
-  late AnimationController _scaleController;
-  late AnimationController _glowController;
-  late AnimationController _fadeOutController;
   late AnimationController _logoAnimController;
-  late AnimationController _particleController;
-  late AnimationController _textSlideController;
+  late AnimationController _fadeOutController;
 
   // Animation values
   late Animation<double> _fadeIn;
-  late Animation<double> _scale;
-  late Animation<double> _glow;
-  late Animation<double> _fadeOut;
   late Animation<double> _logoScale;
-  late Animation<double> _logoOpacity;
-  late Animation<double> _logoRotation;
-  late Animation<Offset> _textSlide;
-
-  // Stars for background
-  final List<_Star> _stars = [];
-  final List<_Particle> _particles = [];
-  late AnimationController _starsController;
+  late Animation<double> _fadeOut;
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize audio player and play splash intro sound
+    // Initialize audio player
     _audioPlayer = AudioPlayer();
-    _initAudio();
+    _initializeAudio();
 
-    // Generate stars for background
-    final random = math.Random(42);
-    for (int i = 0; i < 100; i++) {
-      _stars.add(_Star(
-        x: random.nextDouble(),
-        y: random.nextDouble(),
-        size: random.nextDouble() * 2.0 + 0.5,
-        opacity: random.nextDouble() * 0.6 + 0.3,
-        twinkleSpeed: random.nextDouble() * 0.5 + 0.5,
-      ));
-    }
-
-    // Generate floating particles
-    for (int i = 0; i < 30; i++) {
-      _particles.add(_Particle(
-        x: random.nextDouble(),
-        y: random.nextDouble(),
-        size: random.nextDouble() * 1.2 + 0.3,
-        speed: random.nextDouble() * 0.2 + 0.1,
-        color: Color.fromRGBO(
-          200 + random.nextInt(55),
-          200 + random.nextInt(55),
-          240,
-          random.nextDouble() * 0.4 + 0.1,
-        ),
-        angle: random.nextDouble() * math.pi * 2,
-      ));
-    }
-
-    // Set system UI overlay style to immersive for splash screen
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-
-    // Initialize stars animation controller
-    _starsController = AnimationController(
-      vsync: this,
-      duration: const Duration(minutes: 2),
-    )..repeat();
-
-    // Initialize particle animation controller
-    _particleController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 10),
-    )..repeat();
-
-    // Initialize controllers
+    // Initialize controllers with shorter durations
     _fadeInController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 1000),
     );
 
-    _scaleController = AnimationController(
+    _logoAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    );
-
-    _glowController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2800),
+      duration: const Duration(milliseconds: 1200),
     );
 
     _fadeOutController = AnimationController(
@@ -122,41 +59,10 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(milliseconds: 800),
     );
 
-    _logoAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    );
-
-    _textSlideController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-
     // Create animations
     _fadeIn = CurvedAnimation(
       parent: _fadeInController,
       curve: Curves.easeIn,
-    );
-
-    _scale = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(
-        parent: _scaleController,
-        curve: Curves.easeInOut,
-      ),
-    );
-
-    _glow = Tween<double>(begin: 0.0, end: 0.5).animate(
-      CurvedAnimation(
-        parent: _glowController,
-        curve: Curves.easeInOut,
-      ),
-    );
-
-    _fadeOut = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _fadeOutController,
-        curve: Curves.easeOut,
-      ),
     );
 
     _logoScale = TweenSequence<double>([
@@ -175,27 +81,10 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    _logoRotation = Tween<double>(begin: -0.02, end: 0.02).animate(
+    _fadeOut = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
-        parent: _logoAnimController,
-        curve: Curves.easeInOut,
-      ),
-    );
-
-    _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _logoAnimController,
-        curve: Interval(0.0, 0.5, curve: Curves.easeIn),
-      ),
-    );
-
-    _textSlide = Tween<Offset>(
-      begin: Offset(0, 0.5),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _textSlideController,
-        curve: Curves.easeOutCubic,
+        parent: _fadeOutController,
+        curve: Curves.easeOut,
       ),
     );
 
@@ -203,71 +92,52 @@ class _SplashScreenState extends State<SplashScreen>
     _runAnimationSequence();
   }
 
+  Future<void> _initializeAudio() async {
+    try {
+      // Set up audio player with intro music
+      await _audioPlayer.setAsset('assets/audio/splashintro.mp3');
+      await _audioPlayer.setVolume(0.8); // Set volume to 80%
+      await _audioPlayer.play();
+    } catch (e) {
+      print('Error initializing audio: $e');
+    }
+  }
+
   Future<void> _runAnimationSequence() async {
     // Start with fade in and logo animation
     _fadeInController.forward();
     _logoAnimController.forward();
-    await Future.delayed(Duration(milliseconds: 600));
+    await Future.delayed(Duration(milliseconds: 500));
 
-    // Start text slide animation
-    _textSlideController.forward();
-    await Future.delayed(Duration(milliseconds: 300));
-
-    // Start subtle scaling
-    _scaleController.forward();
-    await Future.delayed(Duration(milliseconds: 300));
-
-    // Add glow effect
-    _glowController.repeat(reverse: true);
+    // Wait for animations to complete
     await Future.delayed(Duration(milliseconds: 2000));
 
+    // Gradually decrease volume before fade out
+    for (double volume = 0.8; volume >= 0.0; volume -= 0.1) {
+      if (!mounted) break;
+      await _audioPlayer.setVolume(volume);
+      await Future.delayed(Duration(milliseconds: 50));
+    }
+
     // Fade out everything
-    _fadeOutController.forward();
-    
-    // Fade out audio as animation completes
-    await _audioPlayer.setVolume(0.0);
-    
-    await _fadeOutController.forward().orCancel;
+    await _fadeOutController.forward();
 
     // Stop audio
-    _audioPlayer.stop();
+    await _audioPlayer.stop();
 
-    // Return to normal UI mode and complete
+    // Complete splash screen
     if (mounted) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       widget.onAnimationComplete();
     }
   }
 
-  // Add the _initAudio method to initialize and play the splash intro sound
-  Future<void> _initAudio() async {
-    try {
-      // Load and prepare the audio file
-      await _audioPlayer.setAsset('assets/audio/splashintro.mp3');
-      // Set volume to desired level (0.0 to 1.0)
-      await _audioPlayer.setVolume(0.3);
-      // Play the audio
-      await _audioPlayer.play();
-    } catch (e) {
-      print('Error playing splash audio: $e');
-    }
-  }
-
   @override
   void dispose() {
     _fadeInController.dispose();
-    _scaleController.dispose();
-    _glowController.dispose();
-    _fadeOutController.dispose();
     _logoAnimController.dispose();
-    _starsController.dispose();
-    _particleController.dispose();
-    _textSlideController.dispose();
-    
-    // Stop and dispose the audio player
-    _audioPlayer.stop();
+    _fadeOutController.dispose();
     _audioPlayer.dispose();
-    
     super.dispose();
   }
 
@@ -280,218 +150,73 @@ class _SplashScreenState extends State<SplashScreen>
           opacity: _fadeOut.value,
           child: Material(
             color: Colors.black,
-            child: Scaffold(
-              backgroundColor: Colors.transparent,
-              body: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Starry background
-                  AnimatedBuilder(
-                    animation: _starsController,
-                    builder: (context, child) {
-                      return CustomPaint(
-                        painter: _StarryNightPainter(
-                          stars: _stars,
-                          animationValue: _starsController.value,
-                          starOpacity: _fadeIn.value,
-                        ),
-                      );
-                    },
-                  ),
-
-                  // Subtle space gradient
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: Alignment(0.0, 0.2),
-                        radius: 1.5,
-                        colors: [
-                          Color(0xFF0A1128),
-                          Color(0xFF090B16),
-                          Colors.black,
-                        ],
-                        stops: [0.0, 0.5, 1.0],
-                      ),
-                    ),
-                  ),
-
-                  // Floating particles
-                  AnimatedBuilder(
-                    animation: _particleController,
-                    builder: (context, child) {
-                      return CustomPaint(
-                        painter: _ParticlesPainter(
-                          particles: _particles,
-                          animationValue: _particleController.value,
-                        ),
-                      );
-                    },
-                  ),
-
-                  // Centered content with animations
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Logo with animations
-                        AnimatedBuilder(
-                          animation: Listenable.merge(
-                              [_logoOpacity, _logoScale, _logoRotation]),
-                          builder: (context, child) {
-                            return Opacity(
-                              opacity: _logoOpacity.value,
-                              child: Transform.rotate(
-                                angle: _logoRotation.value,
-                                child: Transform.scale(
-                                  scale: _logoScale.value,
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      // Moon glow effect
-                                      Container(
-                                        width: 160,
-                                        height: 160,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.white
-                                                  .withOpacity(0.15),
-                                              blurRadius: 30,
-                                              spreadRadius: 5,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      // Moon image
-                                      Image.asset(
-                                        'assets/images/translogo.png',
-                                        width: 150,
-                                        height: 150,
-                                        fit: BoxFit.contain,
-                                      ),
-                                      // Crater glow effect
-                                      Positioned(
-                                        top: 60,
-                                        left: 45,
-                                        child: Container(
-                                          width: 15,
-                                          height: 15,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.white.withOpacity(
-                                                    0.4 * _glow.value),
-                                                blurRadius: 8,
-                                                spreadRadius: 1,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      Positioned(
-                                        top: 40,
-                                        right: 55,
-                                        child: Container(
-                                          width: 10,
-                                          height: 10,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.white.withOpacity(
-                                                    0.3 * _glow.value),
-                                                blurRadius: 6,
-                                                spreadRadius: 1,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-
-                        SizedBox(height: 10),
-
-                        // App name text with animations
-                        AnimatedBuilder(
-                          animation: Listenable.merge(
-                              [_fadeIn, _scale, _glow, _textSlide]),
-                          builder: (context, child) {
-                            return SlideTransition(
-                              position: _textSlide,
-                              child: Opacity(
-                                opacity: _fadeIn.value,
-                                child: Transform.scale(
-                                  scale: _scale.value,
-                                  child: ShaderMask(
-                                    blendMode: BlendMode.srcIn,
-                                    shaderCallback: (bounds) => LinearGradient(
-                                      colors: [
-                                        Color(0xFFC7D3E9), // Light silver/blue
-                                        Color(0xFFEEF2F9), // White/silver
-                                        Color(0xFFADBDD7), // Blue-grey/silver
-                                      ],
-                                      stops: [0.0, 0.5, 1.0],
-                                    ).createShader(bounds),
-                                    child: Text(
-                                      'LunaKraft',
-                                      style: GoogleFonts.montserrat(
-                                        fontSize: 48,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 2.5,
-                                        shadows: [
-                                          Shadow(
-                                            color: Color(0xFFB6C2D6)
-                                                .withOpacity(_glow.value),
-                                            blurRadius: 15.0,
-                                            offset: Offset(0, 0),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Simple gradient background
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment(0.0, 0.2),
+                      radius: 1.5,
+                      colors: [
+                        Color(0xFF0A1128),
+                        Color(0xFF090B16),
+                        Colors.black,
                       ],
+                      stops: [0.0, 0.5, 1.0],
                     ),
                   ),
+                ),
 
-                  // Subtle shooting stars
-                  AnimatedBuilder(
-                    animation: _starsController,
-                    builder: (context, child) {
-                      return CustomPaint(
-                        painter: _ShootingStarPainter(
-                          animationValue: _starsController.value,
-                          starOpacity: _fadeIn.value,
-                        ),
-                      );
-                    },
-                  ),
+                // Centered logo and text
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Logo
+                      AnimatedBuilder(
+                        animation: Listenable.merge([_fadeIn, _logoScale]),
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _fadeIn.value,
+                            child: Transform.scale(
+                              scale: _logoScale.value,
+                              child: Image.asset(
+                                'assets/images/translogo.png',
+                                width: 150,
+                                height: 150,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
 
-                  // Shine effect
-                  AnimatedBuilder(
-                    animation: _starsController,
-                    builder: (context, child) {
-                      return CustomPaint(
-                        painter: _ShineEffectPainter(
-                          animationValue: _starsController.value,
-                        ),
-                      );
-                    },
+                      SizedBox(height: 20),
+
+                      // App name text
+                      AnimatedBuilder(
+                        animation: _fadeIn,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _fadeIn.value,
+                            child: Text(
+                              'LunaKraft',
+                              style: GoogleFonts.montserrat(
+                                fontSize: 48,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 2.5,
+                                color: Colors.white,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );

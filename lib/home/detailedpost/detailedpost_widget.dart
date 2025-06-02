@@ -3044,74 +3044,83 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
             }
             final userRecord = userSnapshot.data!;
 
-            return Scaffold(
-              key: scaffoldKey,
-              backgroundColor: Colors.transparent,
-              body: Hero(
-                tag: 'post_image_${_postReference?.id ?? "default"}',
-                child: SensorBackgroundImage(
-                  imageUrl: postVideoUrl,
-                  motionMultiplier: 0.0,
-                  child: SafeArea(
-                    child: Container(
-                      width: double.infinity,
-                      height: double.infinity,
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.max,
-                          children: [
-                            Padding(
-                              padding:
-                                  EdgeInsetsDirectional.fromSTEB(16, 8, 16, 0),
-                              child: Row(
-                                children: [
-                                  Material(
-                                    color: Colors.transparent,
-                                    child: IconButton(
-                                      icon: Icon(
-                                        Icons.arrow_back_rounded,
-                                        color: Colors.white,
-                                        size: 24,
-                                      ),
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                      },
-                                    ),
-                                  ),
-                                  Text(
-                                    'Dream Details',
-                                    style: FlutterFlowTheme.of(context)
-                                        .headlineMedium
-                                        .override(
-                                          fontFamily: 'Outfit',
+            return GestureDetector(
+              onHorizontalDragEnd: (details) {
+                // Check if the swipe was from left to right (positive velocity)
+                if (details.primaryVelocity != null && details.primaryVelocity! > 0) {
+                  // Navigate back when swiped right
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Scaffold(
+                key: scaffoldKey,
+                backgroundColor: Colors.transparent,
+                body: Hero(
+                  tag: 'post_image_${_postReference?.id ?? "default"}',
+                  child: SensorBackgroundImage(
+                    imageUrl: postVideoUrl,
+                    motionMultiplier: 0.0,
+                    child: SafeArea(
+                      child: Container(
+                        width: double.infinity,
+                        height: double.infinity,
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.max,
+                            children: [
+                              Padding(
+                                padding:
+                                    EdgeInsetsDirectional.fromSTEB(16, 8, 16, 0),
+                                child: Row(
+                                  children: [
+                                    Material(
+                                      color: Colors.transparent,
+                                      child: IconButton(
+                                        icon: Icon(
+                                          Icons.arrow_back_rounded,
                                           color: Colors.white,
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w600,
+                                          size: 24,
                                         ),
-                                  ),
-                                ],
+                                        onPressed: () {
+                                          Navigator.of(context).pop();
+                                        },
+                                      ),
+                                    ),
+                                    Text(
+                                      'Dream Details',
+                                      style: FlutterFlowTheme.of(context)
+                                          .headlineMedium
+                                          .override(
+                                            fontFamily: 'Outfit',
+                                            color: Colors.white,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  16, 16, 16, 16),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.max,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildUserHeader(userRecord),
-                                  SizedBox(height: 16),
-                                  _buildDreamContent(post),
-                                  SizedBox(height: 16),
-                                  _buildInteractionBar(post),
-                                  // Always show comments section regardless of showComments value
-                                  SizedBox(height: 16),
-                                  _buildCommentsSection(post),
-                                ],
+                              Padding(
+                                padding: EdgeInsetsDirectional.fromSTEB(
+                                    16, 16, 16, 16),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.max,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildUserHeader(userRecord),
+                                    SizedBox(height: 16),
+                                    _buildDreamContent(post),
+                                    SizedBox(height: 16),
+                                    _buildInteractionBar(post),
+                                    // Always show comments section regardless of showComments value
+                                    SizedBox(height: 16),
+                                    _buildCommentsSection(post),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -3184,54 +3193,63 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
 
   // Add a method to display private post error
   Widget _buildPrivatePostScaffold() {
-    return Scaffold(
-      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-      appBar: AppBar(
-        backgroundColor: FlutterFlowTheme.of(context).primary,
-        title: Text(
-          'Private Post',
-          style: FlutterFlowTheme.of(context).headlineMedium.override(
-                fontFamily: 'Outfit',
-                color: Colors.white,
-                fontSize: 22,
-              ),
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        // Check if the swipe was from left to right (positive velocity)
+        if (details.primaryVelocity != null && details.primaryVelocity! > 0) {
+          // Navigate back when swiped right
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+        appBar: AppBar(
+          backgroundColor: FlutterFlowTheme.of(context).primary,
+          title: Text(
+            'Private Post',
+            style: FlutterFlowTheme.of(context).headlineMedium.override(
+                  fontFamily: 'Outfit',
+                  color: Colors.white,
+                  fontSize: 22,
+                ),
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.of(context).pop(),
+            color: Colors.white,
+          ),
+          centerTitle: true,
+          elevation: 2,
         ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-          color: Colors.white,
-        ),
-        centerTitle: true,
-        elevation: 2,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.lock_outline,
-              color: FlutterFlowTheme.of(context).secondaryText,
-              size: 60,
-            ),
-            SizedBox(height: 20),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'This is a private post and can only be viewed by its creator.',
-                style: FlutterFlowTheme.of(context).bodyMedium,
-                textAlign: TextAlign.center,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.lock_outline,
+                color: FlutterFlowTheme.of(context).secondaryText,
+                size: 60,
               ),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Go Back'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: FlutterFlowTheme.of(context).primary,
-                foregroundColor: Colors.white,
+              SizedBox(height: 20),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'This is a private post and can only be viewed by its creator.',
+                  style: FlutterFlowTheme.of(context).bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
               ),
-            ),
-          ],
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Go Back'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: FlutterFlowTheme.of(context).primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3239,54 +3257,63 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
 
   // Add a method to display error scaffold
   Widget _buildErrorScaffold(String errorMessage) {
-    return Scaffold(
-      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-      appBar: AppBar(
-        backgroundColor: FlutterFlowTheme.of(context).primary,
-        title: Text(
-          'Error',
-          style: FlutterFlowTheme.of(context).headlineMedium.override(
-                fontFamily: 'Outfit',
-                color: Colors.white,
-                fontSize: 22,
-              ),
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        // Check if the swipe was from left to right (positive velocity)
+        if (details.primaryVelocity != null && details.primaryVelocity! > 0) {
+          // Navigate back when swiped right
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+        appBar: AppBar(
+          backgroundColor: FlutterFlowTheme.of(context).primary,
+          title: Text(
+            'Error',
+            style: FlutterFlowTheme.of(context).headlineMedium.override(
+                  fontFamily: 'Outfit',
+                  color: Colors.white,
+                  fontSize: 22,
+                ),
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.of(context).pop(),
+            color: Colors.white,
+          ),
+          centerTitle: true,
+          elevation: 2,
         ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-          color: Colors.white,
-        ),
-        centerTitle: true,
-        elevation: 2,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              color: FlutterFlowTheme.of(context).error,
-              size: 60,
-            ),
-            SizedBox(height: 20),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                errorMessage,
-                style: FlutterFlowTheme.of(context).bodyMedium,
-                textAlign: TextAlign.center,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: FlutterFlowTheme.of(context).error,
+                size: 60,
               ),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Go Back'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: FlutterFlowTheme.of(context).primary,
-                foregroundColor: Colors.white,
+              SizedBox(height: 20),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  errorMessage,
+                  style: FlutterFlowTheme.of(context).bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
               ),
-            ),
-          ],
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Go Back'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: FlutterFlowTheme.of(context).primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3294,15 +3321,24 @@ class _DetailedpostWidgetState extends State<DetailedpostWidget> {
 
   // Add a method to display loading scaffold
   Widget _buildLoadingScaffold() {
-    return Scaffold(
-      backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-      body: Center(
-        child: SizedBox(
-          width: 50,
-          height: 50,
-          child: SpinKitRipple(
-            color: FlutterFlowTheme.of(context).primary,
-            size: 50,
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        // Check if the swipe was from left to right (positive velocity)
+        if (details.primaryVelocity != null && details.primaryVelocity! > 0) {
+          // Navigate back when swiped right
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+        body: Center(
+          child: SizedBox(
+            width: 50,
+            height: 50,
+            child: SpinKitRipple(
+              color: FlutterFlowTheme.of(context).primary,
+              size: 50,
+            ),
           ),
         ),
       ),

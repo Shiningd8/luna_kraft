@@ -50,6 +50,8 @@ Map<String, dynamic> createUserRecordData({
   List<DocumentReference>? pendingFollowRequests,
   List<String>? pendingFollowRequestsPaths,
   DateTime? lastUsernameChangeDate,
+  List<String>? unlockedBackgrounds,
+  List<String>? unlockedZenSounds,
 }) {
   final firestoreData = {
     if (email != null) 'email': email,
@@ -71,6 +73,8 @@ Map<String, dynamic> createUserRecordData({
       'pending_follow_requests_paths': pendingFollowRequestsPaths,
     if (lastUsernameChangeDate != null)
       'last_username_change_date': lastUsernameChangeDate,
+    if (unlockedBackgrounds != null) 'unlocked_backgrounds': unlockedBackgrounds,
+    if (unlockedZenSounds != null) 'unlocked_zen_sounds': unlockedZenSounds,
   };
 
   return firestoreData;

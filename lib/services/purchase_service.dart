@@ -1,11 +1,14 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'models/subscription_product.dart';
 import 'models/coin_product.dart';
 import '/backend/backend.dart';
 import '/auth/firebase_auth/auth_util.dart';
 import '/services/subscription_manager.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Result class for subscription purchases
 class PurchaseResult {
@@ -69,6 +72,7 @@ class PurchaseService {
       
       // Sync offerings after initialization
       await syncProducts();
+      
     } catch (e) {
       debugPrint('Error initializing RevenueCat: $e');
       // Try a fallback approach for TestFlight if normal init fails
@@ -81,6 +85,7 @@ class PurchaseService {
         }
       } catch (fallbackError) {
         debugPrint('Fallback initialization also failed: $fallbackError');
+        rethrow; // Rethrow the error to notify callers of initialization failure
       }
     }
   }
@@ -329,89 +334,112 @@ class PurchaseService {
       
       // Find the package by product ID
       Package? foundPackage;
-      for (var p in allPackages) {
-        if (p.storeProduct.identifier == productId) {
-          foundPackage = p;
-          debugPrint('Found matching package: ${p.identifier} for product ID: $productId');
+      for (var package in allPackages) {
+        if (package.storeProduct.identifier == productId) {
+          foundPackage = package;
+          debugPrint('Found package with product ID: $productId');
           break;
         }
       }
       
       if (foundPackage == null) {
-        debugPrint('Product not found across any offerings for ID: $productId');
-        debugPrint('Available products: ${allPackages.map((p) => p.storeProduct.identifier).join(', ')}');
+        debugPrint('❌ Package not found for product ID: $productId');
         return PurchaseResult(
           success: false,
-          message: 'Product not found',
+          message: 'Product not available',
+          productId: productId,
         );
       }
       
-      debugPrint('Purchasing package: ${foundPackage.identifier} with product ID: ${foundPackage.storeProduct.identifier}');
+      // Purchase the package
+      debugPrint('Attempting to purchase package: ${foundPackage.identifier}');
       
-      try {
-        // Try the purchase with standard approach
-        final purchaseResult = await Purchases.purchasePackage(foundPackage);
+      // Process the purchase
+      final purchaseResult = await Purchases.purchasePackage(foundPackage);
+      debugPrint('Purchase completed for: $productId');
+      
+      // Get detailed information about the purchase result
+      debugPrint('Purchase result info: CustomerID: ${purchaseResult.originalAppUserId}');
+      final hasActiveEntitlements = purchaseResult.entitlements.active.isNotEmpty;
+      debugPrint('Has active entitlements: $hasActiveEntitlements');
+      
+      if (hasActiveEntitlements) {
+        debugPrint('Active entitlements: ${purchaseResult.entitlements.active.keys.join(', ')}');
+        purchaseResult.entitlements.active.forEach((key, entitlement) {
+          debugPrint('Entitlement: $key, ID: ${entitlement.productIdentifier}, Will Renew: ${entitlement.willRenew}');
+        });
+      }
+      
+      // Handle purchase result based on product type
+      if (productId.contains('lunacoin')) {
+        // This is a Luna Coins purchase - update user's coin balance
+        debugPrint('Processing Luna Coins purchase: $productId');
         
-        // Check if purchase was successful
-        final isPro = purchaseResult.entitlements.active.containsKey('Premium');
-        final hasPurchasedCoins = productId.contains('coin') || productId.contains('lunacoin');
-        
-        if (isPro || hasPurchasedCoins) {
-          return PurchaseResult(
-            success: true,
-            message: 'Purchase successful',
-            productId: foundPackage.storeProduct.identifier,
-            purchaseId: purchaseResult.originalAppUserId,
-          );
-        } else {
-          return PurchaseResult(
-            success: false,
-            message: 'Purchase not activated',
-          );
-        }
-      } catch (e) {
-        // Handle the specific StoreKit receipt validation error
-        if (e.toString().contains('INVALID_RECEIPT') && 
-           (productId.contains('weekly') || productId.contains('monthly'))) {
+        // Extract the coin amount from the product ID
+        final coinAmount = _extractCoinAmount(productId);
+        if (coinAmount > 0 && currentUserReference != null) {
+          debugPrint('Adding $coinAmount Luna Coins to user balance');
           
-          debugPrint('⚠️ Receipt validation issue detected. Implementing workaround...');
-          
-          // For weekly/monthly subscriptions with receipt issues, check if purchase actually went through
           try {
-            await Future.delayed(Duration(seconds: 2)); // Wait for backend processing
-            final customerInfo = await Purchases.getCustomerInfo();
-            
-            // Check if the user now has the premium entitlement despite the error
-            if (customerInfo.entitlements.active.containsKey('Premium')) {
-              debugPrint('✅ Premium entitlement active despite receipt error - purchase was successful');
-              return PurchaseResult(
-                success: true,
-                message: 'Purchase successful (workaround)',
-                productId: productId,
-                purchaseId: customerInfo.originalAppUserId,
-              );
+            // First try the direct Firestore update
+            final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
+            if (currentUserUid != null) {
+              await _updateUserLunaCoinsOnly(currentUserUid, coinAmount, productId);
+            } else {
+              debugPrint('❌ User not logged in, cannot update coins');
             }
-          } catch (fallbackError) {
-            debugPrint('Error in fallback entitlement check: $fallbackError');
+          } catch (e) {
+            debugPrint('❌ Error updating Luna Coins: $e');
+            // No fallback needed now as _updateUserLunaCoinsOnly handles everything
           }
         }
         
-        // Re-throw the original error
-        rethrow;
+        return PurchaseResult(
+          success: true,
+          message: 'Purchased $coinAmount Luna Coins successfully',
+          productId: productId,
+        );
+      } else {
+        // This is a subscription purchase
+        final hasActiveSubscription = purchaseResult.entitlements.active.containsKey('Premium');
+        debugPrint('Purchase is a subscription. Has active Premium subscription: $hasActiveSubscription');
+        
+        if (hasActiveSubscription) {
+          // Immediately update Firestore with subscription details
+          debugPrint('Syncing subscription to Firestore...');
+          await syncSubscriptionToFirestore(purchaseResult);
+          
+          // Force refresh the subscription manager to update UI
+          try {
+            await SubscriptionManager.instance.refreshSubscriptionStatus();
+            debugPrint('Successfully refreshed SubscriptionManager');
+          } catch (e) {
+            debugPrint('Error refreshing SubscriptionManager: $e');
+          }
+        } else {
+          debugPrint('⚠️ Purchase successful but no Premium entitlement found. This may indicate an issue with RevenueCat.');
+        }
+        
+        return PurchaseResult(
+          success: true,
+          message: 'Purchase successful',
+          productId: productId,
+        );
       }
     } catch (e) {
-      debugPrint('Error during purchase: $e');
-      if (e is PurchasesErrorCode) {
-        if (e == PurchasesErrorCode.purchaseCancelledError) {
-          return PurchaseResult(
-            success: false,
-            message: 'Purchase cancelled by user',
-          );
-        }
+      debugPrint('❌ Purchase failed: $e');
+      
+      // Special handling for platform exceptions
+      if (e is PlatformException) {
+        return PurchaseResult(
+          success: false,
+          message: e.message ?? 'Unknown error occurred',
+        );
       }
+      
       return PurchaseResult(
         success: false,
-        message: 'Error: $e',
+        message: e.toString(),
       );
     }
   }
@@ -464,63 +492,128 @@ class PurchaseService {
     }
   }
 
-  // Sync current subscription data from RevenueCat to Firestore
-  static Future<bool> syncSubscriptionToFirestore(CustomerInfo? customerInfo) async {
+  // Sync subscription information from RevenueCat to Firestore
+  static Future<bool> syncSubscriptionToFirestore(CustomerInfo customerInfo) async {
     try {
+      // Ensure we have a user reference
       if (currentUserReference == null) {
-        debugPrint('Cannot sync subscription: User not logged in');
+        debugPrint('❌ Cannot sync subscription - no user logged in');
         return false;
       }
       
-      // Get customer info if not provided
-      CustomerInfo info;
-      if (customerInfo == null) {
-        info = await Purchases.getCustomerInfo();
+      // Check if user has an active premium entitlement
+      final hasPremium = customerInfo.entitlements.active.containsKey('Premium');
+      debugPrint('User has active premium entitlement: $hasPremium');
+      
+      // Print out all available entitlements for debugging
+      debugPrint('Available entitlements: ${customerInfo.entitlements.active.keys.join(', ')}');
+      if (customerInfo.entitlements.active.isNotEmpty) {
+        customerInfo.entitlements.active.forEach((key, entitlement) {
+          debugPrint('Entitlement: $key, ID: ${entitlement.productIdentifier}, Active: ${entitlement.isActive}');
+        });
       } else {
-        info = customerInfo;
+        debugPrint('❌ No active entitlements found in RevenueCat');
       }
       
-      // Check if user has Premium entitlement
-      if (!info.entitlements.active.containsKey('Premium')) {
-        debugPrint('No active Premium entitlement found');
+      if (hasPremium) {
+        // Get the active subscription from the customer info
+        final activeSubscription = customerInfo.entitlements.active['Premium'];
+        if (activeSubscription == null) {
+          debugPrint('❌ Active subscription data is null');
+          return false;
+        }
+        
+        // Get the product ID of the active subscription
+        final productId = activeSubscription.productIdentifier;
+        debugPrint('Active subscription product ID: $productId');
+        
+        // Get user document to check current subscription status
+        final userDoc = await FirebaseFirestore.instance.doc(currentUserReference!.path).get();
+        if (!userDoc.exists) {
+          debugPrint('❌ User document not found');
+          return false;
+        }
+        
+        final userData = userDoc.data() as Map<String, dynamic>?;
+        if (userData == null) {
+          debugPrint('❌ User data is null');
+          return false;
+        }
+        
+        // Get current subscription data
+        final currentSubscriptionData = userData['subscription'] as Map<String, dynamic>?;
+        final currentProductId = currentSubscriptionData?['productId'] as String?;
+        final bonusCoinsApplied = currentSubscriptionData?['bonusCoinsApplied'] as bool? ?? false;
+        
+        debugPrint('Current subscription product ID: $currentProductId');
+        debugPrint('Bonus coins already applied: $bonusCoinsApplied');
+        
+        // Check if this is a new subscription or product change
+        final isNewSubscription = currentProductId != productId;
+        
+        // If this is a new subscription or product change, update subscription data
+        if (isNewSubscription || !bonusCoinsApplied) {
+          // Determine subscription tier and benefits
+          final tier = _getSubscriptionTier(productId);
+          final benefits = _getSubscriptionBenefits(tier);
+          
+          // Get expiry date from RevenueCat
+          final expiryDate = activeSubscription.expirationDate != null
+              ? _safelyConvertToDateTime(activeSubscription.expirationDate)
+              : _calculateExpiryDate(tier, DateTime.now());
+          
+          debugPrint('📅 RevenueCat expirationDate (raw): ${activeSubscription.expirationDate} (${activeSubscription.expirationDate.runtimeType})');
+          debugPrint('📅 Converted expiryDate: $expiryDate');
+          
+          // Determine if bonus coins should be added
+          final shouldAddBonusCoins = isNewSubscription || !bonusCoinsApplied;
+          
+          // Update subscription data in Firestore
+          await _directlyUpdateSubscriptionInFirestore(
+            productId: productId,
+            autoRenew: true,
+            applyBonusCoins: shouldAddBonusCoins,
+            expiryDateOverride: expiryDate,
+          );
+          
+          debugPrint('✅ Successfully synced subscription to Firestore from RevenueCat');
+        } else {
+          debugPrint('ℹ️ Subscription data already up to date, no changes needed');
+        }
+        
+        return true;
+      } else {
+        // No active subscription - check if we need to update Firestore
+        final userDoc = await FirebaseFirestore.instance.doc(currentUserReference!.path).get();
+        if (!userDoc.exists) {
+          debugPrint('❌ User document not found');
+          return false;
+        }
+        
+        final userData = userDoc.data() as Map<String, dynamic>?;
+        if (userData == null) {
+          debugPrint('❌ User data is null');
+          return false;
+        }
+        
+        // Check if user is currently marked as subscribed in Firestore
+        final isSubscribed = userData['isSubscribed'] as bool? ?? false;
+        
+        if (isSubscribed) {
+          // Update Firestore to mark subscription as expired
+          await FirebaseFirestore.instance.doc(currentUserReference!.path).update({
+            'isSubscribed': false,
+            'subscription.isActive': false,
+            'lastSubscriptionUpdate': Timestamp.now(),
+          });
+          
+          debugPrint('✅ Marked subscription as expired in Firestore');
+        }
+        
         return false;
       }
-      
-      // Get the subscription details
-      final entitlement = info.entitlements.active['Premium']!;
-      final productId = entitlement.productIdentifier;
-      
-      // Get tier and other subscription details
-      final tierName = _getSubscriptionTier(productId);
-      final benefits = _getSubscriptionBenefits(tierName);
-      final expiryDate = entitlement.expirationDate != null
-          ? DateTime.fromMillisecondsSinceEpoch(entitlement.expirationDate as int)
-          : DateTime.now().add(Duration(days: 30));
-      
-      debugPrint('Syncing subscription data: Product=$productId, Tier=$tierName, Expiry=$expiryDate');
-      
-      // Update Firestore with subscription details
-      await FirebaseFirestore.instance
-          .doc(currentUserReference!.path)
-          .update({
-        'isSubscribed': true,
-        'subscription': {
-          'productId': productId,
-          'tier': tierName,
-          'activationDate': Timestamp.now(),
-          'expiryDate': Timestamp.fromDate(expiryDate),
-          'isActive': true,
-          'autoRenew': true,
-          'benefits': benefits,
-          'bonusCoinsApplied': false, // Force bonus coins to be applied
-        },
-        'lastSubscriptionUpdate': Timestamp.now(),
-      });
-      
-      debugPrint('✅ Successfully synced subscription from RevenueCat to Firestore');
-      return true;
     } catch (e) {
-      debugPrint('❌ Error syncing subscription data: $e');
+      debugPrint('❌ Error syncing subscription to Firestore: $e');
       return false;
     }
   }
@@ -541,23 +634,42 @@ class PurchaseService {
     return null;
   }
 
-  // Purchase a product by ID directly (more reliable in StoreKit 2)
+  // Purchase a product by its ID
   static Future<PurchaseResult> purchaseProductById(String productId) async {
     try {
-      debugPrint('Attempting direct purchase by product ID: $productId${isSimulatorMode ? " (SIMULATOR MODE)" : ""}');
+      debugPrint('🔄 Attempting to purchase product: $productId');
       
-      if (isSimulatorMode) {
-        // For simulator testing, we'll simulate a successful purchase
+      // Handle simulator mode first
+      if (isSimulatorMode || _overrideSimulatorMode) {
         debugPrint('🔧 SIMULATOR MODE: Simulating successful purchase of $productId');
         await Future.delayed(Duration(seconds: 1)); // Simulate network delay
         
-        // If this is a subscription, update Firestore directly for simulator testing
-        if (productId.contains('premium') || productId.contains('weekly') || 
-            productId.contains('monthly') || productId.contains('yearly')) {
-          await _directlyUpdateSubscriptionInFirestore(productId);
+        // Determine bonus coins based on subscription tier
+        int bonusCoins = 0;
+        if (productId.contains('weekly')) {
+          bonusCoins = 150;
+        } else if (productId.contains('monthly')) {
+          bonusCoins = 250;
+        } else if (productId.contains('yearly')) {
+          bonusCoins = 1000;
         }
         
-        // Return a success result with the product ID
+        // If this is a subscription, update Firestore directly
+        if ((productId.contains('premium') || productId.contains('weekly') || 
+            productId.contains('monthly') || productId.contains('yearly')) &&
+            !productId.contains('lunacoin')) {
+          try {
+            await _directlyUpdateSubscriptionInFirestore(
+              productId: productId,
+              autoRenew: true,
+            );
+            debugPrint('✅ Subscription updated in simulator mode with $bonusCoins bonus coins');
+          } catch (e) {
+            debugPrint('❌ Error updating subscription in simulator mode: $e');
+          }
+        }
+        
+        // Return a success result
         return PurchaseResult(
           success: true,
           message: 'Purchase successful (SIMULATOR MODE)',
@@ -566,144 +678,123 @@ class PurchaseService {
         );
       }
       
-      // Real purchase flow for production devices
+      // Real device purchase flow
+      // Find the package for the product ID
       final offerings = await Purchases.getOfferings();
       
-      // Log available products for debugging
-      debugPrint('Available offerings for direct purchase: ${offerings.all.keys.join(', ')}');
+      // Detailed debug info
+      debugPrint('Available offerings: ${offerings.all.keys.join(', ')}');
       
-      // Build a list of all packages across all offerings
-      List<Package> allPackages = [];
+      // Find the package by looking through all offerings
+      Package? foundPackage;
       offerings.all.forEach((offeringId, offering) {
-        allPackages.addAll(offering.availablePackages);
+        for (var package in offering.availablePackages) {
+          if (package.storeProduct.identifier == productId) {
+            foundPackage = package;
+            debugPrint('Found package with product ID: $productId in offering: $offeringId');
+            break;
+          }
+        }
       });
       
-      // Find the package by product ID
-      Package? foundPackage;
-      for (var p in allPackages) {
-        if (p.storeProduct.identifier == productId) {
-          foundPackage = p;
-          debugPrint('Found matching package: ${p.identifier} for product ID: $productId');
-          break;
-        }
-      }
-      
       if (foundPackage == null) {
-        debugPrint('Product not found across any offerings for ID: $productId');
-        debugPrint('Available products: ${allPackages.map((p) => p.storeProduct.identifier).join(', ')}');
+        debugPrint('❌ Product ID not found in any offering: $productId');
         return PurchaseResult(
           success: false,
           message: 'Product not found',
+          productId: productId,
         );
       }
       
-      debugPrint('Purchasing package: ${foundPackage.identifier} with product ID: ${foundPackage.storeProduct.identifier}');
+      // Attempt the purchase
+      final Package package = foundPackage!;
+      debugPrint('Starting purchase for package: ${package.identifier}');
+      final purchaseResult = await Purchases.purchasePackage(package);
       
-      try {
-        // Try the purchase with the standard approach
-        final purchaseResult = await Purchases.purchasePackage(foundPackage);
-        
-        // Consider the purchase successful if it's a consumable or entitlement
-        final isPremium = purchaseResult.entitlements.active.containsKey('Premium');
-        final isLunacoin = productId.contains('lunacoin');
-        
-        if (isPremium || isLunacoin) {
-          // For subscription purchases, IMMEDIATELY update Firestore with subscription details
-          if (isPremium || productId.contains('premium') || productId.contains('weekly') || 
-              productId.contains('monthly') || productId.contains('yearly')) {
-            // Directly update Firestore subscription details for immediate access
-            await _directlyUpdateSubscriptionInFirestore(productId);
-          }
-          
-          return PurchaseResult(
-            success: true,
-            message: 'Purchase successful',
+      // Check if purchase was successful by looking for entitlements
+      final isPremium = purchaseResult.entitlements.active.containsKey('Premium');
+      debugPrint('Purchase completed, has premium entitlement: $isPremium');
+      
+      // Print out all entitlements for debugging
+      debugPrint('Available entitlements after purchase: ${purchaseResult.entitlements.active.keys.join(', ')}');
+      purchaseResult.entitlements.active.forEach((key, entitlement) {
+        debugPrint('Entitlement: $key, ID: ${entitlement.productIdentifier}, Active: ${entitlement.isActive}');
+      });
+      
+      // CRITICAL FIX: Only update subscription data if the product is a subscription, NOT Luna Coins
+      if (isPremium && !productId.contains('lunacoin')) {
+        // Immediately update Firestore with subscription details
+        try {
+          debugPrint('💽 Updating subscription in Firestore for product: $productId');
+          await _directlyUpdateSubscriptionInFirestore(
             productId: productId,
-            purchaseId: purchaseResult.originalAppUserId,
+            autoRenew: true,
           );
-        } else {
-          return PurchaseResult(
-            success: false,
-            message: 'Purchase not activated',
-          );
-        }
-      } catch (e) {
-        // Handle the specific StoreKit receipt validation error
-        if (e.toString().contains('INVALID_RECEIPT') && 
-           (productId.contains('weekly') || productId.contains('monthly'))) {
+          debugPrint('✅ Subscription successfully updated in Firestore');
           
-          debugPrint('⚠️ Receipt validation issue detected. Implementing workaround...');
-          
-          // For weekly/monthly subscriptions with receipt issues, check if purchase actually went through
-          // by checking the customer info directly
+          // Force a refresh of the subscription manager to ensure UI is updated
           try {
-            await Future.delayed(Duration(seconds: 2)); // Wait for backend processing
-            final customerInfo = await Purchases.getCustomerInfo();
-            
-            // Check if the user now has the premium entitlement despite the error
-            if (customerInfo.entitlements.active.containsKey('Premium')) {
-              debugPrint('✅ Premium entitlement active despite receipt error - purchase was successful');
-              
-              // Directly update Firestore for immediate access
-              await _directlyUpdateSubscriptionInFirestore(productId);
-              
-              return PurchaseResult(
-                success: true,
-                message: 'Purchase successful (workaround)',
-                productId: productId,
-                purchaseId: customerInfo.originalAppUserId,
-              );
-            }
-          } catch (fallbackError) {
-            debugPrint('Error in fallback entitlement check: $fallbackError');
+            await SubscriptionManager.instance.refreshSubscriptionStatus();
+            debugPrint('✅ SubscriptionManager refreshed successfully');
+          } catch (e) {
+            debugPrint('⚠️ Error refreshing SubscriptionManager: $e');
           }
+        } catch (e) {
+          debugPrint('❌ Error updating subscription in Firestore: $e');
+          // Try backup method
+          await syncSubscriptionToFirestore(purchaseResult);
         }
-        
-        // Re-throw the original error if workaround didn't succeed
-        rethrow;
       }
+      
+      return PurchaseResult(
+        success: true,
+        message: 'Purchase successful',
+        productId: productId,
+        purchaseId: purchaseResult.originalAppUserId,
+      );
     } catch (e) {
-      debugPrint('Error during direct product purchase: $e');
-      if (e is PurchasesErrorCode) {
-        if (e == PurchasesErrorCode.purchaseCancelledError) {
-          return PurchaseResult(
-            success: false,
-            message: 'Purchase cancelled by user',
-          );
-        }
+      debugPrint('❌ Purchase failed: $e');
+      
+      // Special handling for platform exceptions
+      if (e is PlatformException) {
+        return PurchaseResult(
+          success: false,
+          message: e.message ?? 'Unknown error occurred',
+          productId: productId,
+        );
       }
+      
       return PurchaseResult(
         success: false,
-        message: 'Error: $e',
+        message: e.toString(),
+        productId: productId,
       );
     }
   }
 
   // Static flag to indicate if we're simulating purchases (for testing or debug mode)
-  static bool get isSimulatorMode => kDebugMode;
+  static bool get isSimulatorMode => false; // Always return false in release mode
 
   // Manually refresh subscription status
   static Future<bool> refreshSubscriptionStatus() async {
     try {
-      debugPrint('🔄 Manually refreshing subscription status...');
-      
-      // Force refresh from RevenueCat
-      await Purchases.restorePurchases();
-      
-      // Try to sync to Firestore
-      final result = await syncSubscriptionToFirestore(null);
-      
-      // Trigger a refresh of the SubscriptionManager
-      try {
-        // Call the refresh method on the SubscriptionManager instance
-        await SubscriptionManager.instance.refreshSubscriptionStatus();
-        debugPrint('✅ SubscriptionManager refresh triggered successfully');
-      } catch (e) {
-        // This is not critical, just for optimization
-        debugPrint('❌ Could not trigger SubscriptionManager refresh: $e');
+      // In simulator mode, return false
+      if (isSimulatorMode) {
+        debugPrint('🔧 SIMULATOR MODE: Refresh not needed (simulated)');
+        return false;
       }
       
-      return result;
+      final customerInfo = await Purchases.getCustomerInfo();
+      final hasActiveSubscription = customerInfo.entitlements.active.containsKey('Premium');
+      
+      if (hasActiveSubscription) {
+        debugPrint('✅ Active subscription found in RevenueCat');
+        await syncSubscriptionToFirestore(customerInfo);
+        return true;
+      } else {
+        debugPrint('❌ No active subscription found in RevenueCat');
+        return false;
+      }
     } catch (e) {
       debugPrint('❌ Error refreshing subscription status: $e');
       return false;
@@ -727,6 +818,16 @@ class PurchaseService {
             productId.contains('yearly');
         
         if (isSubscription && currentUserReference != null) {
+          debugPrint('✅ Subscription purchase was successful for: $productId');
+          
+          // Refresh from RevenueCat first to ensure we have the latest entitlements
+          try {
+            debugPrint('🔄 Refreshing subscription status from RevenueCat...');
+            await refreshSubscriptionStatus();
+          } catch (e) {
+            debugPrint('⚠️ Error refreshing from RevenueCat: $e');
+          }
+          
           // Update user's subscription information in Firestore
           final tierName = _getSubscriptionTier(productId);
           final benefits = _getSubscriptionBenefits(tierName);
@@ -740,6 +841,8 @@ class PurchaseService {
                 .get();
             
             if (userDoc.exists) {
+              debugPrint('📝 Updating subscription data in Firestore...');
+              
               // Update subscription data
               await FirebaseFirestore.instance
                   .doc(currentUserReference!.path)
@@ -758,17 +861,25 @@ class PurchaseService {
                 'lastSubscriptionUpdate': Timestamp.now(),
               });
               
-              print('✅ Successfully updated user subscription status for: $productId');
+              debugPrint('✅ Successfully updated user subscription status for: $productId');
+              
+              // Ensure SubscriptionManager is aware of the change
+              try {
+                await SubscriptionManager.instance.refreshSubscriptionStatus();
+                debugPrint('✅ SubscriptionManager refreshed successfully');
+              } catch (e) {
+                debugPrint('⚠️ Error refreshing SubscriptionManager: $e');
+              }
             }
           } catch (e) {
-            print('❌ Error updating subscription data: $e');
+            debugPrint('❌ Error updating subscription data: $e');
           }
         }
       }
       
       return result;
     } catch (e) {
-      print('Error in purchasePackage: $e');
+      debugPrint('Error in purchasePackage: $e');
       return PurchaseResult(
         success: false,
         message: 'Error: $e',
@@ -779,6 +890,12 @@ class PurchaseService {
   // Helper method to update Firestore with subscription details
   static Future<void> _updateFirestoreWithSubscription(String productId, CustomerInfo purchaseResult) async {
     try {
+      // CRITICAL FIX: Skip this method entirely for Luna Coin purchases
+      if (productId.contains('lunacoin')) {
+        debugPrint('⚠️ Skipping subscription update for Luna Coin product: $productId');
+        return;
+      }
+      
       // Check if this is a subscription product
       final isSubscription = 
           productId.contains('premium') || 
@@ -817,207 +934,288 @@ class PurchaseService {
             'lastSubscriptionUpdate': Timestamp.now(),
           });
           
-          print('✅ Successfully updated user subscription status for: $productId');
+          debugPrint('✅ Successfully updated user subscription status for: $productId');
         }
-      }
-    } catch (e) {
-      print('❌ Error updating subscription data: $e');
-    }
-  }
-  
-  // Helper method to get subscription tier from product ID
-  static String _getSubscriptionTier(String productId) {
-    if (productId.contains('weekly') || productId == 'ios.premium_weekly_sub') {
-      return 'weekly';
-    } else if (productId.contains('monthly') || productId == 'ios.premium_monthly') {
-      return 'monthly';
-    } else if (productId.contains('yearly') || productId == 'ios.premium_yearly') {
-      return 'yearly';
-    }
-    // Default to monthly if we can't determine
-    return 'monthly';
-  }
-  
-  // Helper method to get subscription benefits based on tier
-  static List<String> _getSubscriptionBenefits(String tier) {
-    switch (tier) {
-      case 'weekly':
-        return ['dream_analysis', 'exclusive_themes', 'bonus_coins_150', 'ad_free'];
-      case 'monthly':
-        return ['dream_analysis', 'exclusive_themes', 'bonus_coins_250', 'ad_free', 'zen_mode'];
-      case 'yearly':
-        return ['dream_analysis', 'exclusive_themes', 'bonus_coins_1000', 'ad_free', 'zen_mode', 'priority_support'];
-      default:
-        return ['dream_analysis', 'ad_free']; // Minimum benefits as fallback
-    }
-  }
-  
-  // Helper method to calculate expiry date based on tier
-  static DateTime _calculateExpiryDate(String tier, DateTime startDate) {
-    switch (tier) {
-      case 'weekly':
-        return startDate.add(Duration(days: 7));
-      case 'monthly':
-        return startDate.add(Duration(days: 30));
-      case 'yearly':
-        return startDate.add(Duration(days: 365));
-      default:
-        return startDate.add(Duration(days: 30)); // Default to monthly
-    }
-  }
-
-  // Add a new reliable method to directly update subscription benefits in Firestore
-  static Future<void> _directlyUpdateSubscriptionInFirestore(String productId) async {
-    try {
-      if (currentUserReference == null) {
-        debugPrint('❌ Cannot update subscription: No logged in user');
-        return;
-      }
-      
-      debugPrint('🔄 Directly updating subscription in Firestore for: $productId');
-      
-      // Determine subscription tier and benefits
-      final tierName = _getSubscriptionTier(productId);
-      final benefits = _getSubscriptionBenefits(tierName);
-      final expiryDate = _calculateExpiryDate(tierName, DateTime.now());
-      
-      // Determine bonus coins based on tier
-      int bonusCoins = 0;
-      if (tierName == 'weekly') {
-        bonusCoins = 150;
-      } else if (tierName == 'monthly') {
-        bonusCoins = 250;
-      } else if (tierName == 'yearly') {
-        bonusCoins = 1000;
-      }
-      
-      // Get current user document
-      final userDoc = await FirebaseFirestore.instance.doc(currentUserReference!.path).get();
-      if (!userDoc.exists) {
-        debugPrint('❌ User document not found for updating subscription');
-        return;
-      }
-      
-      final userData = userDoc.data() as Map<String, dynamic>;
-      
-      // Get current coin balance
-      final currentCoins = userData['lunaCoins'] as int? ?? 0;
-      
-      // Update subscription data AND add bonus coins in a single update
-      await FirebaseFirestore.instance.doc(currentUserReference!.path).update({
-        'isSubscribed': true,
-        'subscription': {
-          'productId': productId,
-          'tier': tierName,
-          'activationDate': Timestamp.now(),
-          'expiryDate': Timestamp.fromDate(expiryDate),
-          'isActive': true,
-          'autoRenew': true,
-          'benefits': benefits,
-          'bonusCoinsApplied': true, // Mark as applied since we're adding them now
-        },
-        'lastSubscriptionUpdate': Timestamp.now(),
-        'lunaCoins': currentCoins + bonusCoins, // Add bonus coins immediately
-      });
-      
-      debugPrint('✅ Successfully updated subscription data for: $productId');
-      debugPrint('💰 Added $bonusCoins bonus coins. New balance: ${currentCoins + bonusCoins}');
-      
-      // Try to refresh the subscription manager to update UI immediately
-      // Note: This is optional and may not always work if the manager isn't initialized
-      try {
-        // Import is already at the top of the file
-        SubscriptionManager.instance.refreshSubscriptionStatus();
-        debugPrint('✅ SubscriptionManager refresh triggered successfully');
-      } catch (e) {
-        // Refresh failed but the data is already updated in Firestore
-        debugPrint('Note: Could not trigger SubscriptionManager refresh: $e');
       }
     } catch (e) {
       debugPrint('❌ Error updating subscription data: $e');
     }
   }
+  
+  // Helper method to get subscription tier from product ID
+  static String _getSubscriptionTier(String productId) {
+    if (productId.contains('weekly')) {
+      return 'weekly';
+    } else if (productId.contains('monthly')) {
+      return 'monthly';
+    } else if (productId.contains('yearly')) {
+      return 'yearly';
+    }
+    return 'unknown';
+  }
+  
+  // Helper method to get subscription benefits based on tier
+  static List<String> _getSubscriptionBenefits(String tier) {
+    if (tier == 'weekly') {
+      return ['dream_analysis', 'exclusive_themes', 'bonus_coins_150', 'ad_free'];
+      // Note: 'zen_mode' is intentionally excluded from weekly tier
+    } else if (tier == 'monthly') {
+      return ['dream_analysis', 'exclusive_themes', 'bonus_coins_250', 'ad_free', 'zen_mode'];
+    } else if (tier == 'yearly') {
+      return ['dream_analysis', 'exclusive_themes', 'bonus_coins_1000', 'ad_free', 'zen_mode', 'priority_support'];
+    }
+    return [];
+  }
+  
+  // Helper method to calculate expiry date based on tier
+  static DateTime _calculateExpiryDate(String tier, DateTime startDate) {
+    if (tier == 'weekly') {
+      return startDate.add(Duration(days: 7));
+    } else if (tier == 'monthly') {
+      return startDate.add(Duration(days: 30));
+    } else if (tier == 'yearly') {
+      return startDate.add(Duration(days: 365));
+    }
+    return startDate.add(Duration(days: 30)); // Default to monthly
+  }
 
-  // Emergency method to force unlock all subscription benefits
-  static Future<bool> emergencyForceUnlockAllBenefits() async {
+  // Directly update subscription in Firestore - used as a fallback or for immediate updates
+  static Future<void> _directlyUpdateSubscriptionInFirestore({
+    required String productId,
+    bool autoRenew = true,
+    bool applyBonusCoins = true,
+    DateTime? expiryDateOverride,
+  }) async {
     try {
-      if (currentUserReference == null) {
-        debugPrint('❌ Cannot update subscription: No logged in user');
-        return false;
+      // CRITICAL FIX: Never update subscription data for Luna Coin purchases
+      if (productId.contains('lunacoin')) {
+        debugPrint('⚠️ Prevented subscription data modification for Luna Coin product: $productId');
+        return;
       }
       
-      debugPrint('🆘 EMERGENCY: Force unlocking all subscription benefits!');
+      // Check if we have a user reference
+      if (currentUserReference == null) {
+        debugPrint('❌ Cannot update subscription - no user logged in');
+        return;
+      }
+
+      debugPrint('🔄 Directly updating subscription in Firestore for product: $productId');
       
-      // Use two approaches for maximum reliability:
+      // Determine subscription tier and benefits based on product ID
+      final tier = _getSubscriptionTier(productId);
+      final benefits = _getSubscriptionBenefits(tier);
+      final expiryDate = expiryDateOverride ?? _calculateExpiryDate(tier, DateTime.now());
       
-      // 1. First, directly update Firestore with subscription data
-      final tierName = 'yearly';  // Always give yearly tier (most benefits)
-      final benefits = _getSubscriptionBenefits(tierName);
-      final expiryDate = DateTime.now().add(Duration(days: 365));
+      // Determine bonus coins based on subscription tier
+      int bonusCoins = 0;
+      if (tier == 'weekly') {
+        bonusCoins = 150;
+      } else if (tier == 'monthly') {
+        bonusCoins = 250;
+      } else if (tier == 'yearly') {
+        bonusCoins = 1000;
+      }
       
-      // Add significant bonus coins
-      const bonusCoins = 1000;
-      
-      // Get current user document
+      // Get current user document to update the coin balance
       final userDoc = await FirebaseFirestore.instance.doc(currentUserReference!.path).get();
       if (!userDoc.exists) {
-        debugPrint('❌ User document not found for updating subscription');
-        return false;
+        debugPrint('❌ User document not found');
+        return;
       }
       
-      final userData = userDoc.data() as Map<String, dynamic>;
+      final userData = userDoc.data() as Map<String, dynamic>?;
+      if (userData == null) {
+        debugPrint('❌ User data is null');
+        return;
+      }
       
-      // Get current coin balance
-      final currentCoins = userData['lunaCoins'] as int? ?? 0;
+      // Calculate new coin balance if bonus coins should be applied
+      int newCoins = userData['luna_coins'] as int? ?? 0;
+      if (applyBonusCoins && bonusCoins > 0) {
+        debugPrint('💰 Adding $bonusCoins bonus coins. Current: $newCoins');
+        newCoins += bonusCoins;
+        debugPrint('💰 New balance: $newCoins');
+      }
       
-      // Update subscription data AND add bonus coins in a single update
-      await FirebaseFirestore.instance.doc(currentUserReference!.path).update({
+      // Create subscription data to update
+      final subscriptionData = {
+        'productId': productId,
+        'tier': tier,
+        'benefits': benefits,
+        'activationDate': Timestamp.now(),
+        'expiryDate': Timestamp.fromDate(expiryDate),
+        'autoRenew': autoRenew,
+        'isActive': true,
+        'bonusCoinsApplied': applyBonusCoins, // Only mark as applied if we actually applied them
+      };
+      
+      // Update user document with subscription details
+      final updateData = {
         'isSubscribed': true,
-        'subscription': {
-          'productId': 'ios.premium_yearly',
-          'tier': tierName,
-          'activationDate': Timestamp.now(),
-          'expiryDate': Timestamp.fromDate(expiryDate),
-          'isActive': true,
-          'autoRenew': true,
-          'benefits': benefits,
-          'bonusCoinsApplied': true,
-        },
+        'subscription': subscriptionData,
         'lastSubscriptionUpdate': Timestamp.now(),
-        'lunaCoins': currentCoins + bonusCoins,
-      });
+      };
       
-      // 2. Then, also force testing mode for immediate effect
-      SubscriptionManager.forceEnableTestingMode();
+      // Only update coins if we're applying bonus coins
+      if (applyBonusCoins && bonusCoins > 0) {
+        updateData['luna_coins'] = newCoins;
+      }
       
-      debugPrint('✅ EMERGENCY: All subscription benefits unlocked!');
-      debugPrint('💰 Added $bonusCoins bonus coins. New balance: ${currentCoins + bonusCoins}');
+      await FirebaseFirestore.instance.doc(currentUserReference!.path).update(updateData);
       
-      // Refresh subscription manager
+      if (applyBonusCoins && bonusCoins > 0) {
+        debugPrint('✅ Successfully updated subscription in Firestore with $bonusCoins bonus coins');
+      } else {
+        debugPrint('✅ Successfully updated subscription in Firestore (no bonus coins applied)');
+      }
+      
+      // Try to refresh the SubscriptionManager to update UI immediately
       try {
         await SubscriptionManager.instance.refreshSubscriptionStatus();
-        debugPrint('✅ SubscriptionManager refresh triggered');
-        
-        // Also force the manager to apply missing benefits
-        await SubscriptionManager.instance.applyMissingSubscriptionBenefits();
-        debugPrint('✅ Applied any missing benefits');
       } catch (e) {
-        debugPrint('❌ Error refreshing manager: $e');
-        // Even if this fails, testing mode should still give access
+        debugPrint('⚠️ Error refreshing SubscriptionManager: $e');
       }
       
-      return true;
+      // Debug log to verify the method was called completely
+      debugPrint('✅✅✅ _directlyUpdateSubscriptionInFirestore completed for productId: $productId, autoRenew: $autoRenew, applyBonusCoins: $applyBonusCoins');
     } catch (e) {
-      debugPrint('❌ EMERGENCY UNLOCK ERROR: $e');
+      debugPrint('❌ Error directly updating subscription in Firestore: $e');
+      throw e; // Rethrow to allow caller to handle
+    }
+  }
+
+  // Helper method to check if running on iOS simulator
+  static Future<bool> _isRunningOnIOSSimulator() async {
+    // Simple check for iOS simulator
+    if (!Platform.isIOS) return false;
+    
+    try {
+      // Use a simple heuristic - simulator typically has a device name containing "Simulator"
+      final String deviceName = Platform.environment['SIMULATOR_DEVICE_NAME'] ?? '';
+      return deviceName.contains('Simulator') || 
+             deviceName.contains('iPhone Simulator') ||
+             deviceName.contains('iOS Simulator');
+    } catch (e) {
+      debugPrint('Error checking iOS simulator status: $e');
+      return false;
+    }
+  }
+  
+  // Helper method to check if running on Android emulator
+  static Future<bool> _isRunningOnAndroidEmulator() async {
+    // Simple check for Android
+    if (!Platform.isAndroid) return false;
+    
+    try {
+      // Android emulators typically have specific model names
+      final String model = Platform.environment['ANDROID_MODEL'] ?? '';
+      return model.contains('sdk') || 
+             model.contains('google_sdk') || 
+             model.contains('emulator') ||
+             model.contains('Android SDK');
+    } catch (e) {
+      debugPrint('Error checking Android emulator status: $e');
+      return false;
+    }
+  }
+
+  // Check if device is a simulator/emulator
+  static Future<bool> checkIfSimulator() async {
+    // Always return false for production/release
+    return false;
+  }
+
+  // Static variable to manually override simulator mode
+  static bool _overrideSimulatorMode = false;
+
+  // Helper method to update only Luna Coins without affecting subscription
+  static Future<void> _updateUserLunaCoinsOnly(
+    String uid, 
+    int coinAmount, 
+    String productId,
+  ) async {
+    try {
+      print('🔄 Updating ONLY Luna Coins for user $uid with $coinAmount coins from product $productId');
       
-      // As a last resort, just enable testing mode
-      try {
-        SubscriptionManager.forceEnableTestingMode();
-        return true;
-      } catch (e2) {
-        debugPrint('❌ CRITICAL: Even testing mode failed: $e2');
-        return false;
+      // CRITICAL: Use FieldValue.increment to ONLY modify the luna_coins field
+      // This approach preserves all other user data including:
+      // - unlocked_backgrounds
+      // - subscription data
+      // - other user preferences
+      
+      // BUGFIX: Use correct collection path - "User" instead of "users"
+      final userRef = FirebaseFirestore.instance.collection('User').doc(uid);
+      
+      await userRef.update({
+        'luna_coins': FieldValue.increment(coinAmount),
+        'last_coin_update': FieldValue.serverTimestamp(),
+      });
+      
+      print('✅ Successfully updated ONLY Luna Coins balance for user $uid');
+    } catch (e) {
+      print('❌ Error updating Luna Coins: $e');
+      rethrow;
+    }
+  }
+
+  // Helper method to safely convert to DateTime
+  static DateTime _safelyConvertToDateTime(dynamic date) {
+    try {
+      debugPrint('🔄 Converting date value to DateTime: $date (type: ${date.runtimeType})');
+      
+      if (date == null) {
+        debugPrint('⚠️ Date value is null, using default expiry');
+        return DateTime.now().add(Duration(days: 30));
       }
+      
+      if (date is int) {
+        // Handle milliseconds timestamp
+        if (date > 100000000000) { // If timestamp is in milliseconds (13 digits typically)
+          return DateTime.fromMillisecondsSinceEpoch(date);
+        } else { // If timestamp is in seconds (10 digits typically)
+          return DateTime.fromMillisecondsSinceEpoch(date * 1000);
+        }
+      } 
+      else if (date is double) {
+        // Convert double to int for milliseconds timestamp
+        final int milliseconds = date.toInt();
+        if (milliseconds > 100000000000) { // If timestamp is in milliseconds
+          return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+        } else { // If timestamp is in seconds
+          return DateTime.fromMillisecondsSinceEpoch(milliseconds * 1000);
+        }
+      } 
+      else if (date is String) {
+        debugPrint('🔍 Attempting to parse date string: $date');
+        
+        // Try parsing as int timestamp first
+        try {
+          final int timestamp = int.parse(date);
+          if (timestamp > 100000000000) { // If timestamp is in milliseconds
+            return DateTime.fromMillisecondsSinceEpoch(timestamp);
+          } else { // If timestamp is in seconds
+            return DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+          }
+        } catch (_) {
+          // If not a number, try as ISO format
+          try {
+            return DateTime.parse(date);
+          } catch (e) {
+            debugPrint('❌ Failed to parse date string as ISO: $e');
+            // Default to a future date
+            return DateTime.now().add(Duration(days: 30));
+          }
+        }
+      } 
+      else {
+        debugPrint('⚠️ Unknown date format (${date.runtimeType}), using default expiry');
+        // Default to 30 days from now as fallback
+        return DateTime.now().add(Duration(days: 30));
+      }
+    } catch (e) {
+      debugPrint('❌ Error converting date: $e');
+      // Fallback to a reasonable default
+      return DateTime.now().add(Duration(days: 30));
     }
   }
 }

@@ -7,6 +7,7 @@ import '/backend/backend.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui';
+import 'dart:io';
 import '/services/app_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:page_transition/page_transition.dart';
@@ -19,6 +20,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:convert';
 import '/widgets/custom_text_form_field.dart';
+import '/services/subscription_manager.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:intl/intl.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -162,6 +166,12 @@ class _SettingsPageState extends State<SettingsPage>
                     onTap: () => _navigateToEditProfile(context),
                   ),
                   _buildSettingTile(
+                    icon: Icons.subscriptions_outlined,
+                    title: 'Manage Subscription',
+                    subtitle: 'View, manage or cancel your subscription',
+                    onTap: () => _showManageSubscriptionDialog(context),
+                  ),
+                  _buildSettingTile(
                     icon: Icons.block_outlined,
                     title: 'Manage Blocked Users',
                     subtitle: 'View and manage blocked accounts',
@@ -172,6 +182,12 @@ class _SettingsPageState extends State<SettingsPage>
                     title: 'Account Deletion',
                     subtitle: 'Permanently delete your account',
                     onTap: () => _showDeleteAccountDialog(context),
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.refresh,
+                    title: 'Refresh Subscription',
+                    subtitle: 'Sync subscription status with store',
+                    onTap: () => _refreshSubscriptionStatus(context),
                   ),
                 ],
               ),
@@ -967,6 +983,416 @@ class _SettingsPageState extends State<SettingsPage>
       mode: LaunchMode.externalApplication,
     )) {
       throw Exception('Could not launch $urlString');
+    }
+  }
+
+  void _refreshSubscriptionStatus(BuildContext context) async {
+    // Show loading indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            SizedBox(width: 12),
+            Text('Refreshing subscription...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    
+    try {
+      // Force a complete refresh of subscription status
+      final hasActiveSubscription = 
+          await SubscriptionManager.instance.forceCompleteRefresh();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              hasActiveSubscription
+                  ? 'Active subscription found and refreshed'
+                  : 'No active subscription found',
+            ),
+            backgroundColor: hasActiveSubscription
+                ? FlutterFlowTheme.of(context).primary
+                : FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error refreshing: $e'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showManageSubscriptionDialog(BuildContext context) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 50,
+                width: 50,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    FlutterFlowTheme.of(context).primary,
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
+              Text('Loading subscription details...'),
+            ],
+          ),
+        );
+      },
+    );
+    
+    try {
+      // Check if user has an active subscription
+      final hasSubscription = SubscriptionManager.instance.isSubscribed;
+      final subscriptionTier = SubscriptionManager.instance.subscriptionTier;
+      
+      // Get expiry date from Firestore instead
+      DateTime? expiryDate;
+      try {
+        if (currentUserReference != null) {
+          final userDoc = await FirebaseFirestore.instance
+              .doc(currentUserReference!.path)
+              .get();
+          
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>?;
+            if (userData != null && 
+                userData['subscription'] != null && 
+                userData['subscription']['expiryDate'] != null) {
+              expiryDate = (userData['subscription']['expiryDate'] as Timestamp).toDate();
+            }
+          }
+        }
+      } catch (e) {
+        print('Error getting expiry date: $e');
+      }
+      
+      final benefits = SubscriptionManager.instance.benefits;
+      
+      // Close loading dialog
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      // Show subscription details dialog
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text(
+              hasSubscription
+                  ? 'Active Subscription'
+                  : 'No Active Subscription',
+              style: FlutterFlowTheme.of(context).titleLarge,
+            ),
+            content: Container(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hasSubscription) ...[
+                    // Subscription Info
+                    _buildInfoRow(
+                      context, 
+                      'Status:', 
+                      'Active',
+                      valueColor: Colors.green,
+                    ),
+                    SizedBox(height: 8),
+                    _buildInfoRow(
+                      context, 
+                      'Plan:', 
+                      _getReadablePlanName(subscriptionTier ?? 'Unknown'),
+                    ),
+                    if (expiryDate != null) ...[
+                      SizedBox(height: 8),
+                      _buildInfoRow(
+                        context, 
+                        'Renewal Date:', 
+                        DateFormat('MMM dd, yyyy').format(expiryDate),
+                      ),
+                    ],
+                    SizedBox(height: 16),
+                    
+                    // Benefits
+                    Text(
+                      'Benefits:',
+                      style: FlutterFlowTheme.of(context).titleMedium,
+                    ),
+                    SizedBox(height: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: benefits.map((benefit) {
+                        String readableBenefit = benefit
+                            .replaceAll('_', ' ')
+                            .split(' ')
+                            .map((word) => word.isNotEmpty 
+                                ? '${word[0].toUpperCase()}${word.substring(1)}' 
+                                : '')
+                            .join(' ');
+                            
+                        // Handle numeric values in benefits (like bonus_coins_250)
+                        if (benefit.contains('bonus_coins_')) {
+                          final numRegex = RegExp(r'(\d+)');
+                          final match = numRegex.firstMatch(benefit);
+                          if (match != null) {
+                            readableBenefit = 'Bonus Coins: ${match.group(1)}';
+                          }
+                        }
+                        
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                color: FlutterFlowTheme.of(context).primary,
+                                size: 16,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                readableBenefit,
+                                style: FlutterFlowTheme.of(context).bodyMedium,
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ] else ...[
+                    // No subscription
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'You don\'t have an active subscription. Subscribe to unlock premium features!',
+                        style: FlutterFlowTheme.of(context).bodyMedium,
+                      ),
+                    ),
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          context.pushNamed('MembershipPage');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: FlutterFlowTheme.of(context).primary,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text('View Subscription Plans'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              // Cancel button to close dialog
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close'),
+              ),
+              
+              // Manage subscription button for users with active subscriptions
+              if (hasSubscription)
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    _showManagementInstructions(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: FlutterFlowTheme.of(context).primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('Manage Subscription'),
+                ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      // Close loading dialog if still showing
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      // Show error message
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Error loading subscription details: $e'),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+        ),
+      );
+    }
+  }
+
+  // Helper method to display a row of information
+  Widget _buildInfoRow(BuildContext context, String label, String value, {Color? valueColor}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: FlutterFlowTheme.of(context).bodyMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            style: FlutterFlowTheme.of(context).bodyMedium.copyWith(
+                  color: valueColor ?? FlutterFlowTheme.of(context).primaryText,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // Show instructions on how to manage subscription manually
+  void _showManagementInstructions(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Manage Your Subscription'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'To manage or cancel your subscription:',
+                style: FlutterFlowTheme.of(context).bodyMedium,
+              ),
+              SizedBox(height: 16),
+              if (Platform.isIOS) ...[
+                _buildInstructionStep(context, '1', 'Open the Settings app on your device'),
+                _buildInstructionStep(context, '2', 'Tap your Apple ID at the top'),
+                _buildInstructionStep(context, '3', 'Tap Subscriptions'),
+                _buildInstructionStep(context, '4', 'Find and select this app'),
+                _buildInstructionStep(context, '5', 'Choose a different subscription option or tap Cancel Subscription'),
+              ] else if (Platform.isAndroid) ...[
+                _buildInstructionStep(context, '1', 'Open the Google Play Store app'),
+                _buildInstructionStep(context, '2', 'Tap your profile icon at the top right'),
+                _buildInstructionStep(context, '3', 'Tap Payments & subscriptions'),
+                _buildInstructionStep(context, '4', 'Tap Subscriptions'),
+                _buildInstructionStep(context, '5', 'Find and select this app'),
+                _buildInstructionStep(context, '6', 'Choose a different subscription option or tap Cancel subscription'),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // Helper method to build an instruction step
+  Widget _buildInstructionStep(BuildContext context, String step, String instruction) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: FlutterFlowTheme.of(context).primary,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                step,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              instruction,
+              style: FlutterFlowTheme.of(context).bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getReadablePlanName(String plan) {
+    // Check for common patterns in product IDs
+    if (plan.contains('weekly') || plan.contains('week')) {
+      return 'Weekly Member';
+    } else if (plan.contains('monthly') || plan.contains('month')) {
+      return 'Monthly Member';
+    } else if (plan.contains('yearly') || plan.contains('year') || plan.contains('annual')) {
+      return 'Yearly Member';
+    } else if (plan.contains('premium')) {
+      // If it just says premium without specifics, it's likely a generic premium plan
+      return 'Premium Member';
+    } else if (plan.contains('ios.premium_weekly')) {
+      return 'Weekly Member';
+    } else if (plan.contains('ios.premium_monthly')) {
+      return 'Monthly Member';
+    } else if (plan.contains('ios.premium_yearly')) {
+      return 'Yearly Member';
+    } else {
+      // For other cases, clean up the raw product ID to make it more readable
+      String cleanPlan = plan
+          .replaceAll('ios.', '')
+          .replaceAll('android.', '')
+          .replaceAll('premium_', '')
+          .replaceAll('_', ' ')
+          .replaceAll('.', ' ');
+      
+      // Capitalize each word for better readability
+      cleanPlan = cleanPlan.split(' ')
+          .map((word) => word.isNotEmpty 
+              ? '${word[0].toUpperCase()}${word.substring(1)}' 
+              : '')
+          .join(' ');
+      
+      return cleanPlan;
     }
   }
 }

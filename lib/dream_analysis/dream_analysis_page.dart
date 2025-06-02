@@ -37,8 +37,8 @@ class _DreamAnalysisPageState extends State<DreamAnalysisPage> {
     // Using a Future.microtask ensures this runs in the next event loop
     // after the widget is built, preventing issues with Navigator during build
     Future.microtask(() {
-      // For testing: Always allow access to Dream Analysis
-      final hasAccess = true; // Was: SubscriptionUtil.hasDreamAnalysis;
+      // Check if user has Dream Analysis access through subscription
+      final hasAccess = SubscriptionUtil.hasDreamAnalysis;
       
       if (mounted) {
         setState(() {
@@ -46,8 +46,8 @@ class _DreamAnalysisPageState extends State<DreamAnalysisPage> {
           _checkingAccess = false;
         });
         
-        // Redirection logic temporarily disabled for testing
-        if (false) { // Was: if (!hasAccess) {
+        // Redirect users without subscription access to the Membership page
+        if (!hasAccess) {
           print('🔒 User does not have access to Dream Analysis - redirecting to Membership page');
           Navigator.of(context).pushReplacementNamed('MembershipPage');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -58,7 +58,7 @@ class _DreamAnalysisPageState extends State<DreamAnalysisPage> {
             ),
           );
         } else {
-          print('✅ User has access to Dream Analysis (Testing mode)');
+          print('✅ User has access to Dream Analysis');
         }
       }
     });

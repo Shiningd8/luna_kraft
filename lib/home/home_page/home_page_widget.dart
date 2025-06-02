@@ -616,25 +616,27 @@ class _HomeFeedContentState extends State<_HomeFeedContent> {
                           ),
                         ),
                         SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () {
-                            context.pushNamed('ExploreUsers');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: FlutterFlowTheme.of(context).primary,
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                        Center(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              context.pushNamed('Explore');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: FlutterFlowTheme.of(context).primary,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.explore, size: 18),
-                              SizedBox(width: 8),
-                              Text('Explore Users'),
-                            ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.explore, size: 18),
+                                SizedBox(width: 8),
+                                Text('Explore Users'),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -1725,20 +1727,21 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                           onTap: () {
                                             Navigator.pop(context);
                                             // Direct navigation to Dream Analysis for testing
-                                            context.pushNamed('DreamAnalysis');
+                                            // context.pushNamed('DreamAnalysis');
                                             
-                                            // Subscription check disabled for testing
-                                            // if (SubscriptionUtil.hasDreamAnalysis) {
-                                            //   context.pushNamed('DreamAnalysis');
-                                            // } else {
-                                            //   // Redirect to membership page
-                                            //   context.pushNamed('MembershipPage');
-                                            //   ScaffoldMessenger.of(context).showSnackBar(
-                                            //     SnackBar(
-                                            //       content: Text('Dream Analysis requires a premium subscription'),
-                                            //       backgroundColor: FlutterFlowTheme.of(context).primary,
-                                            //     ),
-                                            //   );
+                                            // Enable subscription check
+                                            if (SubscriptionUtil.hasDreamAnalysis) {
+                                              context.pushNamed('DreamAnalysis');
+                                            } else {
+                                              // Redirect to membership page
+                                              context.pushNamed('MembershipPage');
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Dream Analysis requires a premium subscription'),
+                                                  backgroundColor: FlutterFlowTheme.of(context).primary,
+                                                ),
+                                              );
+                                            }
                                           },
                                         ),
                                         _buildDrawerItem(
@@ -1949,21 +1952,21 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       onTap: () {
                         Navigator.pop(context);
                         // Direct navigation to Dream Analysis for testing
-                        context.pushNamed('DreamAnalysis');
+                        // context.pushNamed('DreamAnalysis');
                         
-                        // Subscription check disabled for testing
-                        // if (SubscriptionUtil.hasDreamAnalysis) {
-                        //   context.pushNamed('DreamAnalysis');
-                        // } else {
-                        //   // Redirect to membership page
-                        //   context.pushNamed('MembershipPage');
-                        //   ScaffoldMessenger.of(context).showSnackBar(
-                        //     SnackBar(
-                        //       content: Text('Dream Analysis requires a premium subscription'),
-                        //       backgroundColor: FlutterFlowTheme.of(context).primary,
-                        //     ),
-                        //   );
-                        // }
+                        // Enable subscription check
+                        if (SubscriptionUtil.hasDreamAnalysis) {
+                          context.pushNamed('DreamAnalysis');
+                        } else {
+                          // Redirect to membership page
+                          context.pushNamed('MembershipPage');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Dream Analysis requires a premium subscription'),
+                              backgroundColor: FlutterFlowTheme.of(context).primary,
+                            ),
+                          );
+                        }
                       },
                     ),
                     _buildDrawerItem(
@@ -2365,8 +2368,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   // Schedule notification permission check after a delay
   void _scheduleNotificationPermissionCheck() {
-    // Check permissions shortly after the homepage loads
-    _notificationRequestTimer = Timer(Duration(seconds: 1), () {
+    // Check permissions after a longer delay to give users time to experience the app
+    _notificationRequestTimer = Timer(Duration(seconds: 5), () {
       _checkNotificationPermission();
     });
   }
@@ -2377,6 +2380,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
     _checkingNotificationPermission = true;
 
     try {
+      // Ensure user is logged in
       if (currentUser?.uid == null) {
         _checkingNotificationPermission = false;
         return;
@@ -2386,37 +2390,47 @@ class _HomePageWidgetState extends State<HomePageWidget>
       final permissionAsked = prefs.getBool('notification_permission_asked') ?? false;
       final permissionGranted = prefs.getBool('notification_permission_granted') ?? false;
 
+      // If permission is already granted, no need to proceed
       if (permissionGranted) {
         _checkingNotificationPermission = false;
         return;
       }
 
+      // If never asked before, ask now after the user has had some time to use the app
       if (!permissionAsked) {
+        // Use post frame callback to avoid interfering with current build
         WidgetsBinding.instance.addPostFrameCallback((_) async {
+          print('Requesting notification permission after user has signed in');
           final hasPermission = await NotificationService().requestPermission();
           final currentTimeMillis = DateTime.now().millisecondsSinceEpoch;
           await prefs.setInt('notification_permission_last_asked_time', currentTimeMillis);
           await prefs.setBool('notification_permission_asked', true);
           await prefs.setBool('notification_permission_granted', hasPermission);
+          print('Notification permission status after request: $hasPermission');
         });
         _checkingNotificationPermission = false;
         return;
       }
 
+      // Check if we should ask again (only if asked more than a week ago)
       final lastAskedTimeMillis = prefs.getInt('notification_permission_last_asked_time') ?? 0;
       final currentTimeMillis = DateTime.now().millisecondsSinceEpoch;
-      final weekInMillis = 7 * 24 * 60 * 60 * 1000;
+      final weekInMillis = 7 * 24 * 60 * 60 * 1000; // One week in milliseconds
 
+      // If already asked recently, don't ask again
       if (permissionAsked && (currentTimeMillis - lastAskedTimeMillis < weekInMillis)) {
         _checkingNotificationPermission = false;
         return;
       }
 
+      // If it's been more than a week since last asked, ask again
       WidgetsBinding.instance.addPostFrameCallback((_) async {
+        print('Re-requesting notification permission after one week');
         final hasPermission = await NotificationService().requestPermission();
         await prefs.setInt('notification_permission_last_asked_time', currentTimeMillis);
         await prefs.setBool('notification_permission_asked', true);
         await prefs.setBool('notification_permission_granted', hasPermission);
+        print('Notification permission status after re-request: $hasPermission');
       });
     } catch (e) {
       print('Error checking notification permission: $e');

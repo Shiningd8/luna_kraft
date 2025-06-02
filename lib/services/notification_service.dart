@@ -226,52 +226,41 @@ class NotificationService {
 
   // Initialize notification service
   Future<void> initialize() async {
-    // Set up handling messages in background
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    try {
+      print('Initializing NotificationService...');
+      // Set background message handler
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Set up foreground notification handling
-    await _setupForegroundNotificationHandling();
+      // Set up foreground notification handling
+      await _setupForegroundNotificationHandling();
 
-    // Initialize local notifications
-    await _initializeLocalNotifications();
+      // Initialize local notifications
+      await _initializeLocalNotifications();
 
-    // For iOS, configure APNs first with proper settings
-    if (Platform.isIOS) {
-      try {
-        // Check APNs token
-        final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
-        print('Initial APNS token: ${apnsToken ?? "null"}');
-      } catch (e) {
-        print('Error getting initial APNS token: $e');
+      // For iOS, configure APNs first with proper settings
+      if (Platform.isIOS) {
+        try {
+          // Check APNs token
+          final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+          print('Initial APNS token: ${apnsToken ?? "null"}');
+          
+          // Clear badge count on iOS
+          await clearIOSBadgeCount();
+        } catch (e) {
+          print('Error getting initial APNS token: $e');
+        }
       }
+
+      // Request permissions and register device
+      await requestPermission();
+
+      // Set up message handlers
+      _setupMessageHandlers();
+
+      print('NotificationService initialized successfully');
+    } catch (e) {
+      print('Error initializing NotificationService: $e');
     }
-
-    // Request permissions and register device
-    await requestPermission();
-
-    // Set up message handlers
-    _setupMessageHandlers();
-
-    // Handle initial notification if app was opened from a notification
-    await _handleInitialNotification();
-
-    // Save FCM token to user's Firestore record if logged in
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await _registerDeviceWithFCM();
-    }
-
-    // Set up the lifecycle observer to handle app state changes
-    _setupLifecycleObserver();
-
-    // Set up connectivity monitoring
-    _setupConnectivityMonitor();
-
-    // Set up a listener for notifications to ensure we catch all of them
-    _setupNotificationListener();
-
-    // Set up FCM token refresh monitoring for more reliable notifications
-    _setupTokenRefreshMonitoring();
   }
 
   // Debug method to print FCM token - kept for development purposes
@@ -324,6 +313,11 @@ class NotificationService {
 
       // Create notification channel (Android only)
       await _createNotificationChannel();
+      
+      // Clear iOS badge count when initializing notifications
+      if (Platform.isIOS) {
+        await clearIOSBadgeCount();
+      }
 
       print('Local notifications initialized successfully');
     } catch (e) {
@@ -353,6 +347,11 @@ class NotificationService {
 
         // Create notification channel (Android only)
         await _createNotificationChannel();
+        
+        // Clear iOS badge count when initializing with fallback
+        if (Platform.isIOS) {
+          await clearIOSBadgeCount();
+        }
 
         print('Local notifications initialized with fallback icon');
       } catch (fallbackError) {
@@ -416,6 +415,11 @@ class NotificationService {
       badge: true,
       sound: true,
     );
+    
+    // Clear iOS badge when setting up foreground notifications
+    if (Platform.isIOS) {
+      await clearIOSBadgeCount();
+    }
   }
 
   // Set up all message handlers
@@ -1142,600 +1146,9 @@ class NotificationService {
     await notificationRef.update({'is_read': true});
   }
 
-  // Test notification method - useful for debugging on emulators
-  Future<void> showTestNotification() async {
-    print('Showing test notification');
-
-    try {
-      // First ensure in-app notification is shown (most reliable)
-      showInAppNotification(
-        NotificationPayload(
-          title: 'Test Notification',
-          body: 'This is a test notification to verify your setup',
-          type: 'test',
-        ),
-      );
-
-      print('In-app notification shown successfully');
-
-      // Then try to show a local notification
-      try {
-        await _showLocalNotification(
-          title: 'Test Notification',
-          body: 'This is a test notification to verify your setup',
-          payload: json.encode({
-            'title': 'Test Notification',
-            'body': 'This is a test notification',
-            'type': 'test',
-            'is_a_like': 'false',
-            'is_follow_request': 'false',
-            'is_reply': 'false',
-          }),
-        );
-        print('System notification sent successfully');
-      } catch (e) {
-        print('Error showing system notification: $e');
-        print('Only the in-app notification was shown');
-      }
-    } catch (e) {
-      print('Failed to show any notifications: $e');
-    }
-  }
-
-  // Debug notification icons to verify they exist
-  Future<void> debugNotificationIcons() async {
-    print('\n===== NOTIFICATION ICON DEBUG =====');
-    try {
-      // Check if the plugin is available
-      final androidPlugin = _flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      if (androidPlugin == null) {
-        print('Android platform-specific implementation not available');
-      } else {
-        print('Android notification plugin is available');
-      }
-
-      // Log the icon resources we're trying to use
-      print('Primary icon resource path: @drawable/notification_icon');
-      print('Fallback icon resource path: @mipmap/ic_launcher');
-
-      // Output debug information about the current channel
-      if (Platform.isAndroid) {
-        try {
-          final List<AndroidNotificationChannel>? channels =
-              await androidPlugin?.getNotificationChannels();
-
-          print('Available notification channels: ${channels?.length ?? 0}');
-          if (channels != null) {
-            for (final channel in channels) {
-              print('Channel ID: ${channel.id}');
-              print('Channel Name: ${channel.name}');
-              print('Channel Importance: ${channel.importance.value}');
-            }
-          }
-        } catch (e) {
-          print('Error retrieving channels: $e');
-        }
-      }
-
-      print('===== NOTIFICATION ICON DEBUG END =====\n');
-    } catch (e) {
-      print('Error in debug notification icons: $e');
-    }
-  }
-
-  // Alternative method to show test notification without using flutter_local_notifications
-  Future<void> showTestNotificationAlternative() async {
-    print('Showing alternative test notification');
-
-    // First show the in-app notification
-    showInAppNotification(
-      NotificationPayload(
-        title: 'Test Notification',
-        body: 'This is a test notification to verify your setup',
-        type: 'test',
-      ),
-    );
-
-    try {
-      // Send a direct Firebase message to the device (this is a "self-message")
-      // This is useful for testing FCM functionality directly
-      final messaging = FirebaseMessaging.instance;
-
-      // Get the FCM token of the current device
-      final token = await messaging.getToken();
-
-      if (token != null) {
-        print('Sending test FCM message to token: $token');
-
-        // Create a notification for Firestore to trigger the Cloud Function
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          try {
-            await NotificationsRecord.collection.add({
-              'title': 'Test Notification',
-              'body': 'This is a test FCM notification',
-              'is_read': false,
-              'made_by': UserRecord.collection.doc(user.uid),
-              'made_to': user.uid,
-              'date': FieldValue.serverTimestamp(),
-              'is_a_like': false,
-              'is_follow_request': false,
-              'is_reply': false,
-              'type': 'test',
-            });
-            print('Test notification document created in Firestore');
-          } catch (e) {
-            print('Error creating test notification in Firestore: $e');
-          }
-        }
-      } else {
-        print('No FCM token available for self-testing');
-      }
-    } catch (e) {
-      print('Error sending alternative test notification: $e');
-    }
-  }
-
-  // Simple notification test that avoids most potential issues
-  Future<void> showSimpleTestNotification() async {
-    print('Showing simple test notification');
-
-    // First show an in-app notification which uses our improved error handling
-    final testNotification = NotificationPayload(
-      title: 'Simple Test',
-      body: 'This is a simple test notification',
-      type: 'test',
-    );
-    showInAppNotification(testNotification);
-
-    // Then try to show a system notification
-    try {
-      // First make sure the channel exists
-      if (Platform.isAndroid) {
-        try {
-          await _createNotificationChannel();
-          print('Created notification channel successfully');
-        } catch (channelError) {
-          print('Error creating channel: $channelError');
-        }
-
-        // Then try to show a notification with minimal properties
-        try {
-          final AndroidNotificationDetails androidDetails =
-              AndroidNotificationDetails(
-            'luna_kraft_channel', // channel id
-            'LunaKraft Notifications', // channel name
-            channelDescription:
-                'Social interaction notifications for LunaKraft',
-            importance: Importance.max,
-            priority: Priority.high,
-            icon: '@drawable/notification_icon',
-          );
-
-          final NotificationDetails platformDetails = NotificationDetails(
-            android: androidDetails,
-          );
-
-          await _flutterLocalNotificationsPlugin.show(
-            1, // Use a simple ID
-            'Simple Test',
-            'This is a simple test notification',
-            platformDetails,
-          );
-
-          print('Simple notification shown successfully');
-        } catch (e) {
-          print('Error showing basic notification: $e');
-        }
-      }
-    } catch (e) {
-      print('Error in showSimpleTestNotification: $e');
-    }
-  }
-
-  // Test notifications with different icon approaches
-  Future<void> testNotificationIcons() async {
-    print('\n===== TESTING NOTIFICATION ICONS =====');
-
-    // First approach - direct name without path
-    try {
-      await _flutterLocalNotificationsPlugin.show(
-        101,
-        'Icon Test 1',
-        'Testing notification_icon directly',
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'luna_kraft_channel',
-            'LunaKraft Notifications',
-            channelDescription:
-                'Social interaction notifications for LunaKraft',
-            importance: Importance.max,
-            priority: Priority.high,
-            icon: 'notification_icon',
-            color: const Color(0xFFE040FB), // Match purple color
-            colorized: true,
-          ),
-        ),
-      );
-      print('Showed notification with icon: notification_icon');
-    } catch (e) {
-      print('Error showing notification with direct icon: $e');
-    }
-
-    // Second approach - with drawable prefix
-    try {
-      await _flutterLocalNotificationsPlugin.show(
-        102,
-        'Icon Test 2',
-        'Testing @drawable/notification_icon path',
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'luna_kraft_channel',
-            'LunaKraft Notifications',
-            channelDescription:
-                'Social interaction notifications for LunaKraft',
-            importance: Importance.max,
-            priority: Priority.high,
-            icon: '@drawable/notification_icon',
-            color: const Color(0xFFE040FB), // Match purple color
-            colorized: true,
-          ),
-        ),
-      );
-      print('Showed notification with icon: @drawable/notification_icon');
-    } catch (e) {
-      print('Error showing notification with drawable path: $e');
-    }
-
-    // Third approach - launcher icon fallback
-    try {
-      await _flutterLocalNotificationsPlugin.show(
-        103,
-        'Icon Test 3',
-        'Testing launcher icon fallback',
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'luna_kraft_channel',
-            'LunaKraft Notifications',
-            channelDescription:
-                'Social interaction notifications for LunaKraft',
-            importance: Importance.max,
-            priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
-            color: const Color(0xFFE040FB), // Match purple color
-            colorized: true,
-          ),
-        ),
-      );
-      print('Showed notification with launcher icon fallback');
-    } catch (e) {
-      print('Error showing notification with launcher icon: $e');
-    }
-
-    print('===== NOTIFICATION ICON TESTS COMPLETE =====\n');
-  }
-
-  // Manual test notification function with additional debugging
-  Future<void> manualTestNotification() async {
-    print('Manually testing notification');
-
-    try {
-      // Create test notification payload
-      final testPayload = NotificationPayload(
-        title: 'Test Notification',
-        body: 'This is a test notification',
-        isLike: true, // Test like notification
-        postId: '12345', // Simple test post ID
-        madeById: 'testuser',
-        type: 'test',
-      );
-
-      // First show an in-app notification
-      print('Showing in-app test notification');
-      showInAppNotification(testPayload);
-
-      // Create a more realistic notification for testing
-      print('Creating test notification with all parameters filled');
-      showInAppNotification(
-        NotificationPayload(
-          title: 'Like Notification',
-          body: 'User123 liked your post',
-          isLike: true,
-          isFollowRequest: false,
-          isReply: false,
-          postId: 'postID123',
-          madeById: 'userID456',
-          type: 'like',
-        ),
-      );
-
-      // Print out current contexts and routes for debugging
-      final context = appNavigatorKey.currentContext;
-      print('Current context available: ${context != null}');
-      if (context != null) {
-        print('Current route: ${ModalRoute.of(context)?.settings.name}');
-      }
-
-      print('Test notifications shown successfully');
-    } catch (e) {
-      print('Error showing test notification: $e');
-    }
-  }
-
   // Add a lifecycle observer to handle notifications properly
   void _setupLifecycleObserver() {
     WidgetsBinding.instance.addObserver(new _AppLifecycleObserver(this));
-  }
-
-  // Comprehensive debug method to test all notification states
-  Future<void> debugNotificationSystem() async {
-    print('\n===== NOTIFICATION SYSTEM DEBUG =====');
-
-    // 1. Check FCM Token
-    try {
-      final token = await _firebaseMessaging.getToken();
-      print('FCM Token Status: ${token != null ? "Valid" : "Missing"}');
-      print('FCM Token: $token');
-    } catch (e) {
-      print('Error getting FCM token: $e');
-    }
-
-    // 2. Check Notification Permissions
-    try {
-      final settings = await _firebaseMessaging.getNotificationSettings();
-      print('\nNotification Permission Status:');
-      print('Authorization Status: ${settings.authorizationStatus}');
-      print('Alert Enabled: ${settings.alert}');
-      print('Badge Enabled: ${settings.badge}');
-      print('Sound Enabled: ${settings.sound}');
-
-      if (Platform.isAndroid) {
-        final androidPlugin = _flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
-        if (androidPlugin != null) {
-          final enabled = await androidPlugin.areNotificationsEnabled();
-          print('Android System Notifications Enabled: $enabled');
-        }
-      }
-    } catch (e) {
-      print('Error checking notification permissions: $e');
-    }
-
-    // 3. Check Notification Channel (Android)
-    if (Platform.isAndroid) {
-      try {
-        final androidPlugin = _flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
-        if (androidPlugin != null) {
-          final channels = await androidPlugin.getNotificationChannels();
-          print('\nNotification Channels:');
-          if (channels != null) {
-            for (final channel in channels) {
-              print('Channel ID: ${channel.id}');
-              print('Channel Name: ${channel.name}');
-              print('Channel Importance: ${channel.importance}');
-              print('Channel Description: ${channel.description}');
-              print('---');
-            }
-          } else {
-            print('No notification channels found');
-          }
-        }
-      } catch (e) {
-        print('Error checking notification channels: $e');
-      }
-    }
-
-    // 4. Test Different Notification Types
-    print('\nTesting notification types:');
-
-    // Test in-app notification
-    try {
-      showInAppNotification(
-        NotificationPayload(
-          title: 'Debug Test',
-          body: 'Testing in-app notification',
-          type: 'debug',
-        ),
-      );
-      print('In-app notification test: SUCCESS');
-    } catch (e) {
-      print('In-app notification test: FAILED - $e');
-    }
-
-    // Test local notification
-    try {
-      await _showLocalNotification(
-        title: 'Debug Test',
-        body: 'Testing local notification',
-        payload: json.encode({
-          'title': 'Debug Test',
-          'body': 'Testing local notification',
-          'type': 'debug',
-        }),
-      );
-      print('Local notification test: SUCCESS');
-    } catch (e) {
-      print('Local notification test: FAILED - $e');
-    }
-
-    // Test FCM notification
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await NotificationsRecord.collection.add({
-          'title': 'Debug Test',
-          'body': 'Testing FCM notification',
-          'is_read': false,
-          'made_by': UserRecord.collection.doc(user.uid),
-          'made_to': user.uid,
-          'date': FieldValue.serverTimestamp(),
-          'is_a_like': false,
-          'is_follow_request': false,
-          'is_reply': false,
-          'type': 'debug',
-        });
-        print('FCM notification test: SUCCESS (document created)');
-      } else {
-        print('FCM notification test: SKIPPED (no user logged in)');
-      }
-    } catch (e) {
-      print('FCM notification test: FAILED - $e');
-    }
-
-    print('===== NOTIFICATION SYSTEM DEBUG END =====\n');
-  }
-
-  // Add this new method
-  void _setupNotificationListener() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    // Listen for notifications where the current user is the recipient
-    NotificationsRecord.collection
-        .where('made_to', isEqualTo: user.uid)
-        .where('is_read', isEqualTo: false)
-        .orderBy('date', descending: true)
-        .limit(10)
-        .snapshots()
-        .listen((snapshot) {
-      // Process any new notifications
-      for (final change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          final notification = NotificationsRecord.fromSnapshot(change.doc);
-          print(
-              'New notification detected locally: ${notification.reference.id}');
-
-          // Skip if already processed (use a timestamp check to avoid duplicates)
-          final now = DateTime.now();
-          final notificationTime = notification.date ?? now;
-          final timeDiff = now.difference(notificationTime).inMinutes;
-
-          // Only process notifications from the last 5 minutes to avoid old ones
-          if (timeDiff <= 5) {
-            _processLocalNotification(notification);
-          }
-        }
-      }
-    }, onError: (error) {
-      print('Error listening for notifications: $error');
-    });
-
-    print('Notification listener set up for user: ${user.uid}');
-  }
-
-  // Add this new method to process notifications detected locally
-  Future<void> _processLocalNotification(
-      NotificationsRecord notification) async {
-    try {
-      print('Processing local notification: ${notification.reference.id}');
-
-      // Get sender username
-      String senderUsername = notification.madeByUsername;
-      if (senderUsername.isEmpty && notification.madeBy != null) {
-        try {
-          final senderDoc = await notification.madeBy!.get();
-          if (senderDoc.exists) {
-            final userData = senderDoc.data() as Map<String, dynamic>?;
-            senderUsername =
-                userData?['user_name'] ?? userData?['userName'] ?? 'Someone';
-          }
-        } catch (e) {
-          print('Error fetching sender details: $e');
-          senderUsername = 'Someone';
-        }
-      }
-
-      // Construct notification message based on type
-      String title = 'New Notification';
-      String body = '';
-
-      if (notification.isALike) {
-        title = 'New Like';
-        body = '$senderUsername liked your post';
-      } else if (notification.isFollowRequest) {
-        if (notification.status == 'pending') {
-          title = 'Follow Request';
-          body = '$senderUsername requested to follow you';
-        } else {
-          title = 'New Follower';
-          body = '$senderUsername started following you';
-        }
-      } else if (notification.isReply) {
-        title = 'New Reply';
-        body = '$senderUsername replied to your comment';
-      } else {
-        title = 'New Comment';
-        body = '$senderUsername commented on your post';
-      }
-
-      // Extract user ID and post ID from DocumentReferences
-      String? madeById;
-      String? postId;
-
-      // Handle madeBy reference
-      if (notification.madeBy != null) {
-        madeById = notification.madeBy!.id;
-      }
-
-      // Handle postRef reference
-      if (notification.postRef != null) {
-        postId = notification.postRef!.path;
-      }
-
-      // Create a payload for the notification
-      final payload = NotificationPayload(
-        title: title,
-        body: body,
-        isLike: notification.isALike,
-        isFollowRequest: notification.isFollowRequest,
-        isReply: notification.isReply,
-        postId: postId,
-        madeById: madeById,
-        type: notification.isALike
-            ? 'like'
-            : notification.isFollowRequest
-                ? 'follow'
-                : notification.isReply
-                    ? 'reply'
-                    : 'comment',
-      );
-
-      // Show in-app notification
-      showInAppNotification(payload);
-
-      // Also show a local notification if app is in background
-      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
-        await _showLocalNotification(
-          title: title,
-          body: body,
-          payload: json.encode({
-            'title': title,
-            'body': body,
-            'is_a_like': notification.isALike.toString(),
-            'is_follow_request': notification.isFollowRequest.toString(),
-            'is_reply': notification.isReply.toString(),
-            'post_ref': postId,
-            'made_by': madeById,
-            'type': notification.isALike
-                ? 'like'
-                : notification.isFollowRequest
-                    ? 'follow'
-                    : notification.isReply
-                        ? 'reply'
-                        : 'comment',
-          }),
-        );
-      }
-
-      print('Local notification processed successfully');
-    } catch (e) {
-      print('Error processing local notification: $e');
-    }
   }
 
   // Set up token refresh monitoring
@@ -1760,6 +1173,39 @@ class NotificationService {
     }, onError: (e) {
       print('Error in FCM token refresh listener: $e');
     });
+  }
+
+  // Method to clear iOS badge count
+  Future<void> clearIOSBadgeCount() async {
+    if (!Platform.isIOS) return;
+    
+    try {
+      // Clear iOS badge count using the FlutterLocalNotificationsPlugin
+      final iOSPlatformSpecific = _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>();
+              
+      if (iOSPlatformSpecific != null) {
+        // Request badge permission
+        await iOSPlatformSpecific.requestPermissions(
+          alert: true, 
+          badge: true, 
+          sound: true,
+        );
+        
+        // Clear all notifications which also clears the badge
+        await iOSPlatformSpecific.cancelAll();
+      }
+      
+      // Also use Firebase Messaging to clear badge
+      await _firebaseMessaging.setForegroundNotificationPresentationOptions(
+        badge: false,
+      );
+      
+      print('iOS badge count cleared successfully');
+    } catch (e) {
+      print('Error clearing iOS badge count: $e');
+    }
   }
 }
 
