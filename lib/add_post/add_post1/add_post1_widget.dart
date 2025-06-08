@@ -15,6 +15,7 @@ import '/index.dart';
 import '/add_post/create_post/create_post_widget.dart';
 import '/widgets/lottie_background.dart';
 import '/services/app_state.dart' as custom_app_state;
+import '/widgets/custom_text_form_field.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lottie/lottie.dart';
@@ -23,6 +24,7 @@ import 'package:simple_gradient_text/simple_gradient_text.dart';
 import 'add_post1_model.dart';
 import '/utils/serialization_helpers.dart';
 import 'package:luna_kraft/backend/backend.dart';
+import 'package:flutter/services.dart';
 export 'add_post1_model.dart';
 
 class AddPost1Widget extends StatefulWidget {
@@ -269,13 +271,15 @@ class _AddPost1WidgetState extends State<AddPost1Widget>
                                       ]
                                     : null,
                               ),
-                              child: TextFormField(
+                              child: CustomTextFormField(
                                 controller: _model.textController,
                                 focusNode: _model.textFieldFocusNode,
                                 maxLines: null,
                                 minLines: 4,
-                                maxLength: 400,
                                 enabled: !_isGenerating,
+                                inputFormatters: [
+                                  LengthLimitingTextInputFormatter(400),
+                                ],
                                 style: FlutterFlowTheme.of(context)
                                     .bodyLarge
                                     .override(

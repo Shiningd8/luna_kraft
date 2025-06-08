@@ -184,8 +184,8 @@ class _SplashScreenState extends State<SplashScreen>
                               scale: _logoScale.value,
                               child: Image.asset(
                                 'assets/images/translogo.png',
-                                width: 150,
-                                height: 150,
+                                width: 180,
+                                height: 180,
                                 fit: BoxFit.contain,
                               ),
                             ),
@@ -193,7 +193,7 @@ class _SplashScreenState extends State<SplashScreen>
                         },
                       ),
 
-                      SizedBox(height: 20),
+                      SizedBox(height: 12),
 
                       // App name text
                       AnimatedBuilder(

@@ -306,14 +306,9 @@ class SubscriptionManager {
     }
 
     try {
-      final userDoc = await FirebaseFirestore.instance.doc(currentUserReference!.path).get();
-
-      // First check if bonus coins were already applied
-      final subscriptionData = userDoc.data()?['subscription'] as Map<String, dynamic>?;
-      final bonusCoinsAlreadyApplied = subscriptionData?['bonusCoinsApplied'] as bool? ?? false;
-      
-      if (bonusCoinsAlreadyApplied) {
-        print('ℹ️ Bonus coins were already applied for this subscription');
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        print('❌ Cannot add bonus coins - no authenticated user');
         return;
       }
 
@@ -328,25 +323,19 @@ class SubscriptionManager {
       }
 
       if (bonusCoins > 0) {
-        // Use a transaction to ensure atomic update
-        await FirebaseFirestore.instance.runTransaction((transaction) async {
-          // Get the latest user data within transaction
-          final latestUserDoc = await transaction.get(currentUserReference!);
-          final userData = latestUserDoc.data() as Map<String, dynamic>?;
-          
-          if (userData == null) return;
-          
-          // Get current coin balance
-          final currentCoins = userData['luna_coins'] as int? ?? 0;
-          
-          // Update both coins and mark as applied in one transaction
-          transaction.update(currentUserReference!, {
-            'luna_coins': currentCoins + bonusCoins,
-            'subscription.bonusCoinsApplied': true,
-          });
-        });
-
-        print('💰 Added $bonusCoins bonus coins for subscription tier: $productId');
+        // Use the safe method from PurchaseService to prevent duplicate additions
+        final success = await PurchaseService.safelyAddBonusCoins(
+          productId: productId,
+          userId: userId,
+          bonusCoins: bonusCoins,
+          source: 'SubscriptionManager._addBonusCoinsForSubscription',
+        );
+        
+        if (success) {
+          print('✅ Bonus coins added successfully via safe method');
+        } else {
+          print('ℹ️ Bonus coins not added (already applied or locked)');
+        }
       }
       
       // Unlock all backgrounds for premium users
@@ -445,18 +434,27 @@ class SubscriptionManager {
       }
       
       if (bonusCoins > 0) {
-        // Calculate new coin balance - use the correct field name
-        final currentCoins = userData['luna_coins'] as int? ?? 0;
-        final newCoins = currentCoins + bonusCoins;
-        
-        // Update user document with new coin balance and mark coins as applied
-        await FirebaseFirestore.instance.doc(currentUserReference!.path).update({
-          'luna_coins': newCoins,
-          'subscription.bonusCoinsApplied': true,
-        });
-        
-        print('✅ Successfully added $bonusCoins missing coins. New balance: $newCoins');
-        return true;
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId != null) {
+          // Use the safe method from PurchaseService to prevent duplicate additions
+          final success = await PurchaseService.safelyAddBonusCoins(
+            productId: productId,
+            userId: userId,
+            bonusCoins: bonusCoins,
+            source: 'SubscriptionManager.applyMissingSubscriptionBenefits',
+          );
+          
+          if (success) {
+            print('✅ Successfully added $bonusCoins missing coins via safe method');
+            return true;
+          } else {
+            print('ℹ️ Bonus coins not added (already applied or locked)');
+            return false;
+          }
+        } else {
+          print('❌ Cannot add bonus coins - no authenticated user');
+          return false;
+        }
       } else {
         print('❓ Could not determine bonus coin amount for product: $productId');
       }

@@ -1066,7 +1066,7 @@ class _ZenModePageState extends State<ZenModePage>
                                   style: FlutterFlowTheme.of(context).bodyLarge.override(
                                     fontFamily: 'Figtree',
                                     fontWeight: FontWeight.bold,
-                                    color: FlutterFlowTheme.of(context).warning,
+                                    color: FlutterFlowTheme.of(context).primaryText,
                                   ),
                                 ),
                               ],
@@ -1216,7 +1216,7 @@ class _ZenModePageState extends State<ZenModePage>
                               onPressed: () {
                                 Navigator.pop(dialogContext);
                                 // Navigate to membership page
-                                Navigator.pushNamed(context, 'MembershipPage');
+                                context.pushNamed('MembershipPage');
                               },
                               text: 'Get Premium Membership',
                               options: FFButtonOptions(
@@ -2906,16 +2906,16 @@ class _ZenModePageState extends State<ZenModePage>
                                                   Container(
                                                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                                     decoration: BoxDecoration(
-                                                      color: FlutterFlowTheme.of(context).warning.withOpacity(0.9),
+                                                      color: Colors.black.withOpacity(0.6),
                                                       borderRadius: BorderRadius.circular(20),
                                                       border: Border.all(
-                                                        color: Colors.white.withOpacity(0.3),
+                                                        color: Colors.white.withOpacity(0.2),
                                                         width: 1,
                                                       ),
                                                       boxShadow: [
                                                         BoxShadow(
-                                                          color: Colors.black.withOpacity(0.2),
-                                                          blurRadius: 4,
+                                                          color: Colors.black.withOpacity(0.3),
+                                                          blurRadius: 6,
                                                           spreadRadius: 0,
                                                         ),
                                                       ],
@@ -2924,19 +2924,11 @@ class _ZenModePageState extends State<ZenModePage>
                                                       mainAxisSize: MainAxisSize.min,
                                                       children: [
                                                         Container(
-                                                          width: 20,
-                                                          height: 20,
+                                                          width: 18,
+                                                          height: 18,
                                                           margin: EdgeInsets.only(right: 6),
-                                                          decoration: BoxDecoration(
-                                                            shape: BoxShape.circle,
-                                                            color: Colors.white.withOpacity(0.2),
-                                                            border: Border.all(
-                                                              color: Colors.white.withOpacity(0.3),
-                                                              width: 1,
-                                                            ),
-                                                          ),
                                                           child: ClipRRect(
-                                                            borderRadius: BorderRadius.circular(10),
+                                                            borderRadius: BorderRadius.circular(9),
                                                             child: Image.asset(
                                                               'assets/images/lunacoin.png',
                                                               fit: BoxFit.cover,
@@ -2950,8 +2942,8 @@ class _ZenModePageState extends State<ZenModePage>
                                                               .override(
                                                                 fontFamily: 'Readex Pro',
                                                                 color: Colors.white,
-                                                                fontWeight: FontWeight.bold,
-                                                                fontSize: 15,
+                                                                fontWeight: FontWeight.w600,
+                                                                fontSize: 14,
                                                               ),
                                                         ),
                                                       ],

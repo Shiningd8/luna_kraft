@@ -1,0 +1,22 @@
+Déclaration d'Utilisation de Techniques de Chiffrement
+
+Nom de l'application: LunaKraft
+Version de l'application: 1.0.0
+
+Description de l'application:
+LunaKraft est une application de média social innovante permettant aux utilisateurs de partager leurs rêves, d’explorer ceux des autres, et d’interagir dans un espace onirique unique. Parmi ses fonctionnalités principales, on retrouve le “Zen Mode” qui permet de mixer des sons de la nature personnalisés pour faciliter la détente et le sommeil, une fonctionnalité d’analyse de rêves, et un générateur de complétion de rêves basé sur l’IA. L'application utilise Firebase pour l'authentification et la sauvegarde sécurisée des données des utilisateurs.
+
+Techniques de chiffrement utilisées:
+LunaKraft repose sur les services Firebase de Google, qui assurent le chiffrement des données en transit via le protocole HTTPS (TLS 1.2/1.3) et le chiffrement des données au repos avec l’algorithme AES-256. Aucune technique de chiffrement propriétaire ou personnalisée n'est utilisée.
+
+Utilisation des algorithmes de chiffrement :
+
+Utilisation exclusive d’algorithmes de chiffrement standards fournis par les services de Firebase et Apple (comme Keychain).
+
+Aucun accès direct ni personnalisation des fonctions de chiffrement.
+
+Détails de l'implémentation :
+Toutes les communications réseau entre l'application et les serveurs Firebase sont protégées par HTTPS. Les données utilisateur, y compris les identifiants de connexion et les publications de rêves, sont stockées de manière sécurisée avec un chiffrement au repos géré par Firebase. L’application ne manipule pas directement de bibliothèques de chiffrement personnalisées.
+
+Déclaration :
+Je soussigné, Shubhankar Mishra, en tant que représentant légal de l'application LunaKraft, déclare que toutes les informations fournies dans ce formulaire sont exactes et complètes.

@@ -1,18 +1,22 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'firebase_app_check_stub.dart';
+import 'package:rxdart/rxdart.dart';
+
+import 'firebase_app_check_stub.dart'
+    if (dart.library.io) 'firebase_app_check_mobile.dart'
+    if (dart.library.html) 'firebase_app_check_web.dart';
 import '../auth_manager.dart';
 
 import '/backend/backend.dart';
 import 'anonymous_auth.dart';
-import 'apple_auth.dart';
 import 'email_auth.dart';
 import 'firebase_user_provider.dart';
 import 'google_auth.dart';
+import 'apple_auth.dart';
 import 'jwt_token_auth.dart';
 import 'github_auth.dart';
 import 'auth_util.dart';
@@ -83,10 +87,10 @@ class FirebaseAuthManager extends AuthManager
   }
 
   @override
-  Future updateEmail({
-    required String email,
-    required BuildContext context,
-  }) async {
+  Future<void> updateEmail(
+    BuildContext context,
+    String email,
+  ) async {
     try {
       if (!loggedIn) {
         print('Error: update email attempted with no logged in user!');
@@ -107,16 +111,16 @@ class FirebaseAuthManager extends AuthManager
   }
 
   @override
-  Future updatePassword({
-    required String newPassword,
-    required BuildContext context,
-  }) async {
+  Future<void> updatePassword(
+    BuildContext context,
+    String password,
+  ) async {
     try {
       if (!loggedIn) {
         print('Error: update password attempted with no logged in user!');
         return;
       }
-      await currentUser?.updatePassword(newPassword);
+      await currentUser?.updatePassword(password);
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -128,10 +132,10 @@ class FirebaseAuthManager extends AuthManager
   }
 
   @override
-  Future resetPassword({
-    required String email,
-    required BuildContext context,
-  }) async {
+  Future<void> resetPassword(
+    BuildContext context,
+    String email,
+  ) async {
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
@@ -139,11 +143,21 @@ class FirebaseAuthManager extends AuthManager
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.message!}')),
       );
-      return null;
+      return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Password reset email sent')),
     );
+  }
+
+  @override
+  Future<void> sendEmailVerification() async {
+    await currentUser?.sendEmailVerification();
+  }
+
+  @override
+  Future<void> refreshUser() async {
+    await currentUser?.refreshUser();
   }
 
   @override
@@ -177,14 +191,16 @@ class FirebaseAuthManager extends AuthManager
       _signInOrCreateAccount(context, anonymousSignInFunc, 'ANONYMOUS');
 
   @override
-  Future<BaseAuthUser?> signInWithApple(BuildContext context) =>
-      _signInOrCreateAccount(context, appleSignIn, 'APPLE');
-
-  @override
   Future<BaseAuthUser?> signInWithGoogle(BuildContext context) {
     // Use our improved Google Sign-In function that handles errors better
     return _signInOrCreateAccount(
         context, () => handleGoogleSignIn(context), 'GOOGLE');
+  }
+
+  @override
+  Future<BaseAuthUser?> signInWithApple(BuildContext context) {
+    return _signInOrCreateAccount(
+        context, () => handleAppleSignIn(context), 'APPLE');
   }
 
   @override

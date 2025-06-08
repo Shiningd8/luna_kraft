@@ -503,7 +503,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextFormField(
+                    CustomTextFormField(
                       controller: _tagsController,
                       focusNode: _tagsFocusNode,
                       style: FlutterFlowTheme.of(context).bodyLarge.override(
@@ -543,7 +543,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                       ),
                       onChanged: _handleTagInput,
                       textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) {
+                      onSubmitted: (_) {
                         _addCurrentTagIfNeeded();
                       },
                     ),

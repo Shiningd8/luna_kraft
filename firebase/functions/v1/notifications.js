@@ -81,6 +81,16 @@ exports.sendOnCreate = functions.firestore
                 body = `${senderUsername} commented on your post`;
             }
 
+            // Calculate unread notification count for this user
+            const unreadNotificationsQuery = await admin.firestore()
+                .collection('notifications')
+                .where('made_to', '==', recipientId)
+                .where('is_read', '==', false)
+                .get();
+            
+            const unreadCount = unreadNotificationsQuery.size;
+            console.log(`User ${recipientId} has ${unreadCount} unread notifications`);
+
             // Construct the message
             const message = {
                 notification: {
@@ -116,7 +126,7 @@ exports.sendOnCreate = functions.firestore
                     payload: {
                         aps: {
                             contentAvailable: true,
-                            badge: 1,
+                            badge: unreadCount,
                             sound: 'default',
                         },
                     },

@@ -30,15 +30,27 @@ import GoogleMobileAds
     #if DEBUG
     if let configURL = Bundle.main.url(forResource: "Configuration", withExtension: "storekit") {
       do {
+        // CRITICAL FIX: Clear any pending transactions before setting up StoreKit testing
+        print("Clearing pending StoreKit transactions...")
+        clearPendingTransactions()
+        
         try SKPaymentQueue.default().setStorekit2TransactionListenerForTesting()
         try SKAdImpression.enabledForTesting()
         print("StoreKit configuration loaded successfully for testing!")
+        
+        // Add additional transaction queue management
+        setupTransactionQueueManagement()
+        
       } catch {
         print("StoreKit configuration loading failed: \(error.localizedDescription)")
       }
     } else {
       print("StoreKit configuration file not found in the bundle!")
     }
+    #else
+    // For production builds, also ensure clean transaction queue
+    clearPendingTransactions()
+    setupTransactionQueueManagement()
     #endif
 
     GeneratedPluginRegistrant.register(with: self)
@@ -160,8 +172,8 @@ import GoogleMobileAds
   }
   
   private func loadRewardedAd(completion: @escaping (Bool) -> Void) {
-    // Use Google's test rewarded ad ID as requested
-    let adUnitID = "ca-app-pub-3940256099942544/1712485313" // Test rewarded ad ID
+    // Use production rewarded ad ID for Luna Kraft
+    let adUnitID = "ca-app-pub-3406090070128457/9972039967" // Production rewarded ad ID
     
     let request = Request()
     RewardedAd.load(with: adUnitID, request: request) { [weak self] ad, error in
@@ -266,6 +278,88 @@ import GoogleMobileAds
     print("Did receive notification response: \(userInfo)")
     Messaging.messaging().appDidReceiveMessage(userInfo)
     completionHandler()
+  }
+  
+  // MARK: - StoreKit Transaction Queue Management
+  
+  /// Clears any pending transactions from the StoreKit queue to prevent transaction mismatches
+  private func clearPendingTransactions() {
+    let paymentQueue = SKPaymentQueue.default()
+    let pendingTransactions = paymentQueue.transactions
+    
+    print("Found \(pendingTransactions.count) pending transactions in queue")
+    
+    for transaction in pendingTransactions {
+      print("Pending transaction: \(transaction.transactionIdentifier ?? "unknown") for product: \(transaction.payment.productIdentifier)")
+      
+      // Only finish transactions that are in a completed or failed state
+      switch transaction.transactionState {
+      case .purchased, .restored:
+        print("Finishing completed transaction: \(transaction.transactionIdentifier ?? "unknown")")
+        paymentQueue.finishTransaction(transaction)
+      case .failed:
+        print("Finishing failed transaction: \(transaction.transactionIdentifier ?? "unknown")")
+        paymentQueue.finishTransaction(transaction)
+      case .purchasing, .deferred:
+        print("Leaving active transaction in queue: \(transaction.transactionIdentifier ?? "unknown")")
+      @unknown default:
+        print("Unknown transaction state for: \(transaction.transactionIdentifier ?? "unknown")")
+      }
+    }
+    
+    print("Transaction queue cleanup completed")
+  }
+  
+  /// Sets up additional transaction queue management to prevent RevenueCat conflicts
+  private func setupTransactionQueueManagement() {
+    // Add observer to monitor transaction queue changes
+    let paymentQueue = SKPaymentQueue.default()
+    
+    // Log current queue state
+    print("Current transaction queue state:")
+    print("- Transactions in queue: \(paymentQueue.transactions.count)")
+    
+    for transaction in paymentQueue.transactions {
+      print("- Transaction: \(transaction.transactionIdentifier ?? "unknown"), Product: \(transaction.payment.productIdentifier), State: \(transactionStateString(transaction.transactionState))")
+    }
+    
+    // Set up periodic queue monitoring (only in debug mode)
+    #if DEBUG
+    Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
+      self.monitorTransactionQueue()
+    }
+    #endif
+  }
+  
+  /// Monitors the transaction queue for potential issues
+  private func monitorTransactionQueue() {
+    let paymentQueue = SKPaymentQueue.default()
+    let transactions = paymentQueue.transactions
+    
+    if !transactions.isEmpty {
+      print("Transaction queue monitor - Found \(transactions.count) transactions:")
+      for transaction in transactions {
+        print("- \(transaction.transactionIdentifier ?? "unknown"): \(transaction.payment.productIdentifier) (\(transactionStateString(transaction.transactionState)))")
+      }
+    }
+  }
+  
+  /// Helper method to convert transaction state to readable string
+  private func transactionStateString(_ state: SKPaymentTransactionState) -> String {
+    switch state {
+    case .purchasing:
+      return "purchasing"
+    case .purchased:
+      return "purchased"
+    case .failed:
+      return "failed"
+    case .restored:
+      return "restored"
+    case .deferred:
+      return "deferred"
+    @unknown default:
+      return "unknown"
+    }
   }
 }
 

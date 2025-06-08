@@ -195,6 +195,16 @@ exports.sendIOSTerminatedNotification = async (snapshot, context) => {
       }
     }
     
+    // Calculate unread notification count for this user
+    const unreadNotificationsQuery = await admin.firestore()
+      .collection('notifications')
+      .where('made_to', '==', recipientId)
+      .where('is_read', '==', false)
+      .get();
+    
+    const unreadCount = unreadNotificationsQuery.size;
+    console.log(`User ${recipientId} has ${unreadCount} unread notifications`);
+    
     // Construct the message
     const message = {
       token: fcmToken,
@@ -228,7 +238,7 @@ exports.sendIOSTerminatedNotification = async (snapshot, context) => {
             },
             "content-available": 1,
             "mutable-content": 1,
-            badge: 1,
+            badge: unreadCount,
             sound: "default"
           }
         }

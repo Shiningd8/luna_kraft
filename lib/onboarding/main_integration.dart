@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:luna_kraft/onboarding/onboarding_manager.dart';
 import 'package:luna_kraft/onboarding/onboarding_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 /// This file demonstrates how to integrate the onboarding flow into your main.dart
 ///
@@ -88,6 +89,14 @@ class _MyAppState extends State<MyApp> {
             _checkOnboardingStatus();
           });
         }),
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: [
+          Locale('en', ''),
+        ],
       );
     }
     
@@ -100,6 +109,14 @@ class _MyAppState extends State<MyApp> {
             child: CircularProgressIndicator(),
           ),
         ),
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: [
+          Locale('en', ''),
+        ],
       );
     }
     
@@ -110,6 +127,14 @@ class _MyAppState extends State<MyApp> {
         home: OnboardingScreen(
           onComplete: _onOnboardingComplete,
         ),
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: [
+          Locale('en', ''),
+        ],
       );
     }
     
@@ -117,6 +142,14 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp.router(
       // Your existing configuration...
       routerConfig: _router,
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: [
+        Locale('en', ''),
+      ],
     );
   }
 }

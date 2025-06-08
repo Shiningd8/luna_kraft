@@ -115,7 +115,7 @@ class _BaseLayoutState extends State<BaseLayout> {
           PageView(
             controller: _pageController,
             onPageChanged: _onPageChanged,
-            physics: BouncingScrollPhysics(),
+            physics: const NeverScrollableScrollPhysics(),
             children: [
               HomePageWidget(),
               HistoryPageWidget(),

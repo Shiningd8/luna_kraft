@@ -12,6 +12,7 @@ import '/backend/schema/posts_record.dart';
 import '/backend/schema/user_record.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/components/share_poster_widget.dart';
+import '/utils/deep_link_helper.dart';
 
 class ShareUtil {
   // Main method to share a post
@@ -43,8 +44,11 @@ class ShareUtil {
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
             home: Scaffold(
-              backgroundColor: Colors.transparent,
-              body: Center(
+              backgroundColor: Colors.black,
+              body: Container(
+                // Ensure proper Instagram story dimensions
+                width: 1080,
+                height: 1920,
                 child: posterWidget,
               ),
             ),
@@ -60,17 +64,17 @@ class ShareUtil {
         overlayState.insert(overlayEntry);
 
         // Wait for the widget to be rendered
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 800));
 
         // Capture image data
         final tempDir = await getTemporaryDirectory();
         final file =
-            File('${tempDir.path}/dream_post_${post.reference.id}.png');
+            File('${tempDir.path}/luna_story_${post.reference.id}.png');
 
-        // Create simple image
+        // Create high-quality image optimized for Instagram stories
         final boundary =
             tempKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-        final ui.Image image = await boundary.toImage(pixelRatio: 3.0); // Increased for better quality
+        final ui.Image image = await boundary.toImage(pixelRatio: 2.0); // Optimized for Instagram stories
         final ByteData? byteData =
             await image.toByteData(format: ui.ImageByteFormat.png);
 
@@ -89,15 +93,24 @@ class ShareUtil {
           Navigator.of(dialogContext, rootNavigator: true).pop();
         }
 
-        // Share the file
+        // Generate deep link for the post
+        final postDeepLink = DeepLinkHelper.generateShareablePostLink(
+          post.reference,
+          userRef: post.poster,
+        );
+
+        // Share the file with Instagram story optimized text and deep link
         if (file.existsSync() && dialogContext.mounted) {
           // Use Share.shareXFiles with proper context and ensure it opens the share sheet
           await Share.shareXFiles(
             [XFile(file.path)],
-            text: 'Check out this dream: ${post.title}',
-            subject: 'Dream: ${post.title}',
+            text: '✨ ${post.title} - Shared from LunaKraft\n\n'
+                  'Don\'t have the app? Download Luna Kraft:\n'
+                  'https://lunakraft.com\n\n'
+                  'Join the dreamy community! 🌙',
+            subject: 'Dream Story: ${post.title}',
           ).then((_) {
-            print("Share completed successfully");
+            print("Instagram story share completed successfully");
           }).catchError((error) {
             print("Share error: $error");
             if (dialogContext.mounted) {

@@ -32,320 +32,287 @@ class SharePosterWidget extends StatefulWidget {
 
 class _SharePosterWidgetState extends State<SharePosterWidget> {
   double _calculateFontSize(String text) {
-    // Dynamic font size calculation based on text length
+    // More aggressive font size calculation for better content fitting
     final length = text.length;
 
-    // More gradual size reduction for longer texts with increased sizes
-    if (length > 1500) return 14.0;
-    if (length > 1200) return 15.0;
-    if (length > 900) return 16.0;
-    if (length > 700) return 17.0;
-    if (length > 500) return 18.0;
-    if (length > 300) return 19.0;
-    if (length > 150) return 20.0;
+    if (length > 2000) return 12.0;
+    if (length > 1500) return 13.0;
+    if (length > 1200) return 14.0;
+    if (length > 900) return 15.0;
+    if (length > 700) return 16.0;
+    if (length > 500) return 17.0;
+    if (length > 300) return 18.0;
+    if (length > 150) return 19.0;
 
-    // Default size for short texts
-    return 21.0;
+    return 20.0;
   }
 
   @override
   Widget build(BuildContext context) {
     final contentFontSize = _calculateFontSize(widget.post.dream);
 
-    // Calculate title font size based on length with increased sizes
+    // Calculate title font size based on length
     final titleLength = widget.post.title.length;
     final double titleFontSize =
-        titleLength > 30 ? 36.0 : (titleLength > 20 ? 40.0 : 44.0);
+        titleLength > 50 ? 24.0 : (titleLength > 30 ? 28.0 : 32.0);
 
-    // Calculate username font size based on length
+    // Calculate username font size
     final usernameLength = (widget.user.displayName ?? '').length;
-    final double usernameFontSize = usernameLength > 15 ? 24.0 : 26.0;
+    final double usernameFontSize = usernameLength > 15 ? 18.0 : 20.0;
 
     return RepaintBoundary(
       key: widget.boundaryKey,
       child: Container(
-        width: double.infinity,
-        constraints: const BoxConstraints(
-          minHeight: 400,
-          maxHeight: 800,
-        ),
+        // Instagram Story dimensions (9:16 aspect ratio)
+        width: 1080,
+        height: 1920,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+            width: 1,
+          ),
         ),
-        child: Stack(
-          children: [
-            // Background image - keeping this intact as requested
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: _buildBackground(),
-            ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: Stack(
+            children: [
+              // Background image
+              Positioned.fill(
+                child: _buildBackground(),
+              ),
 
-            // Gradient overlay for better text readability - enhanced for better contrast
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.25),
-                    Colors.black.withOpacity(0.5),
-                    Colors.black.withOpacity(0.75),
-                  ],
-                  stops: const [0.1, 0.5, 0.9],
+              // Gradient overlay for better text readability
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.3),
+                      Colors.black.withOpacity(0.5),
+                      Colors.black.withOpacity(0.7),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
                 ),
               ),
-            ),
 
-            // Content
-            Positioned.fill(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // User info at top with improved styling
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-                    child: Row(
-                      children: [
-                        // User profile image with enhanced styling
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.5),
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                spreadRadius: 1,
+              // Content with Instagram story safe area margins
+              Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 120, // Safe area for Instagram story top
+                    bottom: 200, // Safe area for Instagram story bottom
+                    left: 24,
+                    right: 24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // User info at top - more compact
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Row(
+                          children: [
+                            // User profile image - smaller
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.5),
+                                  width: 2,
+                                ),
                               ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              color: FlutterFlowTheme.of(context).primary,
-                              child: widget.user.photoUrl != null &&
-                                      widget.user.photoUrl!.isNotEmpty
-                                  ? CachedNetworkImage(
-                                      imageUrl: widget.user.photoUrl!,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (context, url, error) =>
-                                          Center(
-                                        child: Text(
-                                          widget.user.displayName?.isNotEmpty ==
-                                                  true
-                                              ? widget.user.displayName![0]
-                                                  .toUpperCase()
-                                              : 'U',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.bold,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(18),
+                                child: Container(
+                                  width: 36, // Further reduced
+                                  height: 36,
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  child: widget.user.photoUrl != null &&
+                                          widget.user.photoUrl!.isNotEmpty
+                                      ? CachedNetworkImage(
+                                          imageUrl: widget.user.photoUrl!,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (context, url, error) =>
+                                              Center(
+                                            child: Text(
+                                              widget.user.displayName?.isNotEmpty ==
+                                                      true
+                                                  ? widget.user.displayName![0]
+                                                      .toUpperCase()
+                                                  : 'U',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : Center(
+                                          child: Text(
+                                            widget.user.displayName?.isNotEmpty ==
+                                                    true
+                                                ? widget.user.displayName![0]
+                                                    .toUpperCase()
+                                                : 'U',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    )
-                                  : Center(
-                                      child: Text(
-                                        widget.user.displayName?.isNotEmpty ==
-                                                true
-                                            ? widget.user.displayName![0]
-                                                .toUpperCase()
-                                            : 'U',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                widget.user.displayName ?? 'User',
-                                style: GoogleFonts.figtree(
-                                  color: Colors.white,
-                                  fontSize: usernameFontSize,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.2,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.3),
-                                      blurRadius: 3,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                  ],
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                              if (widget.user.userName?.isNotEmpty == true)
-                                Text(
-                                  '@${widget.user.userName}',
-                                  style: GoogleFonts.figtree(
-                                    color: Colors.white.withOpacity(0.8),
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: 0.1,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    widget.user.displayName ?? 'User',
+                                    style: GoogleFonts.figtree(
+                                      color: Colors.white,
+                                      fontSize: usernameFontSize,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.2,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black.withOpacity(0.5),
+                                          blurRadius: 3,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                  if (widget.user.userName?.isNotEmpty == true)
+                                    Text(
+                                      '@${widget.user.userName}',
+                                      style: GoogleFonts.figtree(
+                                        color: Colors.white.withOpacity(0.8),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: 0.1,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Title - more compact
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: AutoSizeText(
+                          widget.post.title,
+                          style: GoogleFonts.figtree(
+                            color: Colors.white,
+                            fontSize: titleFontSize,
+                            fontWeight: FontWeight.w800,
+                            height: 1.1,
+                            letterSpacing: 0.3,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withOpacity(0.6),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
                             ],
                           ),
+                          maxLines: 2, // Reduced to save space
+                          minFontSize: 20,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
-                    ),
-                  ),
-
-                  // Title with enhanced typography and sizing
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                    child: Text(
-                      widget.post.title,
-                      style: GoogleFonts.figtree(
-                        color: Colors.white,
-                        fontSize: titleFontSize,
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
-                        letterSpacing: 0.3,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withOpacity(0.4),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
 
-                  // Dream content with improved readability and scaling
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                      // Use shrinkWrap ListView to ensure all content is visible
-                      child: ListView(
-                        padding: EdgeInsets.zero,
-                        physics: const NeverScrollableScrollPhysics(),
-                        shrinkWrap: true,
-                        children: [
-                          Text(
+                      // Dream content - use remaining available space
+                      Expanded(
+                        child: SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: AutoSizeText(
                             widget.post.dream,
                             style: GoogleFonts.figtree(
                               color: Colors.white,
                               fontSize: contentFontSize,
-                              height: 1.5,
-                              letterSpacing: 0.3,
+                              height: 1.3, // Slightly tighter
+                              letterSpacing: 0.2,
                               fontWeight: FontWeight.w400,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withOpacity(0.5),
                                   blurRadius: 2,
                                   offset: const Offset(0, 1),
                                 ),
                               ],
                             ),
                             textAlign: TextAlign.left,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Brand at bottom with enhanced styling
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.2),
-                        ],
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Logo with fixed dimensions to prevent stretching
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(
-                            'assets/images/lunamoon.png',
-                            width: 24,
-                            height: 24,
-                            fit: BoxFit.contain,
-                            color: Colors.amber[300],
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                Icons.nights_stay,
-                                color: Colors.amber[300],
-                                size: 24,
-                              );
-                            },
+                            minFontSize: 10,
+                            maxLines: null,
+                            overflow: TextOverflow.visible,
                           ),
                         ),
-                        const SizedBox(width: 4), // Reduced spacing for better appearance
-                        Text(
-                          'LunaKraft',
-                          style: GoogleFonts.figtree(
-                            color: Colors.amber[300],
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withOpacity(0.5),
-                                blurRadius: 3,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                      ),
 
-            // Optional: subtle vignette effect for more depth
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.center,
-                    radius: 1.5,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.2),
+                      // Brand at bottom - using combined logo and text image
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.only(top: 16),
+                        alignment: Alignment.center,
+                        child: Image.asset(
+                          'assets/images/lunalogotext.png',
+                          height: 36, // Same height as the previous icon
+                          fit: BoxFit.contain,
+                          color: Colors.amber[300],
+                          errorBuilder: (context, error, stackTrace) {
+                            // Fallback to the original design if image fails to load
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.nights_stay,
+                                  color: Colors.amber[300],
+                                  size: 36,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'LunaKraft',
+                                  style: GoogleFonts.figtree(
+                                    color: Colors.amber[300],
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withOpacity(0.6),
+                                        blurRadius: 3,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
                     ],
-                    stops: const [0.6, 1.0],
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -374,7 +341,6 @@ class _SharePosterWidgetState extends State<SharePosterWidget> {
           ),
         );
       }
-
       // Check if it's a network image URL (for images, not videos)
       else if (bgUrl.contains('http') &&
           !bgUrl.contains('.mp4') &&

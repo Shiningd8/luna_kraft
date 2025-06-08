@@ -46,7 +46,14 @@ class NotificationService: UNNotificationServiceExtension {
         
         // Make sure we have a badge number if notification permission includes badges
         if bestAttemptContent.badge == nil {
-            bestAttemptContent.badge = 1
+            // Check if badge count is provided in the payload
+            if let aps = userInfo["aps"] as? [String: Any],
+               let badgeCount = aps["badge"] as? NSNumber {
+                bestAttemptContent.badge = badgeCount
+            } else {
+                // Only set to 1 as fallback if no badge info is provided
+                bestAttemptContent.badge = 1
+            }
         }
         
         // Deliver the notification if it hasn't been delivered by Firebase helper

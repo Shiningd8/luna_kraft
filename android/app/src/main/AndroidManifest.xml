@@ -74,6 +74,14 @@
                 <data android:scheme="https" android:host="lunakraft.com" android:pathPrefix="/profile/" />
             </intent-filter>
             
+            <!-- HTTPS deep linking for posts -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="lunakraft.com" android:pathPrefix="/post/" />
+            </intent-filter>
+            
             <!-- App Links for fallback to Play Store -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />

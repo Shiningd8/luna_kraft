@@ -621,17 +621,52 @@ GoRouter createRouter(AppStateNotifier appStateNotifier, [Widget? entryPage]) =>
           ),
         ),
         FFRoute(
-          name: 'Profile',
+          name: 'UserProfile',
           path: '/profile/:userId',
           builder: (context, params) {
             final userId = params.getParam('userId', ParamType.String);
-            if (userId != null) {
-              // Create a document reference from the user ID
+            if (userId != null && userId.isNotEmpty) {
               final userRef = FirebaseFirestore.instance.collection('User').doc(userId);
               return UserpageWidget(profileparameter: userRef);
             }
             return Scaffold(
               body: Center(child: Text('User not found')),
+            );
+          },
+        ),
+        FFRoute(
+          name: 'PostDeepLink',
+          path: '/post/:postId',
+          builder: (context, params) {
+            final postId = params.getParam('postId', ParamType.String);
+            final userId = params.getParam('user', ParamType.String);
+            
+            print('PostDeepLink route - postId: $postId, userId: $userId');
+            
+            if (postId != null && postId.isNotEmpty) {
+              // Navigate to the detailed post page
+              return DetailedpostWidget(
+                docref: postId,
+                userref: userId,
+              );
+            }
+            
+            // If no valid post ID, redirect to home
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              context.go('/');
+            });
+            
+            return Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading post...'),
+                  ],
+                ),
+              ),
             );
           },
         ),

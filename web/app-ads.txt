@@ -1,0 +1,9 @@
+# app-ads.txt for LunaKraft
+# This file declares the authorized digital sellers for this app
+# Format: <advertising system domain>, <publisher ID>, <relationship type>, <certification authority ID>
+
+google.com, pub-3406090070128457, DIRECT, f08c47fec0942fa0
+
+# Additional networks (if you use them):
+# facebook.com, XXXXXXXXXXXXXXXX, RESELLER, c3e20eee3f780d68
+# unity.com, XXXXXXX, RESELLER, 96cabb5fbdde37a7 

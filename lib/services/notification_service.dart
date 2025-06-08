@@ -1193,8 +1193,23 @@ class NotificationService {
           sound: true,
         );
         
-        // Clear all notifications which also clears the badge
-        await iOSPlatformSpecific.cancelAll();
+        // Clear the badge by setting it to 0
+        await _flutterLocalNotificationsPlugin.show(
+          0,
+          null,
+          null,
+          NotificationDetails(
+            iOS: DarwinNotificationDetails(
+              presentAlert: false,
+              presentBadge: true,
+              presentSound: false,
+              badgeNumber: 0,
+            ),
+          ),
+        );
+        
+        // Cancel the notification immediately to avoid showing it
+        await _flutterLocalNotificationsPlugin.cancel(0);
       }
       
       // Also use Firebase Messaging to clear badge
@@ -1205,6 +1220,53 @@ class NotificationService {
       print('iOS badge count cleared successfully');
     } catch (e) {
       print('Error clearing iOS badge count: $e');
+    }
+  }
+
+  // Method to update iOS badge count with actual unread count
+  Future<void> updateIOSBadgeCount() async {
+    if (!Platform.isIOS) return;
+    
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      
+      // Get unread notification count for current user
+      final unreadQuery = await FirebaseFirestore.instance
+          .collection('notifications')
+          .where('made_to', isEqualTo: user.uid)
+          .where('is_read', isEqualTo: false)
+          .get();
+      
+      final unreadCount = unreadQuery.docs.length;
+      
+      // Update badge count
+      final iOSPlatformSpecific = _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>();
+              
+      if (iOSPlatformSpecific != null) {
+        await _flutterLocalNotificationsPlugin.show(
+          0,
+          null,
+          null,
+          NotificationDetails(
+            iOS: DarwinNotificationDetails(
+              presentAlert: false,
+              presentBadge: true,
+              presentSound: false,
+              badgeNumber: unreadCount,
+            ),
+          ),
+        );
+        
+        // Cancel the notification immediately to avoid showing it
+        await _flutterLocalNotificationsPlugin.cancel(0);
+      }
+      
+      print('iOS badge count updated to: $unreadCount');
+    } catch (e) {
+      print('Error updating iOS badge count: $e');
     }
   }
 }

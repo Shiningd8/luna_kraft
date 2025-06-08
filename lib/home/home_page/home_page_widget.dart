@@ -1426,6 +1426,13 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
                         await batch.commit();
 
+                        // Clear iOS badge count after marking notifications as read
+                        try {
+                          await NotificationService().clearIOSBadgeCount();
+                        } catch (e) {
+                          print('Error clearing iOS badge count: $e');
+                        }
+
                         Navigator.of(context).push(
                           PageRouteBuilder(
                             pageBuilder:

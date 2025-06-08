@@ -254,7 +254,7 @@ Future<void> main() async {
     ),
     
     // Platform setting
-    platform: TargetPlatform.android,
+    platform: TargetPlatform.iOS,
     
     // Input decoration
     inputDecorationTheme: InputDecorationTheme(
@@ -562,7 +562,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Handle app lifecycle changes
     if (state == AppLifecycleState.resumed) {
       // App came to foreground - reset badge count
-      _resetIOSBadgeCount();
+      NotificationService().clearIOSBadgeCount();
     }
   }
 }

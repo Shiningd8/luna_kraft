@@ -11,7 +11,6 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'firebase_app_check_stub.dart';
 import 'dart:io';
 
@@ -21,6 +20,7 @@ import '/flutter_flow/app_state.dart' as ff_app_state;
 import 'package:stream_transform/stream_transform.dart';
 import 'firebase_auth_manager.dart';
 import 'google_auth.dart';
+import 'apple_auth.dart';
 import 'firebase_user_provider.dart';
 import 'package:luna_kraft/app_state.dart';
 import 'package:luna_kraft/flutter_flow/flutter_flow_util.dart';
@@ -558,100 +558,83 @@ Future<UserCredential?> handleGoogleSignIn(BuildContext context) async {
         context: context,
         barrierColor: Colors.black.withOpacity(0.5),
         builder: (BuildContext context) {
-          return TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0.0, end: 1.0),
-            duration: Duration(milliseconds: 350),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              return Transform.scale(
-                scale: 0.5 + (0.5 * value),
-                child: Opacity(
-                  opacity: value,
-                  child: child,
-                ),
-              );
-            },
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-              child: Dialog(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                insetPadding: EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surface.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.1),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withOpacity(0.2),
-                        blurRadius: 20,
-                        spreadRadius: 1,
-                      ),
-                    ],
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: Offset(0, 10),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              errorIcon,
-                              size: 50,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .error
-                                  .withOpacity(0.8),
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              errorTitle,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              errorMessage,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: 24),
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.primary,
-                                foregroundColor:
-                                    Theme.of(context).colorScheme.onPrimary,
-                                padding: EdgeInsets.symmetric(
-                                    vertical: 12, horizontal: 24),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
+                ],
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Icon(
+                        errorIcon,
+                        color: Theme.of(context).colorScheme.error,
+                        size: 30,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      errorTitle,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      errorMessage,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.8),
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 24),
+                    Container(
+                      width: double.infinity,
+                      child: Center(
+                        child: SizedBox(
+                          width: 120,
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.onPrimary,
+                              padding: EdgeInsets.symmetric(
+                                  vertical: 12, horizontal: 24),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              child: Text('OK'),
                             ),
-                          ],
+                            child: Text('OK'),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -664,6 +647,160 @@ Future<UserCredential?> handleGoogleSignIn(BuildContext context) async {
   } catch (e) {
     // Handle other exceptions
     debugPrint('Unexpected error during Google Sign-In: $e');
+
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Sign In Error'),
+            content:
+                Text('An unexpected error occurred. Please try again later.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    return null;
+  }
+}
+
+// Function to handle Apple Sign-In with error handling
+Future<UserCredential?> handleAppleSignIn(BuildContext context) async {
+  try {
+    return await appleSignInFunc();
+  } on FirebaseAuthException catch (e) {
+    String errorMessage = 'An error occurred during sign in.';
+    String errorTitle = 'Sign In Error';
+    IconData errorIcon = Icons.error_outline;
+
+    // Handle known error codes with user-friendly messages
+    if (e.code == 'apple-signin-unavailable') {
+      errorTitle = 'Apple Sign-In Unavailable';
+      errorMessage = 'Apple Sign-In is not available on this device.';
+      errorIcon = Icons.apple;
+    } else if (e.code == 'apple-signin-failed') {
+      errorTitle = 'Apple Sign-In Failed';
+      errorMessage = 'Apple Sign-In failed. Please try again.';
+      errorIcon = Icons.apple;
+    } else if (e.code == 'account-exists-with-different-credential') {
+      errorTitle = 'Account Exists';
+      errorMessage =
+          'An account already exists with the same email address but different sign-in method. Please try signing in a different way.';
+      errorIcon = Icons.person;
+    } else if (e.code == 'network-request-failed') {
+      errorTitle = 'Network Error';
+      errorMessage = 'Please check your internet connection and try again.';
+      errorIcon = Icons.wifi_off;
+    } else if (e.code.contains('user-disabled')) {
+      errorTitle = 'Account Disabled';
+      errorMessage =
+          'This account has been disabled. Please contact support for help.';
+      errorIcon = Icons.block;
+    }
+
+    // Show error dialog
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (BuildContext context) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Icon(
+                        errorIcon,
+                        color: Theme.of(context).colorScheme.error,
+                        size: 30,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      errorTitle,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      errorMessage,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.8),
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 24),
+                    Container(
+                      width: double.infinity,
+                      child: Center(
+                        child: SizedBox(
+                          width: 120,
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.onPrimary,
+                              padding: EdgeInsets.symmetric(
+                                  vertical: 12, horizontal: 24),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: Text('OK'),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    return null;
+  } catch (e) {
+    // Handle other exceptions
+    debugPrint('Unexpected error during Apple Sign-In: $e');
 
     if (context.mounted) {
       showDialog(

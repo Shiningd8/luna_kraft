@@ -1,6 +1,7 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/widgets/custom_text_form_field.dart';
 import 'package:flutter/material.dart';
 import 'add_post4_model.dart';
 export 'add_post4_model.dart';
@@ -103,65 +104,11 @@ class _AddPost4WidgetState extends State<AddPost4Widget> {
                                     letterSpacing: 0.0,
                                   ),
                             ),
-                            TextFormField(
+                            CustomTextFormField(
                               controller: _model.textController,
                               focusNode: _model.textFieldFocusNode,
-                              autofocus: false,
-                              obscureText: false,
-                              decoration: InputDecoration(
-                                labelStyle: FlutterFlowTheme.of(context)
-                                    .bodyMedium
-                                    .override(
-                                      fontFamily: 'Figtree',
-                                      letterSpacing: 0.0,
-                                    ),
-                                hintText:
-                                    'What did you dream about? Include as many details as you can remember...',
-                                hintStyle: FlutterFlowTheme.of(context)
-                                    .bodyMedium
-                                    .override(
-                                      fontFamily: 'Figtree',
-                                      letterSpacing: 0.0,
-                                    ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color:
-                                        FlutterFlowTheme.of(context).alternate,
-                                    width: 1.0,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12.0),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: Color(0x00000000),
-                                    width: 1.0,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12.0),
-                                ),
-                                errorBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: Color(0x00000000),
-                                    width: 1.0,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12.0),
-                                ),
-                                focusedErrorBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: Color(0x00000000),
-                                    width: 1.0,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12.0),
-                                ),
-                                filled: true,
-                                fillColor: FlutterFlowTheme.of(context)
-                                    .primaryBackground,
-                              ),
-                              style: FlutterFlowTheme.of(context)
-                                  .bodyLarge
-                                  .override(
-                                    fontFamily: 'Figtree',
-                                    letterSpacing: 0.0,
-                                  ),
+                              hintText:
+                                  'What did you dream about? Include as many details as you can remember...',
                               maxLines: 8,
                               minLines: 5,
                               validator: _model.textControllerValidator

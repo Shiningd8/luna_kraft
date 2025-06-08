@@ -27,8 +27,6 @@ class ProfileInputModel extends FlutterFlowModel<ProfileInputWidget> {
   FocusNode? userIDFocusNode;
   TextEditingController? userIDTextController;
   String? Function(BuildContext, String?)? userIDTextControllerValidator;
-  DateTime? datePicked;
-  String? selectedGender;
 
   // Flag to track whether validation errors should be displayed
   bool showValidationErrors = false;

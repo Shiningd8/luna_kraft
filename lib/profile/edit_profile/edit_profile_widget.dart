@@ -5,6 +5,7 @@ import '/backend/firebase_storage/storage.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/widgets/custom_text_form_field.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
@@ -522,13 +523,12 @@ class _EditProfileWidgetState extends State<EditProfileWidget> {
                         ),
                         SizedBox(height: 32),
                         // Display Name Field
-                        TextFormField(
+                        CustomTextFormField(
                           controller: _displayNameController,
+                          hintText: 'Enter your display name',
                           decoration: InputDecoration(
                             labelText: 'Display Name',
-                            labelStyle:
-                                FlutterFlowTheme.of(context).labelMedium,
-                            hintText: 'Enter your display name',
+                            labelStyle: FlutterFlowTheme.of(context).labelMedium,
                             hintStyle: FlutterFlowTheme.of(context).labelMedium,
                             enabledBorder: OutlineInputBorder(
                               borderSide: BorderSide(
@@ -559,12 +559,9 @@ class _EditProfileWidgetState extends State<EditProfileWidget> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             filled: true,
-                            fillColor: FlutterFlowTheme.of(context)
-                                .secondaryBackground,
-                            contentPadding:
-                                EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+                            fillColor: FlutterFlowTheme.of(context).secondaryBackground,
+                            contentPadding: EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
                           ),
-                          style: FlutterFlowTheme.of(context).bodyMedium,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your display name';
@@ -574,13 +571,12 @@ class _EditProfileWidgetState extends State<EditProfileWidget> {
                         ),
                         SizedBox(height: 16),
                         // Username Field
-                        TextFormField(
+                        CustomTextFormField(
                           controller: _usernameController,
+                          hintText: 'Enter your username',
                           decoration: InputDecoration(
                             labelText: 'Username',
-                            labelStyle:
-                                FlutterFlowTheme.of(context).labelMedium,
-                            hintText: 'Enter your username',
+                            labelStyle: FlutterFlowTheme.of(context).labelMedium,
                             hintStyle: FlutterFlowTheme.of(context).labelMedium,
                             enabledBorder: OutlineInputBorder(
                               borderSide: BorderSide(
@@ -611,12 +607,9 @@ class _EditProfileWidgetState extends State<EditProfileWidget> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             filled: true,
-                            fillColor: FlutterFlowTheme.of(context)
-                                .secondaryBackground,
-                            contentPadding:
-                                EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+                            fillColor: FlutterFlowTheme.of(context).secondaryBackground,
+                            contentPadding: EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
                           ),
-                          style: FlutterFlowTheme.of(context).bodyMedium,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your username';

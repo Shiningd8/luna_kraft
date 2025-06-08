@@ -5,6 +5,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/index.dart';
 import '/components/dream_posted_message.dart';
+import '/widgets/custom_text_form_field.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
@@ -349,7 +350,7 @@ class _EditPageWidgetState extends State<EditPageWidget> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextFormField(
+                    CustomTextFormField(
                       controller: _model.textController3,
                       focusNode: _tagsFocusNode,
                       style: FlutterFlowTheme.of(context).bodyLarge.override(
@@ -389,7 +390,7 @@ class _EditPageWidgetState extends State<EditPageWidget> {
                       ),
                       onChanged: _handleTagInput,
                       textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) {
+                      onSubmitted: (_) {
                         _addCurrentTagIfNeeded();
                       },
                     ),
@@ -753,7 +754,7 @@ class _EditPageWidgetState extends State<EditPageWidget> {
                                       width: 1,
                                     ),
                                   ),
-                                  child: TextFormField(
+                                  child: CustomTextFormField(
                                     controller: _model.textController1,
                                     focusNode: _model.textFieldFocusNode1,
                                     style: FlutterFlowTheme.of(context)
@@ -807,7 +808,7 @@ class _EditPageWidgetState extends State<EditPageWidget> {
                                       width: 1,
                                     ),
                                   ),
-                                  child: TextFormField(
+                                  child: CustomTextFormField(
                                     controller: _model.textController2,
                                     focusNode: _model.textFieldFocusNode2,
                                     maxLines: 6,

@@ -46,6 +46,7 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
     return Scaffold(
       key: scaffoldKey,
       backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
+      resizeToAvoidBottomInset: true,
       appBar: responsiveVisibility(
         context: context,
         tabletLandscape: false,
@@ -173,6 +174,16 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
                         focusNode: _model.emailAddressFocusNode,
                         autofillHints: [AutofillHints.email],
                         obscureText: false,
+                        enableInteractiveSelection: true,
+                        contextMenuBuilder: (context, editableTextState) {
+                          // Use the default context menu but with proper positioning
+                          return AdaptiveTextSelectionToolbar.editableText(
+                            editableTextState: editableTextState,
+                          );
+                        },
+                        onTapOutside: (event) {
+                          FocusScope.of(context).unfocus();
+                        },
                         decoration: InputDecoration(
                           labelText: 'Your email address...',
                           labelStyle:
@@ -250,8 +261,8 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
                             return;
                           }
                           await authManager.resetPassword(
-                            email: _model.emailAddressTextController.text,
-                            context: context,
+                            context,
+                            _model.emailAddressTextController.text,
                           );
                         },
                         text: 'Send Link',

@@ -32,6 +32,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Needed for FirebaseFir
 // import 'package:firebase_core/firebase_core.dart'; // Unused import
 // import 'package:firebase_auth/firebase_auth.dart'; // Unused import
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // Remove Unity Ads MethodChannel
 // const MethodChannel _unityChannel = MethodChannel('com.flutterflow.lunakraft/unity_ads');
@@ -1099,7 +1100,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
                     'id': product.id,
                     'title': '${product.amount} Coins',
                     'amount': product.amount,
-                    'price': product.price.replaceAll('\$', ''),
+                    'price': product.price, // Remove the replaceAll to keep original currency
                     'bonus': product.bonus ?? '',
                     'color': _getCoinColor(product.amount),
                   })
@@ -1478,7 +1479,7 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
                                             : 14,
                                     fontWeight: FontWeight.bold,
                                   ),
-                              child: Text('Buy for \$${pack['price']}'),
+                              child: Text('Buy for ${pack['price']}'), // Remove hardcoded $ sign
                             ),
                           ),
                         ),
@@ -2212,6 +2213,16 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
     });
   }
 
+  // URL launcher function
+  void _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      print('Could not launch $url');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2361,6 +2372,114 @@ class _MembershipPageWidgetState extends State<MembershipPageWidget>
                   ),
 
                   SizedBox(height: 24),
+
+                  // Auto-renewal notice and policy links
+                  DelayedAnimation(
+                    delay: Duration(milliseconds: 700),
+                    child: Container(
+                      margin: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Auto-renewal notice
+                          Text(
+                            'Subscription Information',
+                            style: FlutterFlowTheme.of(context).titleSmall.override(
+                                  fontFamily: 'Outfit',
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Subscriptions automatically renew unless canceled at least 24 hours before the end of the current period. You can manage and cancel your subscriptions in your App Store account settings.',
+                            style: FlutterFlowTheme.of(context).bodySmall.override(
+                                  fontFamily: 'Outfit',
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontSize: 12,
+                                ),
+                          ),
+                          SizedBox(height: 16),
+                          
+                          // Policy links
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              // Terms of Use link
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _launchURL('https://lunakraft.com/Landing/terms-of-use.html'),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.2),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Terms of Use',
+                                      textAlign: TextAlign.center,
+                                      style: FlutterFlowTheme.of(context).bodySmall.override(
+                                            fontFamily: 'Outfit',
+                                            color: FlutterFlowTheme.of(context).primary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              
+                              SizedBox(width: 12),
+                              
+                              // Privacy Policy link
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _launchURL('https://lunakraft.com/Landing/privacy-policy.html'),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.2),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Privacy Policy',
+                                      textAlign: TextAlign.center,
+                                      style: FlutterFlowTheme.of(context).bodySmall.override(
+                                            fontFamily: 'Outfit',
+                                            color: FlutterFlowTheme.of(context).primary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                   // Restore purchases button with staggered fade in
                   DelayedAnimation(

@@ -17,7 +17,6 @@ import 'dart:async';
 import 'package:luna_kraft/backend/schema/util/record_data.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -715,6 +714,7 @@ class _SigninWidgetState extends State<SigninWidget>
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
+        resizeToAvoidBottomInset: true,
         body: SafeArea(
           top: true,
           child: Align(
@@ -990,16 +990,12 @@ class _SigninWidgetState extends State<SigninWidget>
                                                     ),
                                                     child: Container(
                                                       width: double.infinity,
-                                                      child: TextFormField(
+                                                      child: CustomTextFormField(
                                                         controller: _model
                                                             .passwordCreateTextController,
                                                         focusNode: _model
                                                             .passwordCreateFocusNode,
                                                         autofocus: true,
-                                                        autofillHints: [
-                                                          AutofillHints
-                                                              .password,
-                                                        ],
                                                         obscureText: !_model
                                                             .passwordCreateVisibility,
                                                         decoration:
@@ -1130,10 +1126,6 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                   letterSpacing:
                                                                       0.0,
                                                                 ),
-                                                        cursorColor:
-                                                            FlutterFlowTheme.of(
-                                                          context,
-                                                        ).primary,
                                                         validator: _model
                                                             .passwordCreateTextControllerValidator
                                                             .asValidator(
@@ -1153,21 +1145,17 @@ class _SigninWidgetState extends State<SigninWidget>
                                                     ),
                                                     child: Container(
                                                       width: double.infinity,
-                                                      child: TextFormField(
+                                                      child: CustomTextFormField(
                                                         controller: _model
                                                             .passwordCreateConfirmTextController,
                                                         focusNode: _model
                                                             .passwordCreateConfirmFocusNode,
                                                         autofocus: true,
-                                                        autofillHints: [
-                                                          AutofillHints
-                                                              .password,
-                                                        ],
                                                         obscureText: !_model
                                                             .passwordCreateConfirmVisibility,
                                                         decoration:
                                                             InputDecoration(
-                                                          labelText: 'Password',
+                                                          labelText: 'Confirm Password',
                                                           labelStyle:
                                                               FlutterFlowTheme
                                                                       .of(
@@ -1293,10 +1281,6 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                   letterSpacing:
                                                                       0.0,
                                                                 ),
-                                                        cursorColor:
-                                                            FlutterFlowTheme.of(
-                                                          context,
-                                                        ).primary,
                                                         validator: _model
                                                             .passwordCreateConfirmTextControllerValidator
                                                             .asValidator(
@@ -1599,131 +1583,145 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                   ),
                                                                 ),
                                                               ),
-                                                              isAndroid
-                                                                  ? Container()
-                                                                  : Padding(
-                                                                      padding:
-                                                                          EdgeInsetsDirectional
-                                                                              .fromSTEB(
-                                                                        0.0,
-                                                                        0.0,
-                                                                        0.0,
-                                                                        16.0,
-                                                                      ),
-                                                                      child:
-                                                                          FFButtonWidget(
-                                                                        onPressed:
-                                                                            () async {
-                                                                          // Disable automatic auth change navigation
-                                                                          AppStateNotifier
-                                                                              .instance
-                                                                              .updateNotifyOnAuthChange(
-                                                                            false,
-                                                                          );
+                                                              Padding(
+                                                                padding:
+                                                                    EdgeInsetsDirectional
+                                                                        .fromSTEB(
+                                                                  0.0,
+                                                                  0.0,
+                                                                  0.0,
+                                                                  16.0,
+                                                                ),
+                                                                child:
+                                                                    FFButtonWidget(
+                                                                  onPressed:
+                                                                      () async {
+                                                                    // Disable automatic auth change navigation to prevent interruption
+                                                                    AppStateNotifier
+                                                                        .instance
+                                                                        .updateNotifyOnAuthChange(
+                                                                      false,
+                                                                    );
 
-                                                                          GoRouter
-                                                                              .of(
-                                                                            context,
-                                                                          ).prepareAuthEvent();
-                                                                          final user =
-                                                                              await authManager.signInWithApple(
-                                                                            context,
-                                                                          );
-                                                                          if (user ==
-                                                                              null) {
-                                                                            return;
-                                                                          }
+                                                                    GoRouter.of(
+                                                                      context,
+                                                                    ).prepareAuthEvent();
+                                                                    final user =
+                                                                        await authManager
+                                                                            .signInWithApple(
+                                                                      context,
+                                                                    );
+                                                                    if (user ==
+                                                                        null) {
+                                                                      return;
+                                                                    }
 
-                                                                          // Check if 2FA is enabled
-                                                                          final is2FAEnabled =
-                                                                              await AuthUtil.isTwoFactorEnabled();
+                                                                    // Check if 2FA is enabled for this user
+                                                                    final is2FAEnabled =
+                                                                        await AuthUtil
+                                                                            .isTwoFactorEnabled();
 
-                                                                          if (mounted) {
-                                                                            if (is2FAEnabled) {
-                                                                              // If 2FA is enabled, redirect to verification
-                                                                              context.pushNamed(
-                                                                                'TwoFactorVerification',
-                                                                                extra: <String, dynamic>{
-                                                                                  'email': user.email,
-                                                                                  kTransitionInfoKey: TransitionInfo(
-                                                                                    hasTransition: true,
-                                                                                    transitionType: PageTransitionType.fade,
-                                                                                    duration: Duration(
-                                                                                      milliseconds: 250,
-                                                                                    ),
-                                                                                  ),
-                                                                                },
-                                                                              );
-                                                                            } else {
-                                                                              // Handle proper navigation flow
-                                                                              await AuthRedirectHandler.navigateAfterAuth(
-                                                                                context,
-                                                                              );
-                                                                            }
-                                                                          }
-                                                                        },
-                                                                        text:
-                                                                            'Continue with Apple',
-                                                                        icon:
-                                                                            FaIcon(
-                                                                          FontAwesomeIcons
-                                                                              .apple,
-                                                                          size:
-                                                                              20.0,
-                                                                        ),
-                                                                        options:
-                                                                            FFButtonOptions(
-                                                                          width:
-                                                                              230.0,
-                                                                          height:
-                                                                              44.0,
-                                                                          padding:
-                                                                              EdgeInsetsDirectional.fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                          ),
-                                                                          iconPadding:
-                                                                              EdgeInsetsDirectional.fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                          ),
-                                                                          color:
-                                                                              FlutterFlowTheme.of(
-                                                                            context,
-                                                                          ).secondaryBackground,
-                                                                          textStyle: FlutterFlowTheme.of(
-                                                                            context,
-                                                                          ).bodyMedium.override(
-                                                                                fontFamily: 'Figtree',
-                                                                                letterSpacing: 0.0,
-                                                                                fontWeight: FontWeight.bold,
+                                                                    if (mounted) {
+                                                                      if (is2FAEnabled) {
+                                                                        // If 2FA is enabled, redirect to the verification page
+                                                                        context
+                                                                            .pushNamed(
+                                                                          'TwoFactorVerification',
+                                                                          extra: <String,
+                                                                              dynamic>{
+                                                                            'email':
+                                                                                user.email,
+                                                                            kTransitionInfoKey:
+                                                                                TransitionInfo(
+                                                                              hasTransition: true,
+                                                                              transitionType: PageTransitionType.fade,
+                                                                              duration: Duration(
+                                                                                milliseconds: 250,
                                                                               ),
-                                                                          elevation:
-                                                                              0.0,
-                                                                          borderSide:
-                                                                              BorderSide(
-                                                                            color:
-                                                                                FlutterFlowTheme.of(
-                                                                              context,
-                                                                            ).alternate,
-                                                                            width:
-                                                                                2.0,
-                                                                          ),
-                                                                          borderRadius:
-                                                                              BorderRadius.circular(
-                                                                            12.0,
-                                                                          ),
-                                                                          hoverColor:
-                                                                              FlutterFlowTheme.of(
-                                                                            context,
-                                                                          ).primaryBackground,
-                                                                        ),
-                                                                      ),
+                                                                            ),
+                                                                          },
+                                                                        );
+                                                                      } else {
+                                                                        // Handle proper navigation flow through profile/onboarding if needed
+                                                                        await AuthRedirectHandler
+                                                                            .navigateAfterAuth(
+                                                                          context,
+                                                                        );
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  text:
+                                                                      'Continue with Apple',
+                                                                  icon: FaIcon(
+                                                                    FontAwesomeIcons
+                                                                        .apple,
+                                                                    size: 20.0,
+                                                                  ),
+                                                                  options:
+                                                                      FFButtonOptions(
+                                                                    width:
+                                                                        230.0,
+                                                                    height:
+                                                                        44.0,
+                                                                    padding:
+                                                                        EdgeInsetsDirectional
+                                                                            .fromSTEB(
+                                                                      0.0,
+                                                                      0.0,
+                                                                      0.0,
+                                                                      0.0,
                                                                     ),
+                                                                    iconPadding:
+                                                                        EdgeInsetsDirectional
+                                                                            .fromSTEB(
+                                                                      0.0,
+                                                                      0.0,
+                                                                      0.0,
+                                                                      0.0,
+                                                                    ),
+                                                                    color:
+                                                                        FlutterFlowTheme
+                                                                            .of(
+                                                                      context,
+                                                                    ).secondaryBackground,
+                                                                    textStyle: FlutterFlowTheme
+                                                                            .of(
+                                                                      context,
+                                                                    )
+                                                                        .bodyMedium
+                                                                        .override(
+                                                                          fontFamily:
+                                                                              'Figtree',
+                                                                          letterSpacing:
+                                                                              0.0,
+                                                                          fontWeight:
+                                                                              FontWeight.bold,
+                                                                        ),
+                                                                    elevation:
+                                                                        0.0,
+                                                                    borderSide:
+                                                                        BorderSide(
+                                                                      color:
+                                                                          FlutterFlowTheme
+                                                                              .of(
+                                                                        context,
+                                                                      ).alternate,
+                                                                      width:
+                                                                          2.0,
+                                                                    ),
+                                                                    borderRadius:
+                                                                        BorderRadius
+                                                                            .circular(
+                                                                      12.0,
+                                                                    ),
+                                                                    hoverColor:
+                                                                        FlutterFlowTheme
+                                                                            .of(
+                                                                      context,
+                                                                    ).primaryBackground,
+                                                                  ),
+                                                                ),
+                                                              ),
                                                             ],
                                                           ),
                                                         ),
@@ -1732,12 +1730,10 @@ class _SigninWidgetState extends State<SigninWidget>
                                                   ),
                                                 ],
                                               ),
-                                            ).animateOnPageLoad(
-                                              animationsMap[
-                                                  'columnOnPageLoadAnimation1']!,
                                             ),
                                           ),
                                         ),
+                                        // Second tab - Log In
                                         Align(
                                           alignment: AlignmentDirectional(
                                             0.0,
@@ -1753,7 +1749,7 @@ class _SigninWidgetState extends State<SigninWidget>
                                             ),
                                             child: SingleChildScrollView(
                                               child: Column(
-                                                mainAxisSize: MainAxisSize.min,
+                                                mainAxisSize: MainAxisSize.max,
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.start,
                                                 children: [
@@ -1817,15 +1813,12 @@ class _SigninWidgetState extends State<SigninWidget>
                                                     ),
                                                     child: Container(
                                                       width: double.infinity,
-                                                      child: TextFormField(
+                                                      child: CustomTextFormField(
                                                         controller: _model
                                                             .emailAddressTextController,
                                                         focusNode: _model
                                                             .emailAddressFocusNode,
                                                         autofocus: true,
-                                                        autofillHints: [
-                                                          AutofillHints.email,
-                                                        ],
                                                         obscureText: false,
                                                         decoration:
                                                             InputDecoration(
@@ -1882,7 +1875,7 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                   FlutterFlowTheme
                                                                       .of(
                                                                 context,
-                                                              ).alternate,
+                                                              ).error,
                                                               width: 2.0,
                                                             ),
                                                             borderRadius:
@@ -1899,7 +1892,7 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                   FlutterFlowTheme
                                                                       .of(
                                                                 context,
-                                                              ).alternate,
+                                                              ).error,
                                                               width: 2.0,
                                                             ),
                                                             borderRadius:
@@ -1915,11 +1908,7 @@ class _SigninWidgetState extends State<SigninWidget>
                                                             context,
                                                           ).secondaryBackground,
                                                           contentPadding:
-                                                              EdgeInsetsDirectional
-                                                                  .fromSTEB(
-                                                            24.0,
-                                                            24.0,
-                                                            0.0,
+                                                              EdgeInsets.all(
                                                             24.0,
                                                           ),
                                                         ),
@@ -1935,10 +1924,6 @@ class _SigninWidgetState extends State<SigninWidget>
                                                         keyboardType:
                                                             TextInputType
                                                                 .emailAddress,
-                                                        cursorColor:
-                                                            FlutterFlowTheme.of(
-                                                          context,
-                                                        ).primary,
                                                         validator: _model
                                                             .emailAddressTextControllerValidator
                                                             .asValidator(
@@ -1958,16 +1943,12 @@ class _SigninWidgetState extends State<SigninWidget>
                                                     ),
                                                     child: Container(
                                                       width: double.infinity,
-                                                      child: TextFormField(
+                                                      child: CustomTextFormField(
                                                         controller: _model
                                                             .passwordTextController,
                                                         focusNode: _model
                                                             .passwordFocusNode,
                                                         autofocus: true,
-                                                        autofillHints: [
-                                                          AutofillHints
-                                                              .password,
-                                                        ],
                                                         obscureText: !_model
                                                             .passwordVisibility,
                                                         decoration:
@@ -2058,11 +2039,7 @@ class _SigninWidgetState extends State<SigninWidget>
                                                             context,
                                                           ).secondaryBackground,
                                                           contentPadding:
-                                                              EdgeInsetsDirectional
-                                                                  .fromSTEB(
-                                                            24.0,
-                                                            24.0,
-                                                            0.0,
+                                                              EdgeInsets.all(
                                                             24.0,
                                                           ),
                                                           suffixIcon: InkWell(
@@ -2102,68 +2079,10 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                   letterSpacing:
                                                                       0.0,
                                                                 ),
-                                                        cursorColor:
-                                                            FlutterFlowTheme.of(
-                                                          context,
-                                                        ).primary,
                                                         validator: _model
                                                             .passwordTextControllerValidator
                                                             .asValidator(
                                                           context,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Align(
-                                                    alignment:
-                                                        AlignmentDirectional(
-                                                            1.0, 0.0),
-                                                    child: Padding(
-                                                      padding:
-                                                          EdgeInsetsDirectional
-                                                              .fromSTEB(
-                                                                  0.0,
-                                                                  0.0,
-                                                                  0.0,
-                                                                  16.0),
-                                                      child: InkWell(
-                                                        onTap: () async {
-                                                          context.pushNamed(
-                                                            ForgotPasswordWidget
-                                                                .routeName,
-                                                            extra: <String,
-                                                                dynamic>{
-                                                              kTransitionInfoKey:
-                                                                  TransitionInfo(
-                                                                hasTransition:
-                                                                    true,
-                                                                transitionType:
-                                                                    PageTransitionType
-                                                                        .fade,
-                                                                duration: Duration(
-                                                                    milliseconds:
-                                                                        250),
-                                                              ),
-                                                            },
-                                                          );
-                                                        },
-                                                        child: Text(
-                                                          'Forgot Password?',
-                                                          style: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .labelMedium
-                                                              .override(
-                                                                fontFamily:
-                                                                    'Figtree',
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .primary,
-                                                                letterSpacing:
-                                                                    0.0,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
-                                                              ),
                                                         ),
                                                       ),
                                                     ),
@@ -2224,15 +2143,10 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                         'Figtree',
                                                                     color: Colors
                                                                         .white,
-                                                                    fontSize:
-                                                                        16.0,
                                                                     letterSpacing:
                                                                         0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold,
                                                                   ),
-                                                          elevation: 0.0,
+                                                          elevation: 3.0,
                                                           borderSide:
                                                               BorderSide(
                                                             color: Colors
@@ -2242,81 +2156,120 @@ class _SigninWidgetState extends State<SigninWidget>
                                                           borderRadius:
                                                               BorderRadius
                                                                   .circular(
-                                                            50.0,
+                                                            12.0,
                                                           ),
-                                                          disabledColor:
-                                                              FlutterFlowTheme
-                                                                      .of(
-                                                            context,
-                                                          )
-                                                                  .secondaryText
-                                                                  .withOpacity(
-                                                                    0.5,
-                                                                  ),
                                                         ),
                                                       ),
                                                     ),
                                                   ),
-                                                  Align(
-                                                    alignment:
-                                                        AlignmentDirectional(
-                                                      0.0,
-                                                      0.0,
-                                                    ),
-                                                    child: Padding(
-                                                      padding:
-                                                          EdgeInsetsDirectional
-                                                              .fromSTEB(
-                                                        16.0,
-                                                        0.0,
-                                                        16.0,
-                                                        24.0,
+                                                  Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.max,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      Padding(
+                                                        padding:
+                                                            EdgeInsetsDirectional
+                                                                .fromSTEB(
+                                                          0.0,
+                                                          12.0,
+                                                          0.0,
+                                                          12.0,
+                                                        ),
+                                                        child: InkWell(
+                                                          splashColor: Colors
+                                                              .transparent,
+                                                          focusColor: Colors
+                                                              .transparent,
+                                                          hoverColor: Colors
+                                                              .transparent,
+                                                          highlightColor: Colors
+                                                              .transparent,
+                                                          onTap: () async {
+                                                            context.pushNamed(
+                                                              'ForgotPassword',
+                                                            );
+                                                          },
+                                                          child: Text(
+                                                            'Forgot Password?',
+                                                            style:
+                                                                FlutterFlowTheme
+                                                                        .of(
+                                                              context,
+                                                            )
+                                                                    .bodyMedium
+                                                                    .override(
+                                                                      fontFamily:
+                                                                          'Figtree',
+                                                                      color: FlutterFlowTheme
+                                                                              .of(
+                                                                        context,
+                                                                      ).primary,
+                                                                      letterSpacing:
+                                                                          0.0,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w500,
+                                                                    ),
+                                                          ),
+                                                        ),
                                                       ),
-                                                      child: Text(
-                                                        'Or sign in with',
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        style:
-                                                            FlutterFlowTheme.of(
-                                                          context,
-                                                        ).labelMedium.override(
-                                                                  fontFamily:
-                                                                      'Figtree',
-                                                                  color: Colors
-                                                                      .white,
-                                                                  letterSpacing:
-                                                                      0.0,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                      ),
-                                                    ),
+                                                    ],
                                                   ),
-                                                  Align(
-                                                    alignment:
-                                                        AlignmentDirectional(
-                                                      0.0,
-                                                      0.0,
-                                                    ),
-                                                    child: Wrap(
-                                                      spacing: 16.0,
-                                                      runSpacing: 0.0,
-                                                      alignment:
-                                                          WrapAlignment.center,
-                                                      crossAxisAlignment:
-                                                          WrapCrossAlignment
-                                                              .center,
-                                                      direction:
-                                                          Axis.horizontal,
-                                                      runAlignment:
-                                                          WrapAlignment.center,
-                                                      verticalDirection:
-                                                          VerticalDirection
-                                                              .down,
-                                                      clipBehavior: Clip.none,
-                                                      children: [
-                                                        Padding(
+                                                  Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.max,
+                                                    children: [
+                                                      Align(
+                                                        alignment:
+                                                            AlignmentDirectional(
+                                                          0.0,
+                                                          0.0,
+                                                        ),
+                                                        child: Padding(
+                                                          padding:
+                                                              EdgeInsetsDirectional
+                                                                  .fromSTEB(
+                                                            16.0,
+                                                            0.0,
+                                                            16.0,
+                                                            24.0,
+                                                          ),
+                                                          child: Text(
+                                                            'Or sign in with',
+                                                            textAlign: TextAlign
+                                                                .center,
+                                                            style:
+                                                                FlutterFlowTheme
+                                                                        .of(
+                                                              context,
+                                                            )
+                                                                    .labelMedium
+                                                                    .override(
+                                                                      fontFamily:
+                                                                          'Figtree',
+                                                                      color:
+                                                                          Color(
+                                                                        0xFFFFFEFE,
+                                                                      ),
+                                                                      letterSpacing:
+                                                                          0.0,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .bold,
+                                                                    ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Align(
+                                                        alignment:
+                                                            AlignmentDirectional(
+                                                          0.0,
+                                                          0.0,
+                                                        ),
+                                                        child: Padding(
                                                           padding:
                                                               EdgeInsetsDirectional
                                                                   .fromSTEB(
@@ -2325,133 +2278,27 @@ class _SigninWidgetState extends State<SigninWidget>
                                                             0.0,
                                                             16.0,
                                                           ),
-                                                          child: FFButtonWidget(
-                                                            onPressed:
-                                                                () async {
-                                                              GoRouter.of(
-                                                                context,
-                                                              ).prepareAuthEvent();
-                                                              final user =
-                                                                  await authManager
-                                                                      .signInWithGoogle(
-                                                                context,
-                                                              );
-                                                              if (user ==
-                                                                  null) {
-                                                                return;
-                                                              }
-
-                                                              // Check if 2FA is enabled for this user
-                                                              final is2FAEnabled =
-                                                                  await AuthUtil
-                                                                      .isTwoFactorEnabled();
-
-                                                              if (mounted) {
-                                                                if (is2FAEnabled) {
-                                                                  // If 2FA is enabled, redirect to the verification page
-                                                                  context
-                                                                      .pushNamed(
-                                                                    'TwoFactorVerification',
-                                                                    extra: <String,
-                                                                        dynamic>{
-                                                                      'email': user
-                                                                          .email,
-                                                                      kTransitionInfoKey:
-                                                                          TransitionInfo(
-                                                                        hasTransition:
-                                                                            true,
-                                                                        transitionType:
-                                                                            PageTransitionType.fade,
-                                                                        duration:
-                                                                            Duration(
-                                                                          milliseconds:
-                                                                              250,
-                                                                        ),
-                                                                      ),
-                                                                    },
-                                                                  );
-                                                                } else {
-                                                                  // Handle proper navigation flow through profile/onboarding if needed
-                                                                  await AuthRedirectHandler
-                                                                      .navigateAfterAuth(
-                                                                    context,
-                                                                  );
-                                                                }
-                                                              }
-                                                            },
-                                                            text:
-                                                                'Continue with Google',
-                                                            icon: FaIcon(
-                                                              FontAwesomeIcons
-                                                                  .google,
-                                                              size: 20.0,
-                                                            ),
-                                                            options:
-                                                                FFButtonOptions(
-                                                              width: 230.0,
-                                                              height: 44.0,
-                                                              padding:
-                                                                  EdgeInsetsDirectional
-                                                                      .fromSTEB(
-                                                                0.0,
-                                                                0.0,
-                                                                0.0,
-                                                                0.0,
-                                                              ),
-                                                              iconPadding:
-                                                                  EdgeInsetsDirectional
-                                                                      .fromSTEB(
-                                                                0.0,
-                                                                0.0,
-                                                                0.0,
-                                                                0.0,
-                                                              ),
-                                                              color:
-                                                                  FlutterFlowTheme
-                                                                      .of(
-                                                                context,
-                                                              ).secondaryBackground,
-                                                              textStyle:
-                                                                  FlutterFlowTheme
-                                                                          .of(
-                                                                context,
-                                                              )
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Figtree',
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.bold,
-                                                                      ),
-                                                              elevation:
-                                                                  0.0,
-                                                              borderSide:
-                                                                  BorderSide(
-                                                                color:
-                                                                    FlutterFlowTheme
-                                                                        .of(
-                                                                  context,
-                                                                ).alternate,
-                                                                width: 2.0,
-                                                              ),
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                12.0,
-                                                              ),
-                                                              hoverColor:
-                                                                  FlutterFlowTheme
-                                                                      .of(
-                                                                context,
-                                                              ).primaryBackground,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        isAndroid
-                                                            ? Container()
-                                                            : Padding(
+                                                          child: Wrap(
+                                                            spacing: 16.0,
+                                                            runSpacing: 0.0,
+                                                            alignment:
+                                                                WrapAlignment
+                                                                    .center,
+                                                            crossAxisAlignment:
+                                                                WrapCrossAlignment
+                                                                    .center,
+                                                            direction:
+                                                                Axis.horizontal,
+                                                            runAlignment:
+                                                                WrapAlignment
+                                                                    .center,
+                                                            verticalDirection:
+                                                                VerticalDirection
+                                                                    .down,
+                                                            clipBehavior:
+                                                                Clip.none,
+                                                            children: [
+                                                              Padding(
                                                                 padding:
                                                                     EdgeInsetsDirectional
                                                                         .fromSTEB(
@@ -2464,7 +2311,146 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                     FFButtonWidget(
                                                                   onPressed:
                                                                       () async {
-                                                                    // Disable automatic auth change navigation
+                                                                    // Disable automatic auth change navigation to prevent interruption
+                                                                    AppStateNotifier
+                                                                        .instance
+                                                                        .updateNotifyOnAuthChange(
+                                                                      false,
+                                                                    );
+
+                                                                    GoRouter.of(
+                                                                      context,
+                                                                    ).prepareAuthEvent();
+                                                                    final user =
+                                                                        await authManager
+                                                                            .signInWithGoogle(
+                                                                      context,
+                                                                    );
+                                                                    if (user ==
+                                                                        null) {
+                                                                      return;
+                                                                    }
+
+                                                                    // Check if 2FA is enabled for this user
+                                                                    final is2FAEnabled =
+                                                                        await AuthUtil
+                                                                            .isTwoFactorEnabled();
+
+                                                                    if (mounted) {
+                                                                      if (is2FAEnabled) {
+                                                                        // If 2FA is enabled, redirect to the verification page
+                                                                        context
+                                                                            .pushNamed(
+                                                                          'TwoFactorVerification',
+                                                                          extra: <String,
+                                                                              dynamic>{
+                                                                            'email':
+                                                                                user.email,
+                                                                            kTransitionInfoKey:
+                                                                                TransitionInfo(
+                                                                              hasTransition: true,
+                                                                              transitionType: PageTransitionType.fade,
+                                                                              duration: Duration(
+                                                                                milliseconds: 250,
+                                                                              ),
+                                                                            ),
+                                                                          },
+                                                                        );
+                                                                      } else {
+                                                                        // Handle proper navigation flow through profile/onboarding if needed
+                                                                        await AuthRedirectHandler
+                                                                            .navigateAfterAuth(
+                                                                          context,
+                                                                        );
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  text:
+                                                                      'Continue with Google',
+                                                                  icon: FaIcon(
+                                                                    FontAwesomeIcons
+                                                                        .google,
+                                                                    size: 20.0,
+                                                                  ),
+                                                                  options:
+                                                                      FFButtonOptions(
+                                                                    width:
+                                                                        230.0,
+                                                                    height:
+                                                                        44.0,
+                                                                    padding:
+                                                                        EdgeInsetsDirectional
+                                                                            .fromSTEB(
+                                                                      0.0,
+                                                                      0.0,
+                                                                      0.0,
+                                                                      0.0,
+                                                                    ),
+                                                                    iconPadding:
+                                                                        EdgeInsetsDirectional
+                                                                            .fromSTEB(
+                                                                      0.0,
+                                                                      0.0,
+                                                                      0.0,
+                                                                      0.0,
+                                                                    ),
+                                                                    color:
+                                                                        FlutterFlowTheme
+                                                                            .of(
+                                                                      context,
+                                                                    ).secondaryBackground,
+                                                                    textStyle: FlutterFlowTheme
+                                                                            .of(
+                                                                      context,
+                                                                    )
+                                                                        .bodyMedium
+                                                                        .override(
+                                                                          fontFamily:
+                                                                              'Figtree',
+                                                                          letterSpacing:
+                                                                              0.0,
+                                                                          fontWeight:
+                                                                              FontWeight.bold,
+                                                                        ),
+                                                                    elevation:
+                                                                        0.0,
+                                                                    borderSide:
+                                                                        BorderSide(
+                                                                      color:
+                                                                          FlutterFlowTheme
+                                                                              .of(
+                                                                        context,
+                                                                      ).alternate,
+                                                                      width:
+                                                                          2.0,
+                                                                    ),
+                                                                    borderRadius:
+                                                                        BorderRadius
+                                                                            .circular(
+                                                                      12.0,
+                                                                    ),
+                                                                    hoverColor:
+                                                                        FlutterFlowTheme
+                                                                            .of(
+                                                                      context,
+                                                                    ).primaryBackground,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              Padding(
+                                                                padding:
+                                                                    EdgeInsetsDirectional
+                                                                        .fromSTEB(
+                                                                  0.0,
+                                                                  0.0,
+                                                                  0.0,
+                                                                  16.0,
+                                                                ),
+                                                                child:
+                                                                    FFButtonWidget(
+                                                                  onPressed:
+                                                                      () async {
+                                                                    // Disable automatic auth change navigation to prevent interruption
                                                                     AppStateNotifier
                                                                         .instance
                                                                         .updateNotifyOnAuthChange(
@@ -2484,14 +2470,14 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                       return;
                                                                     }
 
-                                                                    // Check if 2FA is enabled
+                                                                    // Check if 2FA is enabled for this user
                                                                     final is2FAEnabled =
                                                                         await AuthUtil
                                                                             .isTwoFactorEnabled();
 
                                                                     if (mounted) {
                                                                       if (is2FAEnabled) {
-                                                                        // If 2FA is enabled, redirect to verification
+                                                                        // If 2FA is enabled, redirect to the verification page
                                                                         context
                                                                             .pushNamed(
                                                                           'TwoFactorVerification',
@@ -2510,7 +2496,7 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                           },
                                                                         );
                                                                       } else {
-                                                                        // Handle proper navigation flow
+                                                                        // Handle proper navigation flow through profile/onboarding if needed
                                                                         await AuthRedirectHandler
                                                                             .navigateAfterAuth(
                                                                           context,
@@ -2590,14 +2576,14 @@ class _SigninWidgetState extends State<SigninWidget>
                                                                   ),
                                                                 ),
                                                               ),
-                                                      ],
-                                                    ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ],
                                               ),
-                                            ).animateOnPageLoad(
-                                              animationsMap[
-                                                  'columnOnPageLoadAnimation2']!,
                                             ),
                                           ),
                                         ),

@@ -72,7 +72,61 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
     _model.userIDFocusNode ??= FocusNode();
     _model.userIDFocusNode?.addListener(_handleFocusChange);
 
+    // Auto-populate display name from multiple sources
+    _autoPopulateDisplayName();
+
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+  }
+
+  Future<void> _autoPopulateDisplayName() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      String? displayName;
+
+      // First, try to get the name from Firebase Auth
+      if (currentUser.displayName != null && currentUser.displayName!.isNotEmpty) {
+        displayName = currentUser.displayName!;
+        debugPrint('Using display name from Firebase Auth: $displayName');
+      } else {
+        // If Firebase Auth doesn't have the name, try to get it from stored Apple data
+        displayName = await _getStoredAppleDisplayName(currentUser.uid);
+        if (displayName != null && displayName.isNotEmpty) {
+          debugPrint('Using display name from stored Apple data: $displayName');
+          
+          // Update Firebase Auth with the retrieved name for future use
+          await currentUser.updateDisplayName(displayName);
+        }
+      }
+
+      // Set the display name in the text controller if we found one
+      if (displayName != null && displayName.isNotEmpty && mounted) {
+        safeSetState(() {
+          _model.displayNameTextController?.text = displayName!;
+        });
+        debugPrint('Auto-populated display name: $displayName');
+      }
+    } catch (e) {
+      debugPrint('Error auto-populating display name: $e');
+    }
+  }
+
+  Future<String?> _getStoredAppleDisplayName(String uid) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('apple_user_data')
+          .doc(uid)
+          .get();
+      
+      if (doc.exists) {
+        final data = doc.data();
+        return data?['apple_display_name'] as String?;
+      }
+    } catch (e) {
+      debugPrint('Error retrieving stored Apple display name: $e');
+    }
+    return null;
   }
 
   void _handleFocusChange() {
@@ -106,6 +160,7 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+        resizeToAvoidBottomInset: true,
         extendBodyBehindAppBar: true,
         appBar: PreferredSize(
           preferredSize: Size.fromHeight(60),
@@ -127,8 +182,45 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
                     size: 24.0,
                   ),
                   onPressed: () async {
-                    // Try to pop first, if that fails, navigate to sign in
-                    if (!await Navigator.maybePop(context)) {
+                    // Get the current user
+                    final currentUser = FirebaseAuth.instance.currentUser;
+                    
+                    if (currentUser != null) {
+                      try {
+                        // Delete the incomplete user document if it exists
+                        final userDocRef = FirebaseFirestore.instance
+                            .collection('User')
+                            .doc(currentUser.uid);
+                            
+                        final userDoc = await userDocRef.get();
+                        if (userDoc.exists) {
+                          await userDocRef.delete();
+                          print('Deleted incomplete user profile data');
+                        }
+                        
+                        // Delete the user authentication
+                        await currentUser.delete();
+                        print('Deleted user authentication');
+                        
+                        // Navigate to sign in page without checking onboarding
+                        if (mounted) {
+                          // Ensure auth navigation is enabled
+                          AppStateNotifier.instance.updateNotifyOnAuthChange(true);
+                          context.goNamed('Signin');
+                        }
+                      } catch (e) {
+                        print('Error cleaning up user data: $e');
+                        // If we can't delete the user (requires recent login), just sign out
+                        await FirebaseAuth.instance.signOut();
+                        if (mounted) {
+                          // Ensure auth navigation is enabled
+                          AppStateNotifier.instance.updateNotifyOnAuthChange(true);
+                          context.goNamed('Signin');
+                        }
+                      }
+                    } else {
+                      // If no user is signed in, just navigate back
+                      AppStateNotifier.instance.updateNotifyOnAuthChange(true);
                       context.goNamed('Signin');
                     }
                   },
@@ -539,8 +631,6 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
               'email': currentUser.email,
               'created_time': getCurrentTimestamp,
               'last_updated': getCurrentTimestamp,
-              'date_of_birth': _model.datePicked,
-              'gender': _model.selectedGender,
               'uid': currentUser.uid,
               'phone_number': currentUser.phoneNumber,
               'is_profile_complete': true,
@@ -916,12 +1006,7 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
         ),
         SizedBox(height: 20),
 
-        // Date of Birth field
-        buildDateSelector(),
-        SizedBox(height: 20),
-
-        // Gender field
-        buildGenderSelector(),
+        // Date of birth and gender fields removed - not needed for core app functionality
       ],
     );
   }
@@ -956,6 +1041,13 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
             textCapitalization: textCapitalization,
             textInputAction: TextInputAction.next,
             obscureText: false,
+            enableInteractiveSelection: true,
+            contextMenuBuilder: (context, editableTextState) {
+              // Use the default context menu but with proper positioning
+              return AdaptiveTextSelectionToolbar.editableText(
+                editableTextState: editableTextState,
+              );
+            },
             decoration: InputDecoration(
               labelText: labelText,
               labelStyle: FlutterFlowTheme.of(context).labelMedium.override(
@@ -1026,6 +1118,9 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
               // When a field is tapped, we don't immediately show validation errors
               // They will only show up if the form is submitted or the field loses focus
             },
+            onTapOutside: (PointerDownEvent event) {
+              FocusScope.of(context).unfocus();
+            },
             onChanged: (value) {
               // Clear validation state if user is typing
               if (_model.showValidationErrors) {
@@ -1064,303 +1159,6 @@ class _ProfileInputWidgetState extends State<ProfileInputWidget> {
               },
             ),
         ],
-      ),
-    );
-  }
-
-  // Date selector field
-  Widget buildDateSelector() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: FlutterFlowTheme.of(context).primaryText.withOpacity(0.08),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: InkWell(
-        splashColor: Colors.transparent,
-        focusColor: Colors.transparent,
-        hoverColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        onTap: () async {
-          await showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-            ),
-            builder: (BuildContext context) => Container(
-              height: MediaQuery.of(context).size.height / 3,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: FlutterFlowTheme.of(context).alternate,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                  Text(
-                    'Select Date of Birth',
-                    style: FlutterFlowTheme.of(context).titleMedium,
-                  ),
-                  Expanded(
-                    child: CupertinoTheme(
-                      data: CupertinoTheme.of(context).copyWith(
-                        textTheme:
-                            CupertinoTheme.of(context).textTheme.copyWith(
-                                  dateTimePickerTextStyle:
-                                      FlutterFlowTheme.of(context).titleMedium,
-                                ),
-                      ),
-                      child: CupertinoDatePicker(
-                        mode: CupertinoDatePickerMode.date,
-                        minimumDate: DateTime(1920),
-                        initialDateTime:
-                            _model.datePicked ?? DateTime(2000, 1, 1),
-                        maximumDate:
-                            DateTime.now().subtract(Duration(days: 365 * 13)),
-                        backgroundColor:
-                            FlutterFlowTheme.of(context).secondaryBackground,
-                        use24hFormat: false,
-                        onDateTimeChanged: (newDateTime) => safeSetState(() {
-                          _model.datePicked = newDateTime;
-                        }),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-        child: Container(
-          width: double.infinity,
-          height: 60,
-          decoration: BoxDecoration(
-            color: FlutterFlowTheme.of(context).secondaryBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: FlutterFlowTheme.of(context).alternate.withOpacity(0.5),
-              width: 1,
-            ),
-          ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.calendar_today_rounded,
-                  color: FlutterFlowTheme.of(context).primary,
-                  size: 22,
-                ),
-                SizedBox(width: 12),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Date of Birth',
-                      style: FlutterFlowTheme.of(context).bodySmall.override(
-                            fontFamily: 'Figtree',
-                            color: FlutterFlowTheme.of(context).secondaryText,
-                          ),
-                    ),
-                    Text(
-                      _model.datePicked != null
-                          ? dateTimeFormat('MMM d, y', _model.datePicked)
-                          : 'Select date',
-                      style: FlutterFlowTheme.of(context).bodyMedium,
-                    ),
-                  ],
-                ),
-                Spacer(),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: FlutterFlowTheme.of(context).secondaryText,
-                  size: 16,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Gender selector field
-  Widget buildGenderSelector() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: FlutterFlowTheme.of(context).primaryText.withOpacity(0.08),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: InkWell(
-        splashColor: Colors.transparent,
-        focusColor: Colors.transparent,
-        hoverColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        onTap: () async {
-          await showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-            ),
-            builder: (context) => Container(
-              padding: EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: FlutterFlowTheme.of(context).alternate,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Select Gender',
-                    style: FlutterFlowTheme.of(context).titleMedium,
-                  ),
-                  SizedBox(height: 24),
-                  buildGenderOption('Male', Icons.male),
-                  SizedBox(height: 12),
-                  buildGenderOption('Female', Icons.female),
-                  SizedBox(height: 12),
-                  buildGenderOption('Other', Icons.person),
-                  SizedBox(height: 16),
-                ],
-              ),
-            ),
-          );
-        },
-        child: Container(
-          width: double.infinity,
-          height: 60,
-          decoration: BoxDecoration(
-            color: FlutterFlowTheme.of(context).secondaryBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: FlutterFlowTheme.of(context).alternate.withOpacity(0.5),
-              width: 1,
-            ),
-          ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.person_outline_rounded,
-                  color: FlutterFlowTheme.of(context).primary,
-                  size: 22,
-                ),
-                SizedBox(width: 12),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Gender',
-                      style: FlutterFlowTheme.of(context).bodySmall.override(
-                            fontFamily: 'Figtree',
-                            color: FlutterFlowTheme.of(context).secondaryText,
-                          ),
-                    ),
-                    Text(
-                      _model.selectedGender ?? 'Select gender',
-                      style: FlutterFlowTheme.of(context).bodyMedium,
-                    ),
-                  ],
-                ),
-                Spacer(),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: FlutterFlowTheme.of(context).secondaryText,
-                  size: 16,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Gender option item
-  Widget buildGenderOption(String gender, IconData icon) {
-    bool isSelected = _model.selectedGender == gender;
-
-    return InkWell(
-      onTap: () {
-        safeSetState(() {
-          _model.selectedGender = gender;
-        });
-        Navigator.pop(context);
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? FlutterFlowTheme.of(context).primary.withOpacity(0.1)
-              : FlutterFlowTheme.of(context).secondaryBackground,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? FlutterFlowTheme.of(context).primary
-                : FlutterFlowTheme.of(context).alternate,
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: FlutterFlowTheme.of(context).primary,
-            ),
-            SizedBox(width: 16),
-            Text(
-              gender,
-              style: FlutterFlowTheme.of(context).bodyMedium.override(
-                    fontFamily: 'Figtree',
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-            ),
-            Spacer(),
-            if (isSelected)
-              Icon(
-                Icons.check_circle,
-                color: FlutterFlowTheme.of(context).primary,
-                size: 20,
-              ),
-          ],
-        ),
       ),
     );
   }

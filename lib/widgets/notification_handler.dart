@@ -41,7 +41,7 @@ class _NotificationHandlerState extends State<NotificationHandler>
       AppStateTracker().setForeground();
       
       // Clear badge count when app starts
-      _clearIOSBadgeCount();
+      NotificationService().clearIOSBadgeCount();
     } else {
       AppStateTracker().setBackground();
     }
@@ -119,7 +119,7 @@ class _NotificationHandlerState extends State<NotificationHandler>
       AppStateTracker().setForeground();
       
       // Clear badge count when app becomes active
-      _clearIOSBadgeCount();
+      NotificationService().clearIOSBadgeCount();
       
       // App became active, we can listen to notifications
       _setupNotificationListener();

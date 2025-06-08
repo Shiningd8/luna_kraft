@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '/components/base_layout.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 export '/auth/firebase_auth/auth_util.dart';
 // Export pages
@@ -66,6 +67,14 @@ class _AppInitializerState extends State<AppInitializer> {
           Theme.of(context).textTheme,
         ),
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', ''),
+      ],
       home: FutureBuilder<bool>(
         future: _isInitialized,
         builder: (context, snapshot) {
